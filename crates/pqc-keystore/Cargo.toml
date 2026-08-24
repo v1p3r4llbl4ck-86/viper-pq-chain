@@ -24,7 +24,7 @@ serde_json = { version = "1", features = ["arbitrary_precision"] }
 zeroize = { version = "1", features = ["derive"] }
 sha2 = "0.10"
 sha3 = "0.10"
-pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+pbkdf2 = { version = "0.13", default-features = false, features = ["hmac"] }
 bip39 = { version = "2", default-features = false }
 rand = "0.9"
 argon2 = "0.5"

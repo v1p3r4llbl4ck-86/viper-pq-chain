@@ -51,7 +51,7 @@ rand = "0.9"
 rpassword = "7"
 sha2 = "0.10"
 hmac = "0.12"
-pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+pbkdf2 = { version = "0.13", default-features = false, features = ["hmac"] }
 sha3 = "0.10"
 ciborium.workspace = true
 # TASK-188a — cold-storage rotation (block batches → zstd → cold S3).
