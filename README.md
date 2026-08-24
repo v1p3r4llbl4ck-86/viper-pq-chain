@@ -32,6 +32,9 @@ At genesis the author runs the first validator, two sentries and a bootnode, and
 | public read API | `https://rpc.pqchain.agwswebconsulting.it/v1/status` |
 | P2P seed for your node | `boot1.pqchain.agwswebconsulting.it:26656` |
 
+None of these answers before genesis: the names are reserved, the services come up with the
+chain. Genesis is announced in [ROADMAP.md](ROADMAP.md) and on the repository's Releases page.
+
 Anyone can run a full, rpc or archive node; validators are admitted by the existing set.
 [docs/validator-onboarding.md](docs/validator-onboarding.md) is the join guide.
 
