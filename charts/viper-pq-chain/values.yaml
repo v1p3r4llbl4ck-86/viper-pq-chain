@@ -114,6 +114,13 @@ chainNode:
     podAnnotations: {}
     podLabels: {}
     extraEnv: []
+    # G-01 (ADR-069): Secret with keys `libp2p_seed_salt_hex` and
+    # `kem_seed_salt_hex` (32 bytes hex each). pqcd mixes them into the
+    # libp2p and ML-KEM identity derivations so neither identity can be
+    # recomputed from the public node_id. `pqcd ceremony` emits one Secret
+    # per role and sets this per role; without it pqcd warns at startup.
+    identitySalts:
+      secretName: ""
     # Logging: tracing-subscriber RUST_LOG filter.
     rustLog: "viper_notary=info,pqcd=info,tower_http=warn"
     # Storage class is applied to PersistentVolumeClaim.

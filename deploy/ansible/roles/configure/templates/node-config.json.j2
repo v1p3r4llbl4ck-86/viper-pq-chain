@@ -28,6 +28,12 @@
   ],
   "devnet": {
     "role": "{{ viper_role }}",
+{% if viper_libp2p_seed_salt_hex is defined %}
+    "libp2p_seed_salt_hex": "{{ viper_libp2p_seed_salt_hex }}",
+{% endif %}
+{% if viper_kem_seed_salt_hex is defined %}
+    "kem_seed_salt_hex": "{{ viper_kem_seed_salt_hex }}",
+{% endif %}
     "sync_interval_ms": {{ viper_sync_interval_ms }},
     "block_time_ms":    {{ viper_block_time_ms }},
 {% if viper_role == 'validator' %}

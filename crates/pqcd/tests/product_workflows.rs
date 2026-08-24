@@ -40,6 +40,18 @@ use pqcd::{
 };
 use tokio::time::{self, Duration, Instant};
 
+/// TASK-239: every deadline in this file is multiplied by
+/// `PQCD_TEST_TIME_SCALE` (default 1.0) so a loaded or slow machine can
+/// stretch them without touching the tests (`PQCD_TEST_TIME_SCALE=3`).
+fn scaled(d: Duration) -> Duration {
+    let factor = std::env::var("PQCD_TEST_TIME_SCALE")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|f| *f > 0.0)
+        .unwrap_or(1.0);
+    d.mul_f64(factor)
+}
+
 // ── Test constants ─────────────────────────────────────────────────────────────
 
 /// Genesis anchor used in all tests — [0x11; 32] matches multi_node_devnet.rs.
@@ -566,7 +578,7 @@ async fn vault_create_flows_through_devnet_and_follower_converges() -> Result<()
 
     // Wait for height 1 before injecting so the nodes are fully running.
     producer
-        .wait_for_height(1, Duration::from_secs(5))
+        .wait_for_height(1, scaled(Duration::from_secs(5)))
         .await
         .context("producer must reach height 1")?;
 
@@ -583,7 +595,7 @@ async fn vault_create_flows_through_devnet_and_follower_converges() -> Result<()
     // enough ticks to include the tx (even if the first tick after injection
     // is in progress during ML-DSA signing when we inject).
     let snapshots =
-        wait_for_convergence_at(&[&producer, &follower], 3, Duration::from_secs(8)).await?;
+        wait_for_convergence_at(&[&producer, &follower], 3, scaled(Duration::from_secs(8))).await?;
 
     // No sync errors on either node.
     assert!(
@@ -599,7 +611,7 @@ async fn vault_create_flows_through_devnet_and_follower_converges() -> Result<()
     // The tx may have been included in the block just before convergence was
     // detected; the state write and the convergence poll are not atomic.
     {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(5));
         loop {
             if producer.account_balance(&new_vault_address).await.is_some() {
                 break;
@@ -681,7 +693,7 @@ async fn attestation_create_flows_through_devnet_and_follower_converges() -> Res
 
     // Wait for height 1 before injecting so the nodes are fully running.
     producer
-        .wait_for_height(1, Duration::from_secs(5))
+        .wait_for_height(1, scaled(Duration::from_secs(5)))
         .await
         .context("producer must reach height 1")?;
 
@@ -697,7 +709,7 @@ async fn attestation_create_flows_through_devnet_and_follower_converges() -> Res
     // This mirrors the attestation_revoke test which uses the same strategy and
     // avoids a race between disk-height convergence and state visibility.
     {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
+        let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(8));
         loop {
             if producer.attestation_exists(&attestation_id).await {
                 break;
@@ -712,7 +724,7 @@ async fn attestation_create_flows_through_devnet_and_follower_converges() -> Res
     }
 
     let snapshots =
-        wait_for_convergence_at(&[&producer, &follower], 3, Duration::from_secs(8)).await?;
+        wait_for_convergence_at(&[&producer, &follower], 3, scaled(Duration::from_secs(8))).await?;
 
     assert!(
         snapshots.iter().all(|s| s.last_sync_error.is_none()),
@@ -777,7 +789,7 @@ async fn vault_and_attestation_survive_follower_restart() -> Result<()> {
 
     // Wait for height 1 before injecting.
     producer
-        .wait_for_height(1, Duration::from_secs(5))
+        .wait_for_height(1, scaled(Duration::from_secs(5)))
         .await
         .context("producer must reach height 1")?;
 
@@ -792,7 +804,7 @@ async fn vault_and_attestation_survive_follower_restart() -> Result<()> {
     // Wait for vault_create to be committed so sender nonce becomes 1.
     // We wait for a height increase AND verify the vault account exists.
     producer
-        .wait_for_height_advance(1, Duration::from_secs(5))
+        .wait_for_height_advance(1, scaled(Duration::from_secs(5)))
         .await
         .context("producer must advance height after vault injection")?;
 
@@ -800,7 +812,7 @@ async fn vault_and_attestation_survive_follower_restart() -> Result<()> {
     // This guards against the case where the height advanced but the vault
     // tx was not yet included (e.g. block was empty and tx arrives next tick).
     {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+        let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(5));
         loop {
             if producer.account_balance(&new_vault_address).await.is_some() {
                 break;
@@ -827,7 +839,7 @@ async fn vault_and_attestation_survive_follower_restart() -> Result<()> {
     // Convergence at height=4 is necessary but not sufficient — it's possible for the
     // cluster to reach height 4 before the attestation tx is included in any block.
     {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
+        let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(8));
         loop {
             if producer.attestation_exists(&attestation_id).await {
                 break;
@@ -845,7 +857,7 @@ async fn vault_and_attestation_survive_follower_restart() -> Result<()> {
     let before_restart = wait_for_convergence_at(
         &[&producer, &follower],
         target_height,
-        Duration::from_secs(10),
+        scaled(Duration::from_secs(10)),
     )
     .await?;
 
@@ -872,8 +884,12 @@ async fn vault_and_attestation_survive_follower_restart() -> Result<()> {
     follower.shutdown().await?;
 
     // Producer keeps running — advance a few more blocks.
-    let _ =
-        wait_for_convergence_at(&[&producer], converged_height + 2, Duration::from_secs(5)).await?;
+    let _ = wait_for_convergence_at(
+        &[&producer],
+        converged_height + 2,
+        scaled(Duration::from_secs(5)),
+    )
+    .await?;
 
     // Phase 3: restart the follower from persisted disk state; it must catch up.
     let follower_restarted = start_from_config_path(&follower_cfg_path).await?;
@@ -881,7 +897,7 @@ async fn vault_and_attestation_survive_follower_restart() -> Result<()> {
     let after_restart = wait_for_convergence_at(
         &[&producer, &follower_restarted],
         converged_height + 2,
-        Duration::from_secs(10),
+        scaled(Duration::from_secs(10)),
     )
     .await?;
 
@@ -985,7 +1001,7 @@ async fn tx_submit_via_http_api_admitted_and_included() -> Result<()> {
 
     // Wait for the node to produce its first block before submitting.
     producer
-        .wait_for_height(1, Duration::from_secs(5))
+        .wait_for_height(1, scaled(Duration::from_secs(5)))
         .await
         .context("producer must reach height 1")?;
 
@@ -1060,7 +1076,7 @@ async fn tx_submit_via_http_api_admitted_and_included() -> Result<()> {
 
     // ── Verify the tx was included in a block ────────────────────────────────
     // Wait until the vault account appears in producer state (tx included).
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
+    let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(5));
     loop {
         if producer.account_balance(&new_vault_address).await.is_some() {
             break;
@@ -1121,7 +1137,7 @@ async fn attestation_revoke_flows_through_devnet_and_follower_converges() -> Res
     let follower = start_from_config_path(&follower_cfg_path).await?;
 
     producer
-        .wait_for_height(1, Duration::from_secs(5))
+        .wait_for_height(1, scaled(Duration::from_secs(5)))
         .await
         .context("producer must reach height 1")?;
 
@@ -1134,7 +1150,7 @@ async fn attestation_revoke_flows_through_devnet_and_follower_converges() -> Res
         .context("attestation_create injection must succeed")?;
 
     // Wait for the attestation to be committed before revoking.
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
+    let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(8));
     loop {
         if producer.attestation_exists(&attestation_id).await {
             break;
@@ -1157,7 +1173,7 @@ async fn attestation_revoke_flows_through_devnet_and_follower_converges() -> Res
     wait_for_convergence_at(
         &[&producer, &follower],
         5, // need at least 5 blocks to include both txs
-        Duration::from_secs(10),
+        scaled(Duration::from_secs(10)),
     )
     .await?;
 
@@ -1169,7 +1185,7 @@ async fn attestation_revoke_flows_through_devnet_and_follower_converges() -> Res
     // — and on a CI-slow run the convergence deadline (10s) above can
     // already have consumed most of its budget. Cheap CI insurance.
     {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
+        let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(8));
         loop {
             if producer.attestation_status(&attestation_id).await
                 == Some(AttestationStatus::Revoked)
@@ -1186,7 +1202,7 @@ async fn attestation_revoke_flows_through_devnet_and_follower_converges() -> Res
         }
     }
     {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
+        let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(8));
         loop {
             if follower.attestation_status(&attestation_id).await
                 == Some(AttestationStatus::Revoked)
@@ -1251,7 +1267,7 @@ async fn proof_anchor_flows_through_devnet_and_follower_converges() -> Result<()
     let follower = start_from_config_path(&follower_cfg_path).await?;
 
     producer
-        .wait_for_height(1, Duration::from_secs(5))
+        .wait_for_height(1, scaled(Duration::from_secs(5)))
         .await
         .context("producer must reach height 1")?;
 
@@ -1267,7 +1283,7 @@ async fn proof_anchor_flows_through_devnet_and_follower_converges() -> Result<()
         .context("proof_anchor injection must succeed")?;
 
     // ── Step 2: wait for the anchor to be committed ───────────────────────────
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
+    let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(8));
     loop {
         if producer.proof_anchor_record(&anchor_id).await.is_some() {
             break;
@@ -1279,7 +1295,7 @@ async fn proof_anchor_flows_through_devnet_and_follower_converges() -> Result<()
     }
 
     // ── Step 3: wait for follower convergence ─────────────────────────────────
-    wait_for_convergence_at(&[&producer, &follower], 3, Duration::from_secs(10)).await?;
+    wait_for_convergence_at(&[&producer, &follower], 3, scaled(Duration::from_secs(10))).await?;
 
     // ── Step 4: verify record on both nodes ───────────────────────────────────
     let prod_record = producer
@@ -1366,7 +1382,7 @@ async fn validator_register_flows_through_devnet_and_follower_converges() -> Res
 
     // Baseline: 3 Active validators from the genesis config on both nodes.
     producer
-        .wait_for_height(1, Duration::from_secs(5))
+        .wait_for_height(1, scaled(Duration::from_secs(5)))
         .await
         .context("producer must reach height 1")?;
     let baseline = producer.active_validator_addresses().await;
@@ -1418,7 +1434,7 @@ async fn validator_register_flows_through_devnet_and_follower_converges() -> Res
     // Wait until both nodes converge with the register tx committed. A
     // couple of blocks is enough — same timing envelope as vault_create.
     let snapshots =
-        wait_for_convergence_at(&[&producer, &follower], 3, Duration::from_secs(8)).await?;
+        wait_for_convergence_at(&[&producer, &follower], 3, scaled(Duration::from_secs(8))).await?;
     assert!(
         snapshots.iter().all(|s| s.last_sync_error.is_none()),
         "no sync errors expected: {:?}",
@@ -1437,7 +1453,7 @@ async fn validator_register_flows_through_devnet_and_follower_converges() -> Res
     // safety margin and does not change healthy-path behaviour. Polling
     // step kept at 50ms (well below the 200ms block tick) so detection
     // latency stays sub-tick.
-    let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
+    let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(8));
     let expected_operator = sender_address();
     loop {
         let prod = producer.active_validator_addresses().await;
@@ -1530,7 +1546,7 @@ async fn validator_exit_flows_through_devnet_and_follower_converges() -> Result<
     let follower = start_from_config_path(&follower_cfg_path).await?;
 
     producer
-        .wait_for_height(1, Duration::from_secs(5))
+        .wait_for_height(1, scaled(Duration::from_secs(5)))
         .await
         .context("producer must reach height 1")?;
 
@@ -1577,7 +1593,7 @@ async fn validator_exit_flows_through_devnet_and_follower_converges() -> Result<
     // register tx to have hit committed state first.
     let expected_operator = sender_address();
     {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
+        let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(8));
         loop {
             let prod_active = producer.active_validator_addresses().await;
             if prod_active.len() == 4 && prod_active.contains(&expected_operator) {
@@ -1618,7 +1634,8 @@ async fn validator_exit_flows_through_devnet_and_follower_converges() -> Result<
 
     // Wait for both nodes to converge with the exit tx committed.
     let snapshots =
-        wait_for_convergence_at(&[&producer, &follower], 5, Duration::from_secs(12)).await?;
+        wait_for_convergence_at(&[&producer, &follower], 5, scaled(Duration::from_secs(12)))
+            .await?;
     assert!(
         snapshots.iter().all(|s| s.last_sync_error.is_none()),
         "no sync errors expected"
@@ -1634,7 +1651,7 @@ async fn validator_exit_flows_through_devnet_and_follower_converges() -> Result<
     // two. 5s gave no slack; 8s costs nothing on healthy runs and
     // removes the CI-slow flake.
     {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
+        let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(8));
         loop {
             let prod = producer.active_validator_addresses().await;
             let fol = follower.active_validator_addresses().await;
@@ -1812,7 +1829,7 @@ async fn rapid_fire_multi_operator_validator_registrations_converge() -> Result<
     let follower = start_from_config_path(&follower_cfg_path).await?;
 
     producer
-        .wait_for_height(1, Duration::from_secs(5))
+        .wait_for_height(1, scaled(Duration::from_secs(5)))
         .await
         .context("producer must reach height 1")?;
 
@@ -1861,7 +1878,8 @@ async fn rapid_fire_multi_operator_validator_registrations_converge() -> Result<
     // Typical commit latency is 200ms/block — 5 txs should fit within 3-4
     // blocks even if only one lands per block. 15 s gives a generous margin.
     let snapshots =
-        wait_for_convergence_at(&[&producer, &follower], 5, Duration::from_secs(15)).await?;
+        wait_for_convergence_at(&[&producer, &follower], 5, scaled(Duration::from_secs(15)))
+            .await?;
     assert!(
         snapshots.iter().all(|s| s.last_sync_error.is_none()),
         "no sync errors expected"
@@ -1877,7 +1895,7 @@ async fn rapid_fire_multi_operator_validator_registrations_converge() -> Result<
     // ticks.
     let expected_ops: Vec<Address> = operators.iter().map(|(a, _, _)| a.clone()).collect();
     {
-        let deadline = tokio::time::Instant::now() + Duration::from_secs(30);
+        let deadline = tokio::time::Instant::now() + scaled(Duration::from_secs(30));
         loop {
             let prod = producer.active_validator_addresses().await;
             let fol = follower.active_validator_addresses().await;
@@ -2081,7 +2099,7 @@ async fn three_node_distributed_signing_converges() -> Result<()> {
     // upper bound: 45 s. With block_time_ms=500 + quorum_wait_ms=1500
     // each block takes ~2 s; allowing ~5 blocks plus libp2p mesh
     // formation.
-    let deadline = Instant::now() + Duration::from_secs(45);
+    let deadline = Instant::now() + scaled(Duration::from_secs(45));
     let target_height: u64 = 5;
     loop {
         if Instant::now() >= deadline {
@@ -2327,7 +2345,7 @@ async fn three_node_distributed_signing_20x_determinism() -> Result<()> {
         // Same convergence loop as the parent test, identical timing
         // budget — drift here would produce false failures unrelated to
         // consensus determinism.
-        let deadline = Instant::now() + Duration::from_secs(45);
+        let deadline = Instant::now() + scaled(Duration::from_secs(45));
         loop {
             if Instant::now() >= deadline {
                 for (i, h) in handles.iter().enumerate() {
@@ -2767,7 +2785,7 @@ async fn external_validator_registers_and_participates_in_quorum() -> Result<()>
     // (register-to-Active): up to 30 s; phase 3 (proposer-rotation
     // window of 5 blocks ≈ 10 s with slack): up to 20 s. Sum 80 s
     // leaves 10 s margin.
-    let overall_deadline = Instant::now() + Duration::from_secs(90);
+    let overall_deadline = Instant::now() + scaled(Duration::from_secs(90));
 
     // ── Phase 1: initial 4-node convergence at height ≥ 5 ─────────────────
     //
