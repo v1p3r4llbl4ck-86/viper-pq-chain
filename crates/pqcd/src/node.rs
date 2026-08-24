@@ -1038,6 +1038,29 @@ pub(crate) fn load_node_config(config_path: &Path) -> Result<NodeConfig> {
         }
     }
 
+    // G-01 (ADR-069): the identity salts come from a Secret in the chart
+    // (`chainNode.<role>.identitySalts.secretName`) and reach the process
+    // as environment variables, so node.json — a ConfigMap — never holds
+    // them. An empty variable leaves whatever node.json declared.
+    for (var, field) in [
+        (
+            "VIPER_LIBP2P_SEED_SALT_HEX",
+            &mut config.devnet.libp2p_seed_salt_hex,
+        ),
+        (
+            "VIPER_KEM_SEED_SALT_HEX",
+            &mut config.devnet.kem_seed_salt_hex,
+        ),
+    ] {
+        if let Ok(value) = std::env::var(var) {
+            let trimmed = value.trim();
+            if !trimmed.is_empty() {
+                tracing::info!(variable = var, "identity salt taken from the environment");
+                *field = Some(trimmed.to_string());
+            }
+        }
+    }
+
     Ok(config)
 }
 

@@ -677,3 +677,44 @@ fn configs_roles_examples_match_their_role() {
     }
     assert_eq!(seen, 6);
 }
+
+#[test]
+fn identity_salt_env_overrides_node_json() {
+    let dir = std::env::temp_dir().join(format!(
+        "pqcd-salt-override-{}",
+        SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos()
+    ));
+    fs::create_dir_all(&dir).unwrap();
+    let path = dir.join("node.json");
+    let mut cfg = lint_config(NodeRole::Full, false, None);
+    cfg.devnet.libp2p_seed_salt_hex = Some("11".repeat(32));
+    fs::write(&path, serde_json::to_string(&cfg).unwrap()).unwrap();
+
+    env::remove_var("VIPER_LIBP2P_SEED_SALT_HEX");
+    env::remove_var("VIPER_KEM_SEED_SALT_HEX");
+    let loaded = load_node_config(&path).unwrap();
+    assert_eq!(
+        loaded.devnet.libp2p_seed_salt_hex.as_deref(),
+        Some("11".repeat(32).as_str())
+    );
+    assert_eq!(loaded.devnet.kem_seed_salt_hex, None);
+
+    env::set_var("VIPER_LIBP2P_SEED_SALT_HEX", "22".repeat(32));
+    env::set_var("VIPER_KEM_SEED_SALT_HEX", " 33".repeat(32));
+    let loaded = load_node_config(&path);
+    env::remove_var("VIPER_LIBP2P_SEED_SALT_HEX");
+    env::remove_var("VIPER_KEM_SEED_SALT_HEX");
+    let loaded = loaded.unwrap();
+    assert_eq!(
+        loaded.devnet.libp2p_seed_salt_hex.as_deref(),
+        Some("22".repeat(32).as_str())
+    );
+    assert_eq!(
+        loaded.devnet.kem_seed_salt_hex.as_deref(),
+        Some(" 33".repeat(32).trim())
+    );
+    let _ = fs::remove_dir_all(&dir);
+}

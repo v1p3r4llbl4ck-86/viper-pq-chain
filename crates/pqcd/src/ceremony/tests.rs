@@ -76,7 +76,7 @@ fn ceremony_values_have_expected_top_level_keys() {
         namespace: "viper".into(),
         deploy_token: None,
     };
-    let (values, validators) = generate_ceremony_values(&cfg).unwrap();
+    let (values, validators, _) = generate_ceremony_values(&cfg).unwrap();
     assert_eq!(validators.len(), 3);
     // Top-level Helm keys the chart consumes.
     for key in ["image", "chain", "chainNode", "notary", "kubernetes"] {
@@ -129,8 +129,8 @@ fn build_secrets_manifest_emits_validator_consensus_secret() {
         namespace: "viper".into(),
         deploy_token: None,
     };
-    let (_values, validators) = generate_ceremony_values(&cfg).unwrap();
-    let yaml = build_secrets_manifest(&cfg, "viper", &validators).unwrap();
+    let (_values, validators, salts) = generate_ceremony_values(&cfg).unwrap();
+    let yaml = build_secrets_manifest(&cfg, "viper", &validators, &salts).unwrap();
     assert!(yaml.contains("kind: Secret"));
     assert!(yaml.contains("name: viper-validator-1-consensus"));
     assert!(yaml.contains("consensus_seed:"));
@@ -156,8 +156,8 @@ fn build_secrets_manifest_appends_dockerconfigjson_for_deploy_token() {
             password: "abc123token".into(),
         }),
     };
-    let (_values, validators) = generate_ceremony_values(&cfg).unwrap();
-    let yaml = build_secrets_manifest(&cfg, "viper", &validators).unwrap();
+    let (_values, validators, salts) = generate_ceremony_values(&cfg).unwrap();
+    let yaml = build_secrets_manifest(&cfg, "viper", &validators, &salts).unwrap();
     assert!(yaml.contains("kubernetes.io/dockerconfigjson"));
     assert!(yaml.contains("name: viper-registry-pull"));
     // The decoded `.dockerconfigjson` should round-trip back to the
@@ -192,22 +192,47 @@ fn libp2p_wires_validator_multiaddr_into_sentry_and_full_bootstrap_peers() {
         namespace: "beta".into(),
         deploy_token: None,
     };
-    let (values, _) = generate_ceremony_values(&cfg).unwrap();
+    let (values, _, identity_salts) = generate_ceremony_values(&cfg).unwrap();
     // G-01: every role's node.json carries its own libp2p / KEM salts and the
     // PeerIds the ceremony bakes into bootstrap lists are derived WITH them.
     let salt_of = |role: &str| -> [u8; 32] {
+        let entry = identity_salts
+            .iter()
+            .find(|s| s.role.as_str() == role)
+            .unwrap_or_else(|| panic!("{role}: identity salts"));
+        assert_eq!(
+            entry.libp2p_seed_salt_hex.len(),
+            64,
+            "{role}: 32-byte libp2p salt"
+        );
+        assert_eq!(
+            entry.kem_seed_salt_hex.len(),
+            64,
+            "{role}: 32-byte KEM salt"
+        );
+        assert_ne!(entry.libp2p_seed_salt_hex, entry.kem_seed_salt_hex);
+        // The salts live in Secrets, never in node.json (a ConfigMap), and
+        // the values point every role at its Secret.
         let node_json = values["chainNode"][role]["config"]["nodeJson"]
             .as_str()
             .unwrap();
-        let parsed: serde_json::Value = serde_json::from_str(node_json).unwrap();
-        let hex_salt = parsed["devnet"]["libp2p_seed_salt_hex"]
-            .as_str()
-            .unwrap_or_else(|| panic!("{role}: libp2p_seed_salt_hex"));
-        let kem = parsed["devnet"]["kem_seed_salt_hex"].as_str().unwrap();
-        assert_eq!(hex_salt.len(), 64, "{role}: 32-byte libp2p salt");
-        assert_eq!(kem.len(), 64, "{role}: 32-byte KEM salt");
-        assert_ne!(hex_salt, kem, "{role}: the two salts differ");
-        hex::decode(hex_salt).unwrap().try_into().unwrap()
+        assert!(
+            !node_json.contains("seed_salt_hex"),
+            "{role}: node.json carries no salt"
+        );
+        assert_eq!(
+            values["chainNode"][role]["identitySalts"]["secretName"].as_str(),
+            Some(entry.secret_name.as_str()),
+            "{role}: identitySalts.secretName"
+        );
+        assert_eq!(
+            entry.secret_name,
+            format!("alfa-viper-pq-chain-pqcd-{role}-identity")
+        );
+        hex::decode(&entry.libp2p_seed_salt_hex)
+            .unwrap()
+            .try_into()
+            .unwrap()
     };
     assert_ne!(
         salt_of("validator"),
@@ -315,7 +340,7 @@ fn deploy_token_emits_pull_secret_block() {
             password: "abc123token".into(),
         }),
     };
-    let (values, _) = generate_ceremony_values(&cfg).unwrap();
+    let (values, _, _identity_salts) = generate_ceremony_values(&cfg).unwrap();
     let pull_secrets = values["image"]["pullSecrets"].as_array().unwrap();
     assert_eq!(pull_secrets.len(), 1);
     assert_eq!(pull_secrets[0]["name"], "viper-registry-pull");
@@ -327,4 +352,42 @@ fn deploy_token_emits_pull_secret_block() {
         .find(|s| s["name"] == "viper-registry-pull")
         .expect("registry pull secret missing");
     assert_eq!(registry_secret["type"], "kubernetes.io/dockerconfigjson");
+}
+
+#[test]
+fn build_secrets_manifest_emits_one_identity_secret_per_role() {
+    let cfg = CeremonyConfig {
+        chain_id: "viper-pq-test".into(),
+        validators: 1,
+        block_time_ms: 500,
+        genesis_balance: 1_000_000_000,
+        image_repository: "ghcr.io/example".into(),
+        image_tag: "main".into(),
+        release_name: "alfa".into(),
+        namespace: "beta".into(),
+        deploy_token: None,
+    };
+    let (_values, validators, salts) = generate_ceremony_values(&cfg).unwrap();
+    assert_eq!(salts.len(), 6);
+    let yaml = build_secrets_manifest(&cfg, "beta", &validators, &salts).unwrap();
+    for role in ["validator", "sentry", "full", "rpc", "archive", "bootnode"] {
+        assert!(
+            yaml.contains(&format!("name: alfa-viper-pq-chain-pqcd-{role}-identity")),
+            "{role}: identity Secret"
+        );
+    }
+    assert_eq!(yaml.matches("libp2p_seed_salt_hex: ").count(), 6);
+    assert_eq!(yaml.matches("kem_seed_salt_hex: ").count(), 6);
+    let mut all: Vec<&str> = salts
+        .iter()
+        .flat_map(|s| {
+            [
+                s.libp2p_seed_salt_hex.as_str(),
+                s.kem_seed_salt_hex.as_str(),
+            ]
+        })
+        .collect();
+    all.sort_unstable();
+    all.dedup();
+    assert_eq!(all.len(), 12, "every salt is distinct");
 }
