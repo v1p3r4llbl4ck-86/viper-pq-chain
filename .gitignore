@@ -28,8 +28,6 @@ Thumbs.db
 *.log
 
 # Research source inputs (not committed)
-pq_chain_foundation_v2.md
-deep-research-report.md
 
 # Ansible inventory — contains real IPs and credentials
 deploy/ansible/inventory/hosts.yml
@@ -51,6 +49,7 @@ sdk/typescript/package-lock.json
 
 # Generated reports and monitoring artifacts
 reports/*
+!reports/README.md
 !reports/fuzzing/
 reports/fuzzing/*
 !reports/fuzzing/README.md
