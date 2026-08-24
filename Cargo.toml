@@ -31,7 +31,7 @@ serde = { version = "1", features = ["derive"] }
 # Hex encoding for hashes and keys
 hex = "0.4"
 # Base64 encoding for API tx_bytes transport
-base64 = "0.22"
+base64 = "0.23"
 # Hashing — SHAKE-256 (XOF, FIPS 202) used for tx hashing, address derivation, roots
 sha3 = "0.10"
 # Post-quantum signatures — ML-DSA (FIPS 204) pure-Rust implementation
