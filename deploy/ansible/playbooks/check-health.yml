@@ -1,0 +1,15 @@
+---
+# check-health.yml — non-destructive cluster health check
+#
+# Probes each node's API and systemd state.
+# Safe to run at any time; never modifies node state.
+
+- name: Health Check — Viper PQ Chain Devnet
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  tasks:
+    - name: Run monitoring checks
+      include_role:
+        name: monitoring

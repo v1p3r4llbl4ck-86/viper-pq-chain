@@ -1,0 +1,84 @@
+---
+- name: Download Zabbix 7.4 repo package
+  shell: >
+    wget -q -O /tmp/zabbix-release.deb
+    "https://repo.zabbix.com/zabbix/7.4/release/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.4-1+ubuntu{{ ansible_distribution_version }}_all.deb"
+  args:
+    creates: /tmp/zabbix-release.deb
+  tags: zabbix
+
+- name: Install Zabbix repo
+  apt:
+    deb: /tmp/zabbix-release.deb
+    state: present
+  tags: zabbix
+
+- name: Update apt cache after adding Zabbix repo
+  apt:
+    update_cache: yes
+  tags: zabbix
+
+- name: Install zabbix-agent
+  apt:
+    name: zabbix-agent
+    state: present
+  tags: zabbix
+
+- name: Create Zabbix PSK key file
+  copy:
+    content: "{{ zabbix_psk_secret }}"
+    dest: /etc/zabbix/psk.key
+    owner: zabbix
+    group: zabbix
+    mode: '0600'
+  notify: Restart zabbix-agent
+  tags: zabbix
+
+- name: Deploy zabbix_agentd.conf
+  template:
+    src: zabbix_agentd.conf.j2
+    dest: /etc/zabbix/zabbix_agentd.conf
+    owner: root
+    group: zabbix
+    mode: '0640'
+  notify: Restart zabbix-agent
+  tags: zabbix
+
+- name: Ensure zabbix_agentd.d include directory exists
+  file:
+    path: /etc/zabbix/zabbix_agentd.d
+    state: directory
+    owner: root
+    group: zabbix
+    mode: '0750'
+  tags: zabbix
+
+- name: Deploy Viper UserParameters
+  template:
+    src: viper-agent-params.conf.j2
+    dest: /etc/zabbix/zabbix_agentd.d/viper.conf
+    owner: root
+    group: zabbix
+    mode: '0640'
+  notify: Restart zabbix-agent
+  tags: zabbix
+
+- name: Allow Zabbix passive checks from server
+  command: ufw allow from {{ zabbix_server_ip }} to any port 10050 proto tcp
+  changed_when: false
+  tags: zabbix
+
+- name: Add zabbix user to pqchain group (for audit-log readability)
+  user:
+    name: zabbix
+    groups: pqchain
+    append: yes
+  notify: Restart zabbix-agent
+  tags: zabbix
+
+- name: Enable and start zabbix-agent
+  systemd:
+    name: zabbix-agent
+    enabled: yes
+    state: started
+  tags: zabbix

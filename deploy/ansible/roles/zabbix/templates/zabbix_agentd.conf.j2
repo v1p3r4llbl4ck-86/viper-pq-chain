@@ -1,0 +1,22 @@
+# Managed by Ansible — do not edit manually
+
+PidFile=/run/zabbix/zabbix_agentd.pid
+
+LogFile=/var/log/zabbix/zabbix_agentd.log
+LogFileSize=0
+
+Server={{ zabbix_server_ip }}
+ServerActive={{ zabbix_server_ip }}:10051
+Hostname={{ zabbix_hostname | default(inventory_hostname) }}
+
+StartAgents={{ zabbix_start_agents | default(5) }}
+
+TLSConnect=psk
+TLSAccept=psk
+TLSPSKIdentity={{ zabbix_psk_identity | default(inventory_hostname) }}
+TLSPSKFile=/etc/zabbix/psk.key
+
+AllowKey=system.run[*]
+UnsafeUserParameters=1
+
+Include=/etc/zabbix/zabbix_agentd.d/*.conf

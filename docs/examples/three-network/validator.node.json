@@ -1,0 +1,67 @@
+{
+  "_comment": "Validator node — TASK-219 three-network role. Binds ONLY validator_listen (private network). Holds signing keys. Does NOT publicly listen. Dials VFN(s) outbound via libp2p.bootstrap_peers.",
+  "node_id": "validator-1",
+  "chain_id_hex": "<chain_id_hex from the published genesis>",
+  "data_dir": "/var/lib/pqchain/validator-1",
+  "anchor_prev_hash_hex": "<32-byte hex from genesis>",
+  "fee_params": {
+    "base_fee": 100,
+    "byte_fee": 10,
+    "sigverify_fee_v_a": 60,
+    "sigverify_fee_v_b": 600,
+    "sigverify_fee_v_c": 6000,
+    "exec_fee_per_gas": 1
+  },
+  "p2p_listen_addr": null,
+  "api_listen_addr": "127.0.0.1:26657",
+  "peers": [],
+  "devnet": {
+    "role": "validator",
+    "sync_interval_ms": 1000,
+    "block_time_ms": 500,
+    "proposer_address_hex": "<32-byte hex of this validator's operator address>",
+    "epoch_duration": 60,
+    "unbonding_period": 120,
+    "validators": [
+      {
+        "node_id": "validator-1",
+        "address_hex": "<32-byte hex>",
+        "sig_alg_id": 1,
+        "public_key_hex": "<ML-DSA-65 pk hex>",
+        "commit_seed_hex": "<32-byte hex — KEEP SECRET>"
+      }
+    ],
+    "keystore_path": "/etc/pqchain/keystore.json"
+  },
+  "genesis_accounts": [],
+  "rate_limit": {
+    "max_requests_per_window": 100,
+    "window_secs": 60
+  },
+  "sender_budget": {
+    "max_admits_per_window": 50,
+    "window_secs": 60
+  },
+  "libp2p": {
+    "_comment": "Three-network role: validator. Bind ONLY the private network. NO public_listen — pqcd's TASK-219 lint will WARN at boot if this changes.",
+    "enable": true,
+    "validator_listen": "/ip4/10.0.0.10/tcp/26656",
+    "vfn_listen": null,
+    "public_listen": null,
+    "bootstrap_peers": [
+      "/ip4/10.0.0.20/tcp/26666/p2p/<vfn-1 PeerId>",
+      "/ip4/10.0.0.21/tcp/26666/p2p/<vfn-2 PeerId>",
+      "/ip4/10.0.0.22/tcp/26666/p2p/<vfn-3 PeerId>"
+    ],
+    "gossip_mesh_n": 4,
+    "gossip_mesh_n_low": 2,
+    "gossip_mesh_n_high": 6,
+    "quic_enabled": true,
+    "tcp_tls_fallback": true,
+    "max_peers_per_asn": 3,
+    "validator_peer_ids": [
+      "<peer-id-of-validator-2>",
+      "<peer-id-of-validator-3>"
+    ]
+  }
+}

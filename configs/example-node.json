@@ -1,0 +1,52 @@
+{
+  "_comment": "Example PQ Chain node configuration. Copy to /etc/pqchain/node.json and edit before use.",
+  "node_id": "node-1",
+  "chain_id_hex": "7071636861696e2d6465766e65742d3031",
+  "data_dir": "/var/lib/pqchain",
+  "anchor_prev_hash_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+  "fee_params": {
+    "base_fee": 500,
+    "byte_fee": 2,
+    "sigverify_fee_v_a": 8800,
+    "sigverify_fee_v_b": 14000,
+    "sigverify_fee_v_c": 810000,
+    "exec_fee_per_gas": 43
+  },
+  "p2p_listen_addr": "0.0.0.0:26656",
+  "peers": [
+    {
+      "_comment": "Static local devnet peers. Followers can point only at the producer for TASK-031.",
+      "node_id": "node-2",
+      "p2p_addr": "127.0.0.1:26666"
+    },
+    {
+      "node_id": "node-3",
+      "p2p_addr": "127.0.0.1:26676"
+    }
+  ],
+  "devnet": {
+    "_comment": "Use single_node for standalone bootstrap/status/API, producer for local block production, follower for catch-up from static peers.",
+    "role": "single_node",
+    "sync_interval_ms": 250,
+    "block_time_ms": 1000,
+    "proposer_address_hex": "9999999999999999999999999999999999999999999999999999999999999999"
+  },
+  "genesis_accounts": [
+    {
+      "_comment": "Validator genesis account. address_hex = derive_address(pk_hex, alg_id, key_version).",
+      "address_hex": "replace_with_derived_address",
+      "balance": 1000000000,
+      "nonce": 0,
+      "keys": [
+        {
+          "alg_id": 1,
+          "pk_hex": "replace_with_ml_dsa_65_public_key_hex",
+          "key_version": 1,
+          "valid_from_height": 0,
+          "status": "active",
+          "allowed_tx_types": 4294967295
+        }
+      ]
+    }
+  ]
+}

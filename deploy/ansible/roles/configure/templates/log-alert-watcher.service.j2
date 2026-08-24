@@ -1,0 +1,18 @@
+[Unit]
+Description=Viper PQ Chain — local journal alert watcher
+Documentation=file://{{ viper_repo_path | default('/opt/viper-pq-chain') }}/scripts/log-alert-watcher.sh
+After=pqcd.service
+Wants=pqcd.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/viper-log-alert-watcher.sh
+# We INTENTIONALLY do not StandardOutput=journal here for the watcher
+# itself — its own logs would feed back into the next tick's scan and
+# produce false positives. Send the watcher's own stdout to /dev/null
+# (systemd default for oneshot) and rely on the alerts.jsonl file +
+# Prometheus textfile counters as the durable signal.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

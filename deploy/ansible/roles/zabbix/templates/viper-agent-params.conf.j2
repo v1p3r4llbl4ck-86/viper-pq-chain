@@ -1,0 +1,77 @@
+# Managed by Ansible — do not edit manually
+# Viper PQ Chain — Zabbix UserParameter set
+#
+# All keys are prefixed `viper.*` so they're easy to filter in the Zabbix
+# server UI. Each parameter is a one-liner that ANY of the 3 hosts can
+# answer (every node exposes /v1/metrics on 26657 and writes the same
+# alert/audit files).
+#
+# Items are passive — Zabbix server polls the agent every interval. Set
+# UpdateInterval in the Zabbix template (typical: 60s for counters,
+# 30s for height/peers, 300s for audit/alert counts).
+#
+# Cost: each UserParameter spawns a curl/grep/awk pipeline on poll.
+# With ~10 items × every 60 s = trivial CPU on a modern VM.
+
+# ── Chain state (gauges from /v1/status) ──────────────────────────────
+UserParameter=viper.chain.height,curl -sf -m 5 http://localhost:26657/v1/status | grep -oE '"height":[0-9]+' | grep -oE '[0-9]+'
+UserParameter=viper.chain.epoch,curl -sf -m 5 http://localhost:26657/v1/status | grep -oE '"epoch_number":[0-9]+' | grep -oE '[0-9]+'
+UserParameter=viper.chain.syncing,curl -sf -m 5 http://localhost:26657/v1/status | grep -oE '"syncing":(true|false)' | grep -oE '(true|false)'
+
+# ── Mempool / production (gauges + counters from /v1/metrics) ─────────
+UserParameter=viper.mempool.depth,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_mempool_depth /{print $2}'
+UserParameter=viper.blocks.produced.total,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_blocks_produced_total /{print $2}'
+UserParameter=viper.blocks.imported.total,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_blocks_imported_total /{print $2}'
+UserParameter=viper.txs.admitted.total,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_txs_admitted_total /{print $2}'
+UserParameter=viper.txs.rejected.total,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_txs_rejected_total /{print $2}'
+
+# ── Networking ─────────────────────────────────────────────────────────
+UserParameter=viper.p2p.peers,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_p2p_peers_connected /{print $2}'
+UserParameter=viper.p2p.block_gap.total,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_p2p_block_gap_total /{print $2}'
+UserParameter=viper.p2p.envelope_mismatch.total,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_p2p_envelope_mismatch_total /{print $2}'
+
+# ── Log-event counters (the new logging stack) ─────────────────────────
+UserParameter=viper.log.events.error,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_log_events_total\{level="error"\}/{print $2}'
+UserParameter=viper.log.events.warn,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_log_events_total\{level="warn"\}/{print $2}'
+UserParameter=viper.log.events.info,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_log_events_total\{level="info"\}/{print $2}'
+
+# ── Alert watcher counters (textfile collector — no parsing of logs) ──
+# Parse the Prometheus exposition line `pqchain_alert_total{pattern="X"} N`
+# by anchoring on the literal pattern label and printing the trailing
+# value column ($NF). Empty result → 0 via `|| echo 0`.
+UserParameter=viper.alerts.error_level,grep -E '^pqchain_alert_total\{pattern="error_level"\}' /var/lib/node_exporter/textfile_collector/viper_alerts.prom 2>/dev/null | awk '{print $NF}' | grep . || echo 0
+UserParameter=viper.alerts.panic,grep -E '^pqchain_alert_total\{pattern="panic"\}' /var/lib/node_exporter/textfile_collector/viper_alerts.prom 2>/dev/null | awk '{print $NF}' | grep . || echo 0
+UserParameter=viper.alerts.equivocation,grep -E '^pqchain_alert_total\{pattern="equivocation"\}' /var/lib/node_exporter/textfile_collector/viper_alerts.prom 2>/dev/null | awk '{print $NF}' | grep . || echo 0
+UserParameter=viper.alerts.peer_sync_error,grep -E '^pqchain_alert_total\{pattern="peer_sync_error"\}' /var/lib/node_exporter/textfile_collector/viper_alerts.prom 2>/dev/null | awk '{print $NF}' | grep . || echo 0
+UserParameter=viper.alerts.invalid_signature,grep -E '^pqchain_alert_total\{pattern="invalid_signature"\}' /var/lib/node_exporter/textfile_collector/viper_alerts.prom 2>/dev/null | awk '{print $NF}' | grep . || echo 0
+UserParameter=viper.alerts.chain_halted,grep -E '^pqchain_alert_total\{pattern="chain_halted"\}' /var/lib/node_exporter/textfile_collector/viper_alerts.prom 2>/dev/null | awk '{print $NF}' | grep . || echo 0
+UserParameter=viper.alerts.total,awk '/^pqchain_alert_total\{/{s+=$NF} END{print s+0}' /var/lib/node_exporter/textfile_collector/viper_alerts.prom 2>/dev/null
+
+# ── Audit-log surface (one-liner per file; daily rotation) ────────────
+UserParameter=viper.audit.lines.today,wc -l < /var/log/pqchain/audit/audit-$(date -u +%Y%m%d).jsonl 2>/dev/null || echo 0
+UserParameter=viper.audit.events.block_finalized.today,grep -c '"event":"block_finalized"' /var/log/pqchain/audit/audit-$(date -u +%Y%m%d).jsonl 2>/dev/null || echo 0
+UserParameter=viper.audit.events.process_started.today,grep -c '"event":"process_started"' /var/log/pqchain/audit/audit-$(date -u +%Y%m%d).jsonl 2>/dev/null || echo 0
+
+# ── Stale-tip self-heal — fired count in the rolling window ───────────
+# Zabbix will calculate a delta between polls if you register the item
+# as TYPE=Numeric (unsigned) with PRESERVE-AS-IS storage. Or, simpler,
+# set DELTA(simple change) in the template to graph rate.
+UserParameter=viper.recovery.stale_tip.firings_since_boot,journalctl -u pqcd --since "$(systemctl show -p ActiveEnterTimestamp pqcd | cut -d= -f2)" --no-pager --output=cat 2>/dev/null | grep -c "stale-tip recovery: tip has not advanced"
+
+# ── Canary tx soak (already running on each host via cron) ────────────
+UserParameter=viper.canary.last_status,test -f /var/log/viper-canary/soak.log && tail -1 /var/log/viper-canary/soak.log | awk '{print $2}' || echo "MISSING"
+UserParameter=viper.canary.lines_today,grep -c "^\[$(date -u +%Y-%m-%d)" /var/log/viper-canary/soak.log 2>/dev/null || echo 0
+UserParameter=viper.canary.failures_today,grep -c "^\[$(date -u +%Y-%m-%d)T.*\] FAIL " /var/log/viper-canary/soak.log 2>/dev/null || echo 0
+
+# ── Process supervision ────────────────────────────────────────────────
+UserParameter=viper.process.uptime_seconds,ps -o etimes= -p $(pidof pqcd 2>/dev/null) 2>/dev/null | tr -d ' ' || echo 0
+UserParameter=viper.process.rss_kb,ps -o rss= -p $(pidof pqcd 2>/dev/null) 2>/dev/null | tr -d ' ' || echo 0
+
+# ── Chain disk-size + growth (TASK-187) ───────────────────────────────
+# Both gauges sourced from /v1/metrics. Growth-rate value is a float
+# (negative after a prune / compaction). Disk-free-percent is computed
+# from `df --output=pcent` on the data-dir mount and inverted (df gives
+# `Use%`, we expose `Free%`).
+UserParameter=viper.chain.data_bytes,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_chain_data_bytes /{print $2}'
+UserParameter=viper.chain.growth_rate_bytes_per_hour,curl -sf -m 5 http://localhost:26657/v1/metrics | awk '/^pqchain_chain_growth_rate_bytes_per_hour /{print $2}'
+UserParameter=viper.chain.disk_free_pct,df --output=pcent {{ viper_data_dir | default('/var/lib/pqchain') }} 2>/dev/null | tail -1 | tr -d ' %' | awk '{print 100-$1}' || echo 0

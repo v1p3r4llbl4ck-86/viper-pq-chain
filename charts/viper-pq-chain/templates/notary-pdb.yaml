@@ -1,0 +1,15 @@
+{{- if and .Values.notary.enabled .Values.notary.podDisruptionBudget.enabled (gt (int .Values.notary.replicas) 1) -}}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "viper-pq-chain.notaryName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.notaryLabels" . | nindent 4 }}
+spec:
+  minAvailable: {{ .Values.notary.podDisruptionBudget.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "viper-pq-chain.notarySelectorLabels" . | nindent 6 }}
+{{- end }}

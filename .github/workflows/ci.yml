@@ -1,0 +1,91 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  # Keep the build inside the memory of a small runner; raise on a big one.
+  CARGO_BUILD_JOBS: ${{ vars.CARGO_BUILD_JOBS || 3 }}
+
+# Runs on GitHub-hosted runners (free for a public repository). To use the
+# self-hosted runner instead (release/RUNNER.md in the private repository),
+# set the repository variable CI_RUNS_ON to a JSON label list such as
+# ["self-hosted","linux","viper"].
+jobs:
+  lint:
+    name: fmt, clippy, licences, links
+    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.92.0
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo fmt --all -- --check
+      - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+      - run: scripts/check-licenses.sh
+      - run: scripts/check-links.sh
+
+  deny:
+    name: cargo deny (advisories, licences, bans, sources)
+    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          command: check
+          arguments: --all-features
+
+  test:
+    name: tests (all features)
+    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.92.0
+      - uses: Swatinem/rust-cache@v2
+      - name: unit and integration tests
+        # The multi-node integration tests are timing-sensitive: one test thread.
+        run: cargo test --workspace --all-features --no-fail-fast -- --test-threads=1
+
+  softhsm:
+    name: pqc-hsm against SoftHSM
+    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    env:
+      VIPER_HSM_TEST_MODULE: /usr/lib/softhsm/libsofthsm2.so
+      VIPER_HSM_TEST_SLOT: "0"
+      VIPER_HSM_TEST_PIN: "1234"
+      VIPER_HSM_TEST_LABEL: viper-dev-probe-key
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.92.0
+      - uses: Swatinem/rust-cache@v2
+      - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends softhsm2 opensc
+      - run: cargo test -p pqc-hsm --features softhsm --no-fail-fast
+
+  chart:
+    name: helm lint and render
+    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+      - run: helm lint charts/viper-pq-chain
+      - run: helm template ci charts/viper-pq-chain > /dev/null
+      - name: the chart refuses ceremony values made for another release
+        run: |
+          if helm template ci charts/viper-pq-chain --set _release_name=other > /dev/null 2>&1; then
+            echo "guard did not fire" >&2; exit 1; fi

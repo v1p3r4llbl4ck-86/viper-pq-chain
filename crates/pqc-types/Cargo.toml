@@ -1,0 +1,39 @@
+[package]
+name = "pqc-types"
+description = "Core protocol types for PQ Chain (Account, KeySet, Transaction, etc.)"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+pqc-crypto = { path = "../pqc-crypto" }
+thiserror.workspace = true
+hex.workspace = true
+serde = { workspace = true, optional = true }
+ciborium.workspace = true
+
+[dev-dependencies]
+# Used by the viper_research_1_root_pin test to read validator entries
+# from deploy/ansible/files/genesis-viper-research-1.json at test runtime,
+# so any drift in either the JSON or the pinned const surfaces here.
+serde_json = "1"
+
+[features]
+## Default feature set. Enables `token_economics` for backward compatibility
+## during the viper-pq-1 → viper-research-1 pivot (2026-05-11). See pqc-state
+## Cargo.toml for the full pivot rationale.
+default = ["token_economics"]
+
+serde = ["dep:serde", "pqc-crypto/serde"]
+
+## Token economics: scope in pqc-types is currently NARROW — only the
+## `churn::validator_stake_weight` accessor and any future stake-bond payload
+## decoders depend on this flag. With token_economics OFF, churn returns 1
+## for every validator (semantic PoA: stake is uniform).
+##
+## Most pqc-types modules (transaction, block, account skeleton, keyset,
+## fork digest, hash registry, churn floor parameters) are token-agnostic
+## and remain compiled regardless. See the private planning notes
+token_economics = []

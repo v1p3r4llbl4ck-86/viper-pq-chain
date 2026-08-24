@@ -1,0 +1,29 @@
+[Unit]
+Description=Viper PQ Chain — monthly cold-storage rotation (TASK-188 / TASK-188b)
+Documentation=file://{{ viper_repo_path | default('/opt/viper-pq-chain') }}/docs/operators/RUNBOOK.md
+# Same Wants= / After= pattern as pqcd-prune.service: a transient pqcd
+# outage must not block the rotation. The wrapper script's EXIT trap
+# re-starts pqcd unconditionally.
+After=network.target pqcd.service
+Wants=pqcd.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/pqcd-cold-rotate.sh
+StandardOutput=journal
+StandardError=journal
+# Cold-storage export is CPU-bound (zstd level 19) AND I/O-heavy (RocksDB
+# scan + sequential writes). De-prioritise vs. live work; the rotation is
+# a monthly tick so it can take its time.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+# 4-hour ceiling — a 30-day-worth-of-blocks rotation on NVMe at ~50 MB/s
+# zstd-19 typically lands in 30 minutes; the ceiling is operator-alert
+# territory if exceeded (likely an unrelated I/O contention or a TSA
+# 30-second timeout looping forever — both worth waking someone up).
+TimeoutStartSec=4h
+
+[Install]
+WantedBy=multi-user.target

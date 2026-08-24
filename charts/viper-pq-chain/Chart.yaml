@@ -1,0 +1,46 @@
+apiVersion: v2
+name: viper-pq-chain
+description: |
+  Production-grade Helm chart for the Viper PQ Chain stack — a post-quantum
+  blockchain (FIPS 203/204/205 baseline) with a role-based topology
+  (validator, sentry/VFN, full node, RPC, archive, notary, bootnode).
+
+  Designed for permissioned-consortium deployments (PA / QTSP / regulated
+  sectors) and for k8s-based dev/test clusters. Does NOT manage the
+  upstream live `viper-pq-1` chain (that runs on systemd via Ansible);
+  this chart is for new networks (testnet, partner pilots, audit envs).
+type: application
+
+# Chart version — independent from app version, bumped on every chart change.
+version: 0.3.0
+
+# App version — pinned to the Cargo workspace.package.version at chart
+# publication time. Image tags default to this when values.image.<name>.tag
+# is empty.
+appVersion: "0.1.1"
+
+home: https://pqchain.agwswebconsulting.it
+sources:
+  - https://github.com/v1p3r4llbl4ck-86/viper-pq-chain
+icon: https://pqchain.agwswebconsulting.it/og-image.png
+
+keywords:
+  - blockchain
+  - post-quantum
+  - eIDAS
+  - QEAA
+  - FIPS-204
+  - ML-DSA
+  - notarization
+  - consortium
+
+maintainers:
+  - name: Alberto Galassi
+    email: galassi.alberto86@gmail.com
+
+annotations:
+  category: Blockchain
+  licenses: Apache-2.0
+  artifacthub.io/license: Apache-2.0
+  artifacthub.io/operator: "false"
+  artifacthub.io/prerelease: "true"

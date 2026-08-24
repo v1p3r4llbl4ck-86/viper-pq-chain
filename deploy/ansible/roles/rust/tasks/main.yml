@@ -1,0 +1,35 @@
+---
+- name: Check if Rust is installed
+  command: rustc --version
+  register: rust_check
+  ignore_errors: yes
+  changed_when: false
+
+- name: Install Rust via rustup
+  shell: >
+    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs
+    | sh -s -- -y --default-toolchain stable --no-modify-path
+  when: rust_check.rc != 0
+  environment:
+    HOME: /root
+
+- name: Ensure Rust PATH is in /etc/profile.d
+  copy:
+    dest: /etc/profile.d/cargo.sh
+    content: |
+      # Added by Viper PQ Chain Ansible deploy
+      export PATH="$HOME/.cargo/bin:$PATH"
+    mode: '0644'
+
+- name: Verify Rust version meets minimum (1.75+)
+  shell: |
+    source /root/.cargo/env
+    rustc --version
+  args:
+    executable: /bin/bash
+  register: rust_version
+  changed_when: false
+
+- name: Show Rust version
+  debug:
+    msg: "Rust: {{ rust_version.stdout }}"

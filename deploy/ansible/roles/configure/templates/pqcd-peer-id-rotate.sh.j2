@@ -1,0 +1,182 @@
+#!/bin/bash
+# Managed by Ansible — do not edit manually
+#
+# Viper PQ Chain — 90-day libp2p PeerId rotation wrapper.
+#
+# Stage B of the 2026-05-11 PeerId-rotation scoping (see docs/historical/RUNBOOK-PEER-ID-ROTATION-viper-research-1.md).
+# Closes R-14's operational guardrail by bounding the HNDL recovery
+# window on each validator's libp2p Ed25519 identity to ≤ 90 days.
+#
+# Flow (matches scoping doc §3):
+#   1. Read VIPER_PASSPHRASE from /etc/pqchain/cron.env (mode 0400,
+#      owner pqchain) — set at deploy time by Ansible from the
+#      `viper_keystore_passphrase` vault variable.
+#   2. Capture pre-rotation state (current salt, current local PeerId,
+#      current on-chain peer_id_hex) into the log for forensic recovery.
+#   3. Generate a new 32-byte salt via `openssl rand -hex 32`.
+#   4. Invoke `pqcd wallet rotate-peer-id` (which submits the on-chain
+#      ValidatorRotatePeerId tx, polls for landing, verifies the binding
+#      flipped, then atomically writes the new salt to node.json).
+#   5. systemctl restart pqcd — the swarm reinitialises with the new
+#      keypair; ~10-15 s of one-validator-temporarily-off-mesh per
+#      scoping doc §4.
+#   6. Post-rotation verification: pqcd serves /v1/status; the local
+#      PeerId matches the on-chain binding.
+#
+# Failure modes (matches scoping doc §3.6):
+#   - tx submit fails → node.json untouched; chain continues on OLD
+#     PeerId; systemd marks unit failed; operator alert.
+#   - tx lands but post-apply verification fails (e.g. another rotation
+#     raced) → node.json untouched; on-chain binding has flipped to
+#     someone else's value; operator must manually revert.
+#   - file write fails → atomic rename means either OLD or NEW; not
+#     half. EXIT trap restarts pqcd; operator alert.
+#   - systemctl restart pqcd fails → log + alert; chain continues 2/3
+#     quorum without this validator until operator intervenes.
+
+set -u
+set -o pipefail
+
+PQCD={{ viper_binary_path }}
+NODE_CONFIG={{ viper_config_dir }}/node.json
+KEYSTORE={{ viper_keystore_path }}
+CRON_ENV={{ viper_config_dir }}/cron.env
+API_URL="http://127.0.0.1:{{ viper_api_port | default(26657) }}"
+LOG_DIR=/var/log/pqchain
+LOGFILE=$LOG_DIR/peer-id-rotate.log
+RUN_TS=$(date -u +%FT%TZ)
+NODE_ID={{ viper_validator_node_id }}
+
+mkdir -p "$LOG_DIR"
+chown pqchain:pqchain "$LOG_DIR" 2>/dev/null || true
+touch "$LOGFILE"
+chmod 644 "$LOGFILE" 2>/dev/null || true
+
+log() {
+    echo "[$(date -u +%FT%TZ)] $*" >> "$LOGFILE"
+}
+
+# Restart pqcd on EVERY exit path — the chain MUST come back up even
+# if the rotation logic failed mid-flight. Same shape as
+# pqcd-cold-rotate.sh / pqcd-prune.sh.
+trap 'log "EXIT trap: ensuring pqcd.service is up"; systemctl start pqcd.service || true' EXIT
+
+log "rotate_start node_id=$NODE_ID validator_node_id=$NODE_ID run_ts=$RUN_TS"
+
+# ── §1: source the passphrase env file ──────────────────────────────────
+if [[ ! -r "$CRON_ENV" ]]; then
+    log "FATAL cron_env_missing path=$CRON_ENV"
+    log "FATAL operator action: ensure Ansible deployed /etc/pqchain/cron.env"
+    log "FATAL with mode 0400 owner pqchain — see docs/historical/RUNBOOK-PEER-ID-ROTATION-viper-research-1.md §3"
+    exit 64
+fi
+# shellcheck disable=SC1090
+source "$CRON_ENV"
+if [[ -z "${VIPER_PASSPHRASE:-}" ]]; then
+    log "FATAL VIPER_PASSPHRASE empty after sourcing $CRON_ENV"
+    exit 65
+fi
+export VIPER_PASSPHRASE
+
+# ── §2: capture pre-rotation state for forensic recovery ────────────────
+PRE_SALT=$(jq -r '.devnet.libp2p_seed_salt_hex // "<UNSET>"' "$NODE_CONFIG" 2>/dev/null || echo "<READ_FAILED>")
+PRE_LOCAL_PEER_ID=$("$PQCD" peer-id "$NODE_ID" ${PRE_SALT:+${PRE_SALT/<UNSET>/}} 2>/dev/null | tail -n 1 || echo "<DERIVE_FAILED>")
+# Derive properly with the salt arg only when set (not "<UNSET>"):
+if [[ "$PRE_SALT" != "<UNSET>" && "$PRE_SALT" != "<READ_FAILED>" ]]; then
+    PRE_LOCAL_PEER_ID=$("$PQCD" peer-id "$NODE_ID" --salt "$PRE_SALT" 2>/dev/null | tail -n 1 || echo "<DERIVE_FAILED>")
+fi
+
+# On-chain peer_id_hex via the /v1/validators API (added in Stage A.3).
+# Look up by the operator's address — derived from the local keystore.
+PRE_OPERATOR_ADDR=$("$PQCD" wallet address "$KEYSTORE" 2>/dev/null | jq -r '.address_hex' 2>/dev/null || echo "")
+if [[ -n "$PRE_OPERATOR_ADDR" ]]; then
+    PRE_ONCHAIN_PEER_ID_HEX=$(curl -sf --max-time 5 "$API_URL/v1/validators/$PRE_OPERATOR_ADDR" 2>/dev/null \
+        | jq -r '.data.peer_id_hex // "null"' 2>/dev/null || echo "<API_FAILED>")
+else
+    PRE_ONCHAIN_PEER_ID_HEX="<ADDR_RESOLVE_FAILED>"
+fi
+log "pre_rotation salt=$PRE_SALT local_peer_id=$PRE_LOCAL_PEER_ID operator_addr=$PRE_OPERATOR_ADDR onchain_peer_id_hex=$PRE_ONCHAIN_PEER_ID_HEX"
+
+# ── §3: generate the new salt ───────────────────────────────────────────
+# Note: bash string-length expansion collides with Jinja2 comment
+# delimiters when this file is templated, so we compute length via
+# `wc -c` instead. The end-of-string newline is stripped with
+# `tr -d '\n'` so a perfectly-correct 64-char hex emits 64 (not 65).
+NEW_SALT=$(openssl rand -hex 32 2>/dev/null | tr -d '\n')
+NEW_SALT_LEN=$(printf '%s' "$NEW_SALT" | wc -c)
+if [[ "$NEW_SALT_LEN" -ne 64 ]]; then
+    log "FATAL openssl_rand_failed produced $NEW_SALT_LEN-char output; expected 64"
+    exit 66
+fi
+log "new_salt_generated len=$NEW_SALT_LEN"
+
+# ── §4: invoke the rotate-peer-id CLI ───────────────────────────────────
+# The CLI handles: build + sign + post the tx, poll /v1/txs/<hash> until
+# landed, GET /v1/validators/<addr> and assert peer_id_hex matches the
+# derived value, atomic node.json write with mode + ownership preservation.
+# Fail-closed semantics: on any error the CLI does NOT write node.json.
+log "rotate_peer_id_invoke node_config=$NODE_CONFIG api=$API_URL"
+if ! "$PQCD" wallet rotate-peer-id "$KEYSTORE" \
+        --new-salt "$NEW_SALT" \
+        --node "$API_URL" \
+        --in-place "$NODE_CONFIG" \
+        --poll-timeout-secs 60 \
+        2>>"$LOGFILE"
+then
+    rc=$?
+    log "FATAL rotate_peer_id_cli_failed rc=$rc"
+    log "FATAL node.json is UNCHANGED — chain continues on OLD PeerId"
+    log "FATAL see docs/historical/RUNBOOK-PEER-ID-ROTATION-viper-research-1.md §6 (Failure modes)"
+    exit "$rc"
+fi
+log "rotate_peer_id_cli_ok"
+
+# ── §5: restart pqcd so the swarm picks up the new salt ─────────────────
+log "pqcd_restart_invoke"
+if ! systemctl restart pqcd.service 2>>"$LOGFILE"; then
+    rc=$?
+    log "FATAL pqcd_restart_failed rc=$rc"
+    log "FATAL node.json carries the NEW salt but the running swarm is on"
+    log "FATAL the OLD keypair. systemctl start pqcd manually + monitor logs."
+    exit "$rc"
+fi
+
+# Wait for pqcd to serve /v1/status before declaring success. Bounded
+# by the systemd service's TimeoutStartSec=10min ceiling.
+for attempt in $(seq 1 60); do
+    if curl -sf --max-time 2 "$API_URL/v1/status" >/dev/null 2>&1; then
+        log "pqcd_api_responsive after_attempts=$attempt"
+        break
+    fi
+    sleep 1
+done
+if ! curl -sf --max-time 2 "$API_URL/v1/status" >/dev/null 2>&1; then
+    log "FATAL pqcd_api_unresponsive after 60s — operator intervention required"
+    exit 67
+fi
+
+# ── §6: post-rotation verification ──────────────────────────────────────
+POST_SALT=$(jq -r '.devnet.libp2p_seed_salt_hex // "<UNSET>"' "$NODE_CONFIG")
+POST_LOCAL_PEER_ID=$("$PQCD" peer-id "$NODE_ID" --salt "$POST_SALT" 2>/dev/null | tail -n 1)
+POST_ONCHAIN_PEER_ID_HEX=$(curl -sf --max-time 5 "$API_URL/v1/validators/$PRE_OPERATOR_ADDR" 2>/dev/null \
+    | jq -r '.data.peer_id_hex // "null"' || echo "<API_FAILED>")
+log "post_rotation salt=$POST_SALT local_peer_id=$POST_LOCAL_PEER_ID onchain_peer_id_hex=$POST_ONCHAIN_PEER_ID_HEX"
+
+if [[ "$POST_SALT" == "$PRE_SALT" ]]; then
+    log "FATAL rotation_no_op salt did not change post-rotation — investigate"
+    exit 68
+fi
+
+log "rotate_ok pre_salt=$PRE_SALT post_salt=$POST_SALT pre_peer=$PRE_LOCAL_PEER_ID post_peer=$POST_LOCAL_PEER_ID"
+
+# Final retention sweep: keep ≤ N days of log lines. systemd's
+# journald already retains the structured StandardOutput stream; this
+# is the human-readable companion. Stay simple: tail -c keeps the
+# tail by byte count; one rotation produces ~1 KB so a 1 MB cap
+# retains ~1000 rotations ≈ 250 years of quarterly ticks.
+TAIL_BYTES={{ viper_peer_id_rotate_log_tail_bytes | default(1048576) }}
+if [[ -f "$LOGFILE" ]] && [[ $(stat -c %s "$LOGFILE") -gt $TAIL_BYTES ]]; then
+    tail -c "$TAIL_BYTES" "$LOGFILE" > "${LOGFILE}.tmp" && mv "${LOGFILE}.tmp" "$LOGFILE"
+fi
+
+exit 0

@@ -1,0 +1,29 @@
+[package]
+name = "pqc-tx"
+description = "Transaction CBOR encoding, signed preimage construction, and validation pipeline"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[dependencies]
+pqc-crypto = { path = "../pqc-crypto" }
+pqc-types  = { path = "../pqc-types", default-features = false }
+ciborium.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+hex.workspace = true
+serde.workspace = true
+
+[features]
+default = ["token_economics"]
+stub-verifier = ["pqc-crypto/stub-verifier"]
+## Cross-workspace `token_economics` propagation. See pqc-state/Cargo.toml
+## for the pivot rationale (viper-pq-1 → viper-research-1, 2026-05-11).
+token_economics = ["pqc-types/token_economics"]
+
+[dev-dependencies]
+hex.workspace = true
+pqc-crypto = { path = "../pqc-crypto", features = ["stub-verifier"] }
+proptest.workspace = true

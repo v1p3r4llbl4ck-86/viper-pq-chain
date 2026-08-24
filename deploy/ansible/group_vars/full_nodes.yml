@@ -1,0 +1,33 @@
+---
+# group_vars/full_nodes.yml — variables that apply only to full nodes
+
+# Full nodes sync faster than block_time since they are catching up.
+# Override here if needed; default is inherited from all.yml.
+viper_sync_interval_ms: 100
+
+# Phase 8 M1 libp2p — full node role = NodeRole::ValidatorFullnode in
+# pqcd, which consumes `vfn_listen` from the libp2p section (ADR-041
+# §3). Templated via `viper_p2p_port` so the per-host inventory entry
+# drives the listen address (follower-1 = 26666, follower-2 = 26676).
+#
+# `bootstrap_peers` pins the validator's deterministic PeerId
+# (SHA3-256("viper-libp2p-node:" || "producer") → multihash, computed
+# once via `pqcd peer-id <validator node_id>`, i.e. `pqcd peer-id producer`
+# for the example inventory). Set `viper_upstream_peer_id` in your
+# inventory; the validator address comes from the `validators` group. If the
+# validator node_id ever changes the peer id must be regenerated.
+viper_libp2p: >-
+  {{ viper_libp2p_common | combine({
+       'vfn_listen': '0.0.0.0:' ~ viper_p2p_port,
+       'bootstrap_peers': [
+         '/ip4/' ~ hostvars[groups['validators'][0]].ansible_host ~ '/tcp/26656/p2p/' ~ viper_upstream_peer_id
+       ]
+     }) }}
+
+# ── TASK-187a — full-node prune opt-in ────────────────────────────────────
+# Full nodes are the prune candidates (validators + archive-leaning hosts
+# stay full-history). The retained tail is `viper_prune_keep_tail_blocks`
+# from group_vars/all/defaults.yml (default 1209600 ≈ 7 days at 500 ms).
+# Override per-host in inventory if a specific full node needs a different
+# retention window.
+viper_prune_enabled: true

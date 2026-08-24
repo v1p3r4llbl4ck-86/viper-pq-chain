@@ -1,0 +1,22 @@
+Viper PQ Chain
+Copyright (c) 2026 Alberto Galassi
+
+This repository is licensed under several licences; see LICENSE.md for the map.
+
+Third-party code redistributed in this repository, with its original licence:
+
+  vendor/slh-dsa           slh-dsa 0.1.0 from the RustCrypto project
+                           (https://github.com/RustCrypto/signatures), Apache-2.0 OR MIT,
+                           with local changes. Licence texts: vendor/slh-dsa/LICENSE-APACHE,
+                           vendor/slh-dsa/LICENSE-MIT.
+  vendor/libp2p-tls-pq     libp2p-tls 0.6.2 from rust-libp2p
+                           (https://github.com/libp2p/rust-libp2p), MIT,
+                           Copyright Parity Technologies (UK) Ltd. and Protocol Labs,
+                           patched for the post-quantum handshake (upstream PR rust-libp2p#6236).
+                           Licence text: vendor/libp2p-tls-pq/LICENSE.
+  vendor/libp2p-quic-pq    libp2p-quic 0.13.0 from rust-libp2p, MIT,
+                           Copyright Parity Technologies (UK) Ltd., same patch series.
+                           Licence text: vendor/libp2p-quic-pq/LICENSE.
+
+Dependencies pulled from crates.io keep their own licences; `cargo deny check licenses`
+enforces the allow-list in deny.toml.

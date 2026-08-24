@@ -1,0 +1,42 @@
+version = 1
+SPDX-PackageName = "viper-pq-chain"
+SPDX-PackageSupplier = "Alberto Galassi <galassi.alberto86@gmail.com>"
+
+# Files without an SPDX header are covered here (REUSE 3.2). Rust sources carry
+# their own `// SPDX-License-Identifier:` line; scripts/check-licenses.sh checks both.
+
+[[annotations]]
+path = ["specs/**", "docs/**", "*.md"]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2026 Alberto Galassi"
+SPDX-License-Identifier = "CC-BY-4.0"
+
+[[annotations]]
+path = ["sdk/**", "tests/acvp/**", "crates/pqc-crypto/**", "crates/pqc-types/**", "crates/pqc-tx/**", "crates/pqc-tsa/**", "crates/pqc-light-client/**", "crates/pqc-keystore/**"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 Alberto Galassi"
+SPDX-License-Identifier = "Apache-2.0"
+
+[[annotations]]
+path = ["crates/**", "fuzz/**", "charts/**", "deploy/**", "docker/**", "scripts/**", "configs/**", "Cargo.toml", "Cargo.lock", "Makefile", "flake.nix", "flake.lock", "deny.toml", "audit.toml", ".gitlab-ci.yml", ".gitleaks.toml", "rust-toolchain.toml"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 Alberto Galassi"
+SPDX-License-Identifier = "BUSL-1.1"
+
+[[annotations]]
+path = ["notary/**"]
+precedence = "closest"
+SPDX-FileCopyrightText = "2026 Alberto Galassi"
+SPDX-License-Identifier = "LicenseRef-Proprietary"
+
+[[annotations]]
+path = ["vendor/libp2p-tls-pq/**", "vendor/libp2p-quic-pq/**"]
+precedence = "closest"
+SPDX-FileCopyrightText = ["Parity Technologies (UK) Ltd.", "Protocol Labs", "2026 Alberto Galassi (post-quantum patch)"]
+SPDX-License-Identifier = "MIT"
+
+[[annotations]]
+path = ["vendor/slh-dsa/**"]
+precedence = "closest"
+SPDX-FileCopyrightText = ["The RustCrypto Project Developers", "2026 Alberto Galassi (local changes)"]
+SPDX-License-Identifier = "Apache-2.0 OR MIT"

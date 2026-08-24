@@ -1,0 +1,67 @@
+---
+# Health check tasks — used by check-health.yml playbook.
+# These are read-only probes; they never modify node state.
+
+- name: Check validator API /v1/status
+  uri:
+    url:            "http://{{ ansible_host }}:{{ viper_api_port }}/v1/status"
+    return_content: yes
+    status_code:    200
+    timeout:        5
+  register: status_result
+  ignore_errors: yes
+  when: viper_role == 'validator'
+
+- name: Display validator chain status
+  debug:
+    msg: >-
+      [{{ viper_node_id }}] VALIDATOR
+      height={{ status_result.json.height | default('UNREACHABLE') }}
+      chain={{ status_result.json.chain_id | default('N/A') }}
+      tip={{ (status_result.json.tip_hash | default('N/A'))[:16] }}...
+      state_root={{ (status_result.json.state_root | default('N/A'))[:16] }}...
+  when: viper_role == 'validator'
+
+- name: Check validator Prometheus metrics
+  uri:
+    url:         "http://{{ ansible_host }}:{{ viper_api_port }}/v1/metrics"
+    status_code: 200
+    timeout:     5
+  register: metrics_result
+  ignore_errors: yes
+  when: viper_role == 'validator'
+
+- name: Display metrics status
+  debug:
+    msg: >-
+      [{{ viper_node_id }}] metrics={{ 'OK' if metrics_result.status == 200 else 'UNREACHABLE' }}
+  when: viper_role == 'validator'
+
+- name: Check full node P2P port reachability
+  wait_for:
+    host:    "{{ ansible_host }}"
+    port:    "{{ viper_p2p_port }}"
+    timeout: 5
+  delegate_to: localhost
+  become: no
+  ignore_errors: yes
+  register: p2p_probe
+  when: viper_role == 'full'
+
+- name: Display full node P2P status
+  debug:
+    msg: >-
+      [{{ viper_node_id }}] FULL NODE
+      p2p={{ 'OPEN' if not p2p_probe.failed else 'UNREACHABLE' }}
+      port={{ viper_p2p_port }}
+  when: viper_role == 'full'
+
+- name: Check pqcd systemd service state
+  command: systemctl is-active pqcd
+  register: service_state
+  changed_when: false
+  ignore_errors: yes
+
+- name: Display service state
+  debug:
+    msg: "[{{ viper_node_id }}] systemd pqcd={{ service_state.stdout }}"

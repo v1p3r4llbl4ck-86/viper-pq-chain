@@ -1,0 +1,9 @@
+---
+- name: reload systemd
+  systemd:
+    daemon_reload: yes
+
+- name: restart pqcd
+  systemd:
+    name:  pqcd
+    state: restarted

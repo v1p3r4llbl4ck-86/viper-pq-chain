@@ -1,0 +1,26 @@
+[package]
+name = "pqc-light-client"
+description = "Sync-committee selection and compact-header attestations (SPEC-LIGHT-CLIENT-001): the verifier-side half of the light-client protocol"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Extracted from pqc-consensus on 2026-08-24 so that a light verifier can be
+# built without pulling in the node core. It MUST stay free of any dependency
+# on pqc-consensus / pqc-state / pqc-mempool / pqc-p2p / pqcd: that is the
+# whole point of the crate (verification path is permissively licensed).
+pqc-crypto = { path = "../pqc-crypto", features = ["ml-dsa-backend"] }
+ciborium.workspace = true
+
+[dev-dependencies]
+pqc-crypto = { path = "../pqc-crypto", features = ["stub-verifier"] }
+hex.workspace = true
+
+[lints]
+workspace = true

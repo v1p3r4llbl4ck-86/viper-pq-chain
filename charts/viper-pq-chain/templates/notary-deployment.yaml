@@ -1,0 +1,239 @@
+{{- if .Values.notary.enabled -}}
+{{- $autoNodeUrl := "" -}}
+{{- $svc := include "viper-pq-chain.firstChainNodeService" . -}}
+{{- if $svc -}}
+{{- $autoNodeUrl = printf "http://%s-headless:26657" $svc -}}
+{{- end -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "viper-pq-chain.notaryName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.notaryLabels" . | nindent 4 }}
+spec:
+  {{- if not .Values.notary.autoscaling.enabled }}
+  replicas: {{ .Values.notary.replicas }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "viper-pq-chain.notarySelectorLabels" . | nindent 6 }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  template:
+    metadata:
+      labels:
+        {{- include "viper-pq-chain.notaryLabels" . | nindent 8 }}
+      annotations:
+        viper.pqchain.io/config-checksum: {{ printf "%s-%s-%s" .Values.chain.id (default $autoNodeUrl .Values.notary.config.nodeUrl) (.Values.notary.config | toJson | sha256sum | trunc 16) | sha256sum | trunc 16 }}
+    spec:
+      serviceAccountName: {{ include "viper-pq-chain.serviceAccountName" . }}
+      automountServiceAccountToken: false
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.notary.podSecurityContext | nindent 8 }}
+      {{- with .Values.notary.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.notary.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        {{- if .Values.notary.affinity }}
+        {{- toYaml .Values.notary.affinity | nindent 8 }}
+        {{- else }}
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "viper-pq-chain.notarySelectorLabels" . | nindent 20 }}
+        {{- end }}
+      containers:
+        - name: viper-notary
+          image: {{ include "viper-pq-chain.image" (dict "ctx" . "binary" "notary") }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: NOTARY_LISTEN_ADDR
+              value: {{ .Values.notary.config.listenAddr | quote }}
+            - name: NOTARY_LISTEN_PORT
+              value: {{ .Values.notary.config.listenPort | quote }}
+            - name: NOTARY_NODE_URL
+              value: {{ default $autoNodeUrl .Values.notary.config.nodeUrl | quote }}
+            - name: NOTARY_CHAIN_ID
+              value: {{ default .Values.chain.id .Values.notary.config.chainId | quote }}
+            - name: NOTARY_FINALIZATION_TIMEOUT_MS
+              value: {{ .Values.notary.config.finalizationTimeoutMs | quote }}
+            - name: NOTARY_CORS_ORIGIN
+              value: {{ .Values.notary.config.corsOrigin | quote }}
+            - name: NOTARY_PUBLIC_BASE_URL
+              value: {{ .Values.notary.config.publicBaseUrl | quote }}
+            {{- if .Values.notary.config.evidenceDisabled }}
+            - name: NOTARY_EVIDENCE_DISABLED
+              value: "1"
+            {{- end }}
+            # Sprint 5.17: NOTARY_SEED_HEX is mandatory. The notary backend
+            # refuses to start in a release build when this env var is unset
+            # (`viper-notary` was rebuilt without the `dev-defaults` Cargo
+            # feature). Failing the chart render here surfaces the missing
+            # secret at `helm install` instead of at pod startup.
+            {{- if not .Values.notary.serviceAccountKey.secretName }}
+            {{- fail "notary.serviceAccountKey.secretName is required. Pre-create a Secret with key `service_account_seed` containing the 32-byte hex ML-DSA seed (e.g. via `pqcd ceremony`). See SECURITY-FIX-PLAN.md §2." }}
+            {{- end }}
+            - name: NOTARY_SEED_HEX
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.notary.serviceAccountKey.secretName }}
+                  key: service_account_seed
+            # Sprint 5.1: Postgres connection URL — required.
+            {{- if not .Values.notary.tenantDb.secretName }}
+            {{- fail "notary.tenantDb.secretName is required (Sprint 5.1 retired the SQLite backend). Pre-create a Secret with the Postgres URL." }}
+            {{- end }}
+            - name: NOTARY_TENANT_DB_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.notary.tenantDb.secretName }}
+                  key: {{ .Values.notary.tenantDb.secretKey | quote }}
+            {{- if .Values.notary.adminToken.secretName }}
+            # Sprint 1: admin sub-router bearer. When unset the admin
+            # routes return 404 — intentional, see admin.rs.
+            - name: NOTARY_ADMIN_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.notary.adminToken.secretName }}
+                  key: admin_token
+            {{- end }}
+            {{- if .Values.notary.metricsToken.secretName }}
+            # Sprint 4.2: Prometheus /metrics bearer. When unset
+            # /metrics returns 404. Independent of admin token.
+            - name: NOTARY_METRICS_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.notary.metricsToken.secretName }}
+                  key: metrics_token
+            {{- end }}
+            # Sprint 5.9: audit + webhook-deliveries retention pruner.
+            # `days: 0` disables it (default); set both env vars only
+            # when the operator opts in.
+            {{- if gt (.Values.notary.retention.days | int) 0 }}
+            - name: NOTARY_AUDIT_RETENTION_DAYS
+              value: {{ .Values.notary.retention.days | quote }}
+            - name: NOTARY_RETENTION_INTERVAL_SECS
+              value: {{ .Values.notary.retention.intervalSecs | quote }}
+            {{- end }}
+            {{- if .Values.notary.smtp.secretName }}
+            # Sprint 5.10: transactional emails. host/port/from come
+            # from values (non-secret); user/password from the Secret.
+            # When secretName is unset, no NOTARY_SMTP_HOST is exported
+            # and the email module's send_* helpers stay no-ops.
+            - name: NOTARY_SMTP_HOST
+              value: {{ .Values.notary.smtp.host | quote }}
+            - name: NOTARY_SMTP_PORT
+              value: {{ .Values.notary.smtp.port | quote }}
+            - name: NOTARY_SMTP_FROM
+              value: {{ .Values.notary.smtp.from | quote }}
+            - name: NOTARY_SMTP_USER
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.notary.smtp.secretName }}
+                  key: {{ .Values.notary.smtp.userKey | quote }}
+            - name: NOTARY_SMTP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.notary.smtp.secretName }}
+                  key: {{ .Values.notary.smtp.passwordKey | quote }}
+            {{- end }}
+            {{- if .Values.notary.stripe.secretName }}
+            # Sprint 5.3: Stripe billing. When unset, every Stripe
+            # path returns 503 — the rest of the SaaS keeps running.
+            - name: STRIPE_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.notary.stripe.secretName }}
+                  key: {{ .Values.notary.stripe.secretKeyKey | quote }}
+            - name: STRIPE_WEBHOOK_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Values.notary.stripe.secretName }}
+                  key: {{ .Values.notary.stripe.webhookSecretKey | quote }}
+            - name: STRIPE_REPORT_INTERVAL_SECS
+              value: {{ .Values.notary.stripe.reportIntervalSecs | quote }}
+            {{- end }}
+            {{- if .Values.notary.otel.endpoint }}
+            # Sprint 5.11: OpenTelemetry OTLP gRPC export. Empty
+            # endpoint = OTel layer skipped at startup.
+            - name: NOTARY_OTEL_ENDPOINT
+              value: {{ .Values.notary.otel.endpoint | quote }}
+            {{- end }}
+            - name: RUST_LOG
+              value: "viper_notary=info,tower_http=warn"
+            {{- with .Values.notary.extraEnv }}
+            # Sprint 5.16 — operator-supplied extra env (catches things
+            # like NOTARY_SIGNUP_INVITE_CODE / NOTARY_ADMIN_IP_ALLOWLIST
+            # that don't have a dedicated chart value). Pass-through
+            # to the container env array; supports `value:` and
+            # `valueFrom:` shapes verbatim.
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.notary.config.listenPort }}
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 5
+            failureThreshold: 24
+          readinessProbe:
+            # Sprint 3.4 + 5.16: default `/readyz` checks tenant DB +
+            # upstream chain reachability — pod stays Unready until
+            # both are up. For notary-only deployments (no chain
+            # alongside, e.g. pointing at an external pqcd), override
+            # `notary.readinessProbe.path` to `/health` so the pod
+            # reaches Ready as soon as the process is alive; the
+            # operator monitors chain reachability via the body of
+            # an explicit `/readyz` probe instead of via Service
+            # routing.
+            httpGet:
+              path: {{ .Values.notary.readinessProbe.path | default "/readyz" | quote }}
+              port: http
+            periodSeconds: {{ .Values.notary.readinessProbe.periodSeconds | default 10 }}
+            failureThreshold: {{ .Values.notary.readinessProbe.failureThreshold | default 3 }}
+            timeoutSeconds: {{ .Values.notary.readinessProbe.timeoutSeconds | default 5 }}
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            periodSeconds: 30
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.notary.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml .Values.notary.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: home
+              mountPath: /home/viper-notary
+      volumes:
+        # The runtime needs writable /tmp and /home — readOnlyRootFilesystem.
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi
+        - name: home
+          emptyDir:
+            sizeLimit: 64Mi
+{{- end }}

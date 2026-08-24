@@ -1,0 +1,19 @@
+---
+# deploy-only.yml — skip build, just update config and restart
+#
+# Use this after `make deploy` has run at least once and you want to:
+#   - push a new node.json (fee params, peer list, etc.)
+#   - restart with the existing binary
+#
+# Does NOT clone the repo or run cargo build.
+
+- name: Redeploy Viper PQ Chain (config + restart only)
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  roles:
+    - configure
+    - deploy
+    - role: notary
+      when: viper_role == 'validator'

@@ -1,0 +1,31 @@
+[Unit]
+Description=Viper PQ Chain Node ({{ viper_node_id }})
+Documentation=https://github.com/viper-pqchain/viper-pq-chain
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=pqchain
+Group=pqchain
+ExecStart={{ viper_binary_path }} devnet-serve {{ viper_config_dir }}/node.json
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+MemoryMax={{ viper_memory_max | default('4G') }}
+OOMPolicy=stop
+Environment=RUST_LOG=info
+Environment=VIPER_NODE_ID={{ viper_node_id }}
+# Pin log destination explicitly. systemd's default is `journal` for both,
+# but pinning makes future surprises (a distro-default flip, an Environment
+# override) impossible — `journalctl -u pqcd` keeps working.
+StandardOutput=journal
+StandardError=journal
+# Protect the system: node only needs its data, config, and the audit log dir.
+# /var/log/pqchain/audit is written by the AuditLogLayer (crates/pqcd/src/audit_log.rs);
+# without ReadWritePaths systemd would block the open() under NoNewPrivileges + default sandboxing.
+ReadWritePaths={{ viper_data_dir }} {{ viper_config_dir }} /var/log/pqchain/audit
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

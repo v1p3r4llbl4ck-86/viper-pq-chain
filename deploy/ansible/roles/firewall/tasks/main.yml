@@ -1,0 +1,62 @@
+---
+- name: Install ufw
+  apt:
+    name: ufw
+    state: present
+
+- name: Allow SSH
+  command: ufw allow 22/tcp
+  changed_when: false
+
+- name: Allow P2P port
+  command: ufw allow {{ viper_p2p_port }}/tcp
+  changed_when: false
+
+- name: Allow API port (validator only)
+  command: ufw allow {{ viper_api_port }}/tcp
+  changed_when: false
+  when: viper_role == 'validator'
+
+# Phase 8 libp2p — ADR-041 / SPEC-P2P-002.
+# QUIC uses UDP; TCP/TLS fallback uses TCP. Open both so the cutover
+# can flip quic_enabled without a firewall change. Gated on
+# `viper_libp2p.enable` so pre-cutover deploys stay closed.
+- name: Allow libp2p validator listener (QUIC + TCP fallback)
+  command: "ufw allow {{ item.port }}/{{ item.proto }}"
+  loop:
+    - { port: 26656, proto: udp }
+    - { port: 26656, proto: tcp }
+  changed_when: false
+  when:
+    - viper_libp2p is defined
+    - viper_libp2p.enable | default(false)
+    - viper_role == 'validator'
+
+- name: Allow libp2p VFN listener (QUIC + TCP fallback)
+  command: "ufw allow {{ item.port }}/{{ item.proto }}"
+  loop:
+    - { port: 26666, proto: udp }
+    - { port: 26666, proto: tcp }
+  changed_when: false
+  when:
+    - viper_libp2p is defined
+    - viper_libp2p.enable | default(false)
+    - viper_role in ['full', 'validator']
+
+- name: Allow libp2p public-fullnode listener (QUIC + TCP fallback)
+  command: "ufw allow {{ item.port }}/{{ item.proto }}"
+  loop:
+    - { port: 26676, proto: udp }
+    - { port: 26676, proto: tcp }
+  changed_when: false
+  when:
+    - viper_libp2p is defined
+    - viper_libp2p.enable | default(false)
+    - viper_libp2p.public_listen is defined
+
+- name: Enable UFW with default deny
+  shell: |
+    ufw --force enable
+    ufw default deny incoming
+    ufw default allow outgoing
+  changed_when: false

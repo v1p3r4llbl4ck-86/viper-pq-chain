@@ -1,0 +1,15 @@
+---
+# pqcd-apparmor handlers.
+#
+# Triggered by `notify: reload-apparmor-profile-pqcd` in tasks/main.yml
+# when the on-disk profile bytes change. Without this file the notify
+# string-matches nothing and ansible silently drops the reload, leaving
+# the kernel with the old profile while /etc/apparmor.d/ has the new one
+# (APPARMOR-PROFILE-AUDIT.md §"P1 fix").
+#
+# `apparmor_parser -r` replaces the in-kernel profile with the on-disk
+# bytes — idempotent and the canonical reload pathway.
+
+- name: reload-apparmor-profile-pqcd
+  ansible.builtin.command: apparmor_parser -r /etc/apparmor.d/usr.local.bin.pqcd
+  become: true

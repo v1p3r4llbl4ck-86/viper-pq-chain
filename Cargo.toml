@@ -1,0 +1,128 @@
+[workspace]
+members = [
+    "crates/pqc-crypto",
+    "crates/pqc-types",
+    "crates/pqc-tx",
+    "crates/pqc-state",
+    "crates/pqc-mempool",
+    "crates/pqc-light-client",
+    "crates/pqc-consensus",
+    "crates/pqc-p2p",
+    "crates/pqc-tsa",
+    "crates/pqc-hsm",
+    "crates/pqc-keystore",
+    "crates/pqcd",
+    "crates/viper-archival-sidecar",
+]
+resolver = "2"
+
+[workspace.package]
+version = "0.1.1"
+edition = "2021"
+authors = ["Alberto Galassi <galassi.alberto86@gmail.com>"]
+license = "Apache-2.0"
+
+[workspace.dependencies]
+pqc-p2p = { path = "crates/pqc-p2p" }
+# CBOR — deterministic encoding per SPEC-TX-001 §4
+ciborium = "0.2"
+# Serialization support (non-signing paths only)
+serde = { version = "1", features = ["derive"] }
+# Hex encoding for hashes and keys
+hex = "0.4"
+# Base64 encoding for API tx_bytes transport
+base64 = "0.22"
+# Hashing — SHAKE-256 (XOF, FIPS 202) used for tx hashing, address derivation, roots
+sha3 = "0.10"
+# Post-quantum signatures — ML-DSA (FIPS 204) pure-Rust implementation
+ml-dsa = "0.1.0-rc.8"
+# Post-quantum KEM — ML-KEM-768 (FIPS 203) pure-Rust implementation
+ml-kem = { version = "0.3.0-rc.2", default-features = false }
+# Post-quantum signatures — SLH-DSA (FIPS 205) pure-Rust implementation
+slh-dsa = "0.1"
+# Error handling
+thiserror = "2"
+anyhow = "1"
+# Logging / observability
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "registry", "json"] }
+# Testing
+proptest = "1"
+criterion = { version = "0.5", features = ["html_reports"] }
+getrandom = { version = "0.4", features = ["sys_rng"] }
+# RocksDB — column-family-backed chain store (ADR-032 / TASK-103).
+# `default-features = false` disables `bindgen-runtime` (no clang needed; uses pre-generated
+# FFI bindings).  RocksDB C++ is still compiled from the bundled source — requires gcc-c++:
+#   dnf install gcc-c++ make   (RHEL/Rocky/Alma 9)
+# `multi-threaded-cf` enables concurrent column-family handle access.
+# `lz4` enables LZ4 block compression for the blocks/checkpoints CFs.
+rocksdb = { version = "0.22", default-features = false, features = ["multi-threaded-cf", "lz4"] }
+
+# PKCS#11 binding for SoftHSM2 / AWS CloudHSM / Thales / YubiHSM.
+# `cryptoki` (NOT the older `pkcs11` crate) is the maintained binding from
+# Parallaxsecond — safer API surface, RAII session handles, typed mechanisms.
+# Pinned to 0.12 (released 2026-Q1, current as of 2026-05) for a stable
+# `Pkcs11::new()` + `MechanismType` API surface; bumps to 0.13+ should be
+# vetted for breaking changes to the `Object`/`AttributeInfo` traits.
+# Off by default in workspace builds — only `pqc-hsm` opts in via the
+# `softhsm` cargo feature; this keeps non-HSM crates from pulling the
+# native PKCS#11 link line through their build graph.
+cryptoki = "0.12"
+
+[patch.crates-io]
+# Vendor patch for slh-dsa 0.1.0: removes RandomizedSigner impl that is incompatible
+# with signature 2.3.0-pre.7+ (trait signature changed between pre.4 and pre.7).
+# Uses stable signature ^2.2 (Signer, Verifier, KeypairRef, Error all present; rand_core
+# feature dropped as code uses rand_core directly, not via signature re-export).
+# This avoids workspace conflict: libp2p → ed25519-dalek → signature ^2 (stable only).
+# ml-dsa 0.1.0-rc.8 uses signature 3.0.0-rc.10 (separate major version; no conflict).
+slh-dsa = { path = "vendor/slh-dsa" }
+
+# Vendor patch for libp2p-tls 0.6.2 — adds an injection seam for
+# `rustls::crypto::CryptoProvider` (additive: existing API unchanged).
+# Without this seam consumers cannot plug in `rustls-post-quantum` to enable
+# X25519MLKEM768 hybrid TLS on the libp2p handshake. Tracking upstream:
+# libp2p/rust-libp2p#6236 (zero movement since 2025-12-28). Drops the day
+# the upstream PR lands. Patch surface ~50 LOC in src/lib.rs + src/upgrade.rs.
+# See vendor/libp2p-tls-pq/Cargo.toml for the full patch-notes block and
+# the private design notes for the decision.
+libp2p-tls = { path = "vendor/libp2p-tls-pq" }
+
+# Vendor patch for libp2p-quic 0.13.0 — adds `Config::new_with_provider()`
+# that threads a custom `rustls::crypto::CryptoProvider` into both the
+# client- and server-side libp2p-tls configs underneath QUIC. Pairs with
+# the libp2p-tls patch above (libp2p-quic uses libp2p-tls for the underlying
+# TLS handshake). Same drop-trigger: libp2p/rust-libp2p#6236.
+libp2p-quic = { path = "vendor/libp2p-quic-pq" }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+# Arithmetic overflow = hard panic in release too. Consensus / fee /
+# staking math MUST never silently wrap; an overflow is either a bug or
+# an attacker-crafted input, and both outcomes are preferable-to-crash
+# over silent corruption. Per docs/phase-8-audit-plan.md §2.1.
+overflow-checks = true
+
+# Workspace-wide lints — codified here (not only in CI) so a `cargo
+# clippy` run anywhere in the tree produces the same result the
+# auditors will see at kickoff. Deny rules target the classes the
+# audit-plan §2.1 calls out as non-negotiable. Individual crates may
+# `#[allow(...)]` at call site with a written justification.
+[workspace.lints.clippy]
+# Hard denials — panic and silent-truncation classes forbidden in
+# production code. Tests use `#[allow(...)]` per-function if needed.
+unwrap_used = "warn"
+expect_used = "warn"
+indexing_slicing = "warn"
+# Deny outright: these are almost always bugs rather than conscious
+# choices, and the audit report will flag each one regardless.
+uninlined_format_args = "deny"
+needless_borrows_for_generic_args = "deny"
+
+[workspace.lints.rust]
+# Unsafe code is allowed *only* with an explicit `// SAFETY:` comment
+# proving the invariant. cargo-geiger is expected to report 0 on this
+# repo (verified 2026-04-22 in docs/phase-8-audit-readiness.md).
+unsafe_code = "warn"

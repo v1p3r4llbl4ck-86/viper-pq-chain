@@ -1,0 +1,49 @@
+{
+  "name": "@v1p3r4llbl4ck/sdk",
+  "version": "0.3.0",
+  "description": "TypeScript SDK for Viper PQ Chain — post-quantum-native blockchain, aligned with the viper-pq-1 launch architecture (ADR-053). 0.3.0 adds typed read methods for the algorithm registry, single-validator detail, account attestation listing and on-chain governance proposals + votes.",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc",
+    "build:watch": "tsc --watch",
+    "lint": "eslint src --ext .ts",
+    "test": "jest --config jest.config.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "viper",
+    "viper-pq-1",
+    "pq-chain",
+    "post-quantum",
+    "blockchain",
+    "ml-dsa",
+    "slh-dsa",
+    "sdk",
+    "governance",
+    "algorithm-registry"
+  ],
+  "license": "Apache-2.0",
+  "homepage": "https://github.com/v1per-pqchain/viper-pqchain#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/v1per-pqchain/viper-pqchain.git",
+    "directory": "sdk/typescript"
+  },
+  "bugs": {
+    "url": "https://github.com/v1per-pqchain/viper-pqchain/issues"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^20.0.0",
+    "jest": "^30.3.0",
+    "ts-jest": "^29.4.9",
+    "typescript": "^5.4.0"
+  }
+}

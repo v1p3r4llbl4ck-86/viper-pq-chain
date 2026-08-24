@@ -1,0 +1,82 @@
+---
+# site.yml — full provisioning playbook
+#
+# Runs the complete stack in dependency order:
+#   1. common      — system packages, users, directories
+#   2. rust        — Rust toolchain
+#   3. build       — clone repo, cargo build --release, install binary
+#   4. configure   — generate node.json and systemd unit from templates
+#   5. firewall    — UFW rules
+#   6. deploy      — enable + start service, wait for readiness
+#
+# Order matters: validators are configured before full nodes so that
+# full node templates can read the validator's ansible_host from hostvars.
+
+- name: Provision Viper PQ Chain Mainnet
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Validate required inventory variables
+      assert:
+        that:
+          - viper_node_id is defined
+          - viper_role is defined
+          - viper_role in ['validator', 'full']
+          - viper_chain_id is defined
+          - viper_p2p_port is defined
+          - viper_repo_url is defined
+          - viper_repo_url != "https://github.com/YOUR_USER/viper-pq-chain.git"
+        fail_msg: >
+          Missing or unconfigured inventory variables.
+          Copy inventory/hosts.yml.example to inventory/hosts.yml
+          and fill in real IPs and viper_repo_url.
+
+    - name: Validate validator has api_port
+      assert:
+        that:
+          - viper_api_port is defined
+        fail_msg: "validators group hosts must define viper_api_port"
+      when: viper_role == 'validator'
+
+    - name: Validate notary variables on validator
+      assert:
+        that:
+          - notary_service_account_seed_hex is defined
+          - notary_service_account_seed_hex | length == 64
+          - notary_service_account_address_hex is defined
+          - notary_service_account_address_hex | length == 64
+        fail_msg: >
+          Validator is missing notary variables.
+          Set notary_service_account_seed_hex and notary_service_account_address_hex
+          in group_vars/validators.yml or via a vault lookup in hosts.yml.
+      when: viper_role == 'validator'
+
+  roles:
+    - common
+    - rust
+    - build
+    - configure
+    - firewall
+    - deploy
+    - role: notary
+      when: viper_role == 'validator'
+      when: viper_role == 'validator'
+    - zabbix
+
+  post_tasks:
+    - name: Print deployment summary
+      debug:
+        msg: >-
+          Node {{ viper_node_id }} ({{ viper_role }}) deployed.
+          Binary: {{ viper_binary_path }}
+          Config: {{ viper_config_dir }}/node.json
+          Data:   {{ viper_data_dir }}/{{ viper_node_id }}
+          {% if viper_role == 'validator' %}
+          API:     http://{{ ansible_host }}:{{ viper_api_port }}/v1/status
+          Dashboard: https://{{ notary_domain }}/
+          Explorer:  https://{{ notary_domain }}/explorer
+          Notarize:  https://{{ notary_domain }}/notarize
+          API Docs:  https://{{ notary_domain }}/docs
+          {% endif %}

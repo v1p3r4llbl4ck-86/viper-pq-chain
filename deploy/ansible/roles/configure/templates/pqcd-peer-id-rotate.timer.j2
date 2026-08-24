@@ -1,0 +1,39 @@
+[Unit]
+Description=Viper PQ Chain — 90-day libp2p PeerId rotation tick (R-14 operational guardrail)
+Documentation=file://{{ viper_repo_path | default('/opt/viper-pq-chain') }}/docs/historical/RUNBOOK-PEER-ID-ROTATION-viper-research-1.md
+
+[Timer]
+# Quarterly cadence staggered across the validator set so no two
+# validators rotate in the same 1-hour window — see
+# docs/historical/RUNBOOK-PEER-ID-ROTATION-viper-research-1.md.
+#
+# Default mapping (3-validator set):
+#   validator-1 → 01,04,07,10 (Jan / Apr / Jul / Oct)
+#   validator-2 → 02,05,08,11 (Feb / May / Aug / Nov)
+#   validator-3 → 03,06,09,12 (Mar / Jun / Sep / Dec)
+#
+# Operator can override per-host by setting `viper_peer_id_rotate_months`
+# explicitly in inventory; the default below maps from the per-host
+# `viper_validator_node_id` set in `inventory/hosts.ini`. Hosts whose
+# validator-id is not in the table fall back to the default of all-12
+# months — effectively a monthly rotation, which the operator probably
+# does NOT want but is the safe non-silent failure mode (clearly visible
+# in `systemctl list-timers`).
+{% set _vnid_to_months = {
+  'validator-1': '01,04,07,10',
+  'validator-2': '02,05,08,11',
+  'validator-3': '03,06,09,12',
+} %}
+{% set _months = viper_peer_id_rotate_months | default(_vnid_to_months[viper_validator_node_id] | default('01,02,03,04,05,06,07,08,09,10,11,12')) %}
+OnCalendar={{ viper_peer_id_rotate_calendar | default('*-' ~ _months ~ '-01 03:30:00 UTC') }}
+# 30-min jitter so 3 hosts on the same month-day don't all fire at
+# exactly 03:30 — defends against a coincident-restart consensus
+# blip if two validators ever land on the same month (they shouldn't
+# given the staggering, but operator may override).
+RandomizedDelaySec=30min
+Persistent=true
+AccuracySec=1min
+Unit=pqcd-peer-id-rotate.service
+
+[Install]
+WantedBy=timers.target

@@ -1,0 +1,101 @@
+name: release
+
+# Tag vX.Y.Z → release binaries (linux x86_64), container images on ghcr.io
+# signed with cosign (keyless), SBOMs, checksums, and a GitHub Release that
+# carries all of it. The release build is the public-chain build: no token
+# economics, hybrid post-quantum TLS on.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+  id-token: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_BUILD_JOBS: ${{ vars.CARGO_BUILD_JOBS || 3 }}
+  RELEASE_FEATURES: --no-default-features --features hybrid-kem-tls
+
+jobs:
+  binaries:
+    name: linux x86_64 binaries
+    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.92.0
+      - uses: Swatinem/rust-cache@v2
+      - name: build
+        run: cargo build --release $RELEASE_FEATURES -p pqcd -p viper-archival-sidecar
+      - name: package
+        run: |
+          set -e
+          v=${GITHUB_REF_NAME}
+          mkdir -p dist
+          for b in pqcd viper-archival-sidecar; do
+            tar -C target/release -czf "dist/${b}-${v}-linux-x86_64.tar.gz" "$b"
+          done
+          cp LICENSE.md NOTICE dist/
+          (cd dist && sha256sum *.tar.gz > SHA256SUMS)
+      - name: SBOM (CycloneDX) of the workspace
+        uses: anchore/sbom-action@v0
+        with:
+          path: .
+          format: cyclonedx-json
+          output-file: dist/viper-pq-chain-${{ github.ref_name }}.cdx.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+  images:
+    name: container images → ghcr.io
+    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    strategy:
+      matrix:
+        image: [pqcd, viper-archival-sidecar]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/${{ matrix.image }}.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ github.ref_name }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:latest
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ github.ref_name }}
+      - uses: sigstore/cosign-installer@v3
+      - name: sign (keyless, Sigstore)
+        run: cosign sign --yes ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
+
+  publish:
+    name: GitHub Release
+    needs: [binaries, images]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          generate_release_notes: true
+          body: |
+            Release build of Viper PQ Chain (`--no-default-features --features hybrid-kem-tls`: no token economics, hybrid post-quantum TLS).
+            Binaries for Linux x86_64 with `SHA256SUMS`; container images `ghcr.io/${{ github.repository_owner }}/pqcd` and `…/viper-archival-sidecar` tagged `${{ github.ref_name }}`, signed with cosign (keyless); CycloneDX SBOM attached.
+            Licences: LICENSE.md (Apache-2.0 verification path, BUSL-1.1 node, CC BY 4.0 documents).

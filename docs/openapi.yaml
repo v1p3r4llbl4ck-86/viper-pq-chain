@@ -1,0 +1,1710 @@
+openapi: "3.0.3"
+info:
+  title: Viper Chain API
+  version: "0.2.0"
+  description: >
+    API for interacting with Viper PQ Chain — a post-quantum digital trust
+    L1. The public chain is `viper-testnet-1` (`chain_id_hex` is the hex of
+    the ASCII chain id, e.g. `76697065722d746573746e65742d31`); it is
+    created after the public release, so there is no live network to
+    query at publication time. Routes marked "specified, not implemented"
+    are documented for SDK alignment but are not served by `pqcd`. Use these
+    endpoints to query chain state, submit transactions, look up
+    attestations / proofs / governance receipts, manage verifiable
+    credentials, and anchor proofs.
+    Spec version aligns with the Viper SDK 0.2.0 release (TS + Python),
+    which predates `viper-testnet-1` and is re-aligned before republishing.
+
+servers:
+  - url: https://rpc.pqchain.agwswebconsulting.it
+    description: Planned public read API of viper-testnet-1 (DNS published at genesis; not live at publication time)
+  - url: http://localhost:26657
+    description: Local devnet node (default API port)
+
+tags:
+  - name: Chain
+    description: Network status, blocks, transaction lookups, and fee market info
+  - name: Accounts
+    description: Account balance and key information
+  - name: Validators
+    description: Validator set queries
+  - name: Attestations
+    description: Lookup of finalized attestations by id (the on-chain layer beneath /api/credentials)
+  - name: Proofs
+    description: Anchor and verify proofs of ownership, custody, or metadata
+  - name: Governance
+    description: Governance proposal execution receipts
+  - name: Archival
+    description: Archival overlay records (SPEC-ARCHIVAL-001)
+  - name: Credentials
+    description: Issue and verify digital credentials
+  - name: Transactions
+    description: Submit signed transactions
+  - name: Notarization
+    description: Document notarization service
+  - name: System
+    description: Health checks, metrics, and operational endpoints
+
+paths:
+  # ── Chain ────────────────────────────────────────────────────────────────────
+  /v1/network:
+    get:
+      tags: [Chain]
+      summary: Get network identity
+      description: >
+        Returns the chain id (hex), current tip height, tip hash, state
+        root at the tip, and the bootstrap recovery source for this
+        node. Implemented by `crates/pqcd/src/api.rs::handle_network`.
+      operationId: getNetwork
+      responses:
+        "200":
+          description: Network identity snapshot
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkResponse"
+              example:
+                chain_id: "76697065722d70712d31"
+                height: 3462
+                tip_hash: "1c730e583768424c66b1312c70a062fadc41bf83670f94ca3f5604c236861a67"
+                state_root: "c69dce3dd8023da4a761e9cb1c5585910abbe906217e20ff070b0be62d2f80ea"
+                recovery_source: "full_replay"
+
+  /v1/status:
+    get:
+      tags: [Chain]
+      summary: Get node status
+      description: >
+        Returns the current node status including chain identity, block
+        height, tip hash, state root, base fee (compute dimension), and
+        epoch information. Used by the block explorer to determine
+        ONLINE/OFFLINE status. Implemented by
+        `crates/pqcd/src/devnet.rs::handle_status`.
+      operationId: getStatus
+      responses:
+        "200":
+          description: Current node status
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StatusResponse"
+              example:
+                node_id: "validator-1"
+                chain_id: "viper-testnet-1"
+                height: 3462
+                tip_hash: "1c730e583768424c66b1312c70a062fadc41bf83670f94ca3f5604c236861a67"
+                state_root: "c69dce3dd8023da4a761e9cb1c5585910abbe906217e20ff070b0be62d2f80ea"
+                syncing: false
+                base_fee: 100
+                epoch_number: 57
+                epoch_length_blocks: 60
+
+  /v1/blocks/latest:
+    get:
+      tags: [Chain]
+      summary: Get the latest committed block
+      description: >
+        Returns the latest committed block header. Implemented by
+        `crates/pqcd/src/api.rs::handle_latest_block`.
+      operationId: getLatestBlock
+      responses:
+        "200":
+          description: Latest block header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockResponse"
+        "404":
+          description: No blocks committed yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/blocks/{height}:
+    get:
+      tags: [Chain]
+      summary: Get block by height
+      description: Returns a finalized block header at the specified height.
+      operationId: getBlock
+      parameters:
+        - name: height
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Block height
+      responses:
+        "200":
+          description: Block header
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlockResponse"
+              example:
+                height: 1
+                block_hash: "3298b17716cc11f3c96338eccc30d83216baacdc7999321ae3c755cef8505e80"
+                prev_hash: "0000000000000000000000000000000000000000000000000000000000000000"
+                state_root: "5f7cffae01c89d3c2083149bb262a11a45fe80fb8c83623d8f71858fec4a2d6f"
+                tx_root: "cd1f2983870c17a95e8c1ff09d6f87433bdfcda3f4d337c7f674a5986e050f40"
+                proposer: "1e8d7e0409cdf863dda465627cfb84a58e04bf9e2bbc6852228bf343c048e0a9"
+                timestamp: 1777125588
+                tx_count: 0
+                tx_hashes: []
+                bytes_used: 0
+        "404":
+          description: Block not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/txs/{hash}:
+    get:
+      tags: [Chain]
+      summary: Get transaction by hash
+      description: Looks up a finalized transaction by its hash (64-character hex string).
+      operationId: getTransaction
+      parameters:
+        - name: hash
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+          description: Transaction hash (64 hex characters)
+      responses:
+        "200":
+          description: Transaction details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TransactionResponse"
+        "400":
+          description: Invalid hash format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Transaction not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/fee-market:
+    get:
+      tags: [Chain]
+      summary: Get fee market state
+      description: >
+        Returns the current multi-dimensional EIP-4844 fee market state
+        (ADR-053 §T2.1, SPEC-FEE-002 v0.2). At launch only the
+        `compute` dimension is wired to real tx activity; `storage`,
+        `witness`, and `contention` are reserved slots pinned at their
+        reserve floor (target = 0). The top-level `base_fee` and
+        `block_gas_limit` fields are backwards-compatible aliases for
+        `compute.base_fee` and `compute.limit`. Implemented by
+        `crates/pqcd/src/devnet.rs::handle_fee_market`.
+      operationId: getFeeMarket
+      responses:
+        "200":
+          description: Fee market state
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FeeMarketResponse"
+              example:
+                base_fee: 100
+                block_gas_limit: 10000000
+                burn_rate_bps: 0
+                compute:
+                  base_fee: 100
+                  limit: 10000000
+                  target: 5000000
+                  excess: 0
+                  reserve_floor: 100
+                  update_fraction: 3338477
+                storage:
+                  base_fee: 100
+                  limit: 0
+                  target: 0
+                  excess: 0
+                  reserve_floor: 100
+                  update_fraction: 1
+                witness:
+                  base_fee: 100
+                  limit: 0
+                  target: 0
+                  excess: 0
+                  reserve_floor: 100
+                  update_fraction: 1
+                contention:
+                  base_fee: 100
+                  limit: 0
+                  target: 0
+                  excess: 0
+                  reserve_floor: 100
+                  update_fraction: 1
+
+  # ── Accounts ─────────────────────────────────────────────────────────────────
+  /v1/accounts/{address}:
+    get:
+      tags: [Accounts]
+      summary: Get account by address
+      description: Returns account balance and nonce for the given address (64-character hex).
+      operationId: getAccount
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+          description: Account address (64 hex characters)
+      responses:
+        "200":
+          description: Account details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountResponse"
+              example:
+                address: "087024f943f46283fbfffd2536313d74a87c39aee943f5b4dce88a6f1ba53cfc"
+                nonce: 2
+                balance: "49900"
+        "400":
+          description: Invalid address format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Account not found
+
+  /v1/accounts/{address}/attestations:
+    get:
+      tags: [Accounts, Attestations]
+      summary: List attestations issued by an account (specified, not implemented)
+      description: |
+        Returns every finalized attestation whose `attester` matches the requested address.
+        Useful for surfacing a notary's history, an organization's issued credentials, etc.
+      operationId: getAccountAttestations
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+            example: "ff1359c9d4b25fcaf81b8cec4d1494a7e523c256e16b59f5d5884adf827b4b83"
+      responses:
+        "200":
+          description: List of attestations issued by this address (possibly empty)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AttestationResponse"
+        "400":
+          description: Malformed address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Algorithms ──────────────────────────────────────────────────────────────
+  /v1/algorithms:
+    get:
+      tags: [Algorithms]
+      summary: List algorithm registry entries
+      description: |
+        Returns every entry in the on-chain algorithm registry — the set of
+        signature / KEM algorithms the chain currently dispatches on. New
+        entries are added via `ProposalEffect::AddAlgorithm` governance.
+        Public response intentionally omits internal calibration constants
+        (benchmark numbers, per-algorithm fee floors); use `/v1/fee-market`
+        for the live per-dimension fees.
+      operationId: getAlgorithms
+      responses:
+        "200":
+          description: Algorithm registry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/AlgorithmEntry"
+
+  /v1/algorithms/{alg_id}:
+    get:
+      tags: [Algorithms]
+      summary: Get a single algorithm registry entry
+      operationId: getAlgorithm
+      parameters:
+        - name: alg_id
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: uint16
+            example: 2
+      responses:
+        "200":
+          description: Algorithm entry
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/AlgorithmEntry"
+        "404":
+          description: Algorithm id not registered
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Validators ───────────────────────────────────────────────────────────────
+  /v1/validators:
+    get:
+      tags: [Validators]
+      summary: List validators
+      description: Returns all registered validators in the current validator set.
+      operationId: getValidators
+      responses:
+        "200":
+          description: Validator list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Validator"
+              example:
+                - address: "087024f943f46283fbfffd2536313d74a87c39aee943f5b4dce88a6f1ba53cfc"
+                  node_id: "validator-1"
+                  consensus_alg_id: 2
+                  status: "active"
+                  self_bond: "0"
+                  registered_height: 0
+
+  /v1/validators/{address}:
+    get:
+      tags: [Validators]
+      summary: Get a single validator by operator address
+      operationId: getValidator
+      parameters:
+        - name: address
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+      responses:
+        "200":
+          description: Validator detail
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ValidatorDetail"
+        "400":
+          description: Malformed address
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Validator not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Attestations ─────────────────────────────────────────────────────────────
+  /v1/attestations/{id}:
+    get:
+      tags: [Attestations]
+      summary: Get attestation by id
+      description: >
+        Returns a finalized attestation record by its 32-byte id (64
+        hex characters). Implemented by the node runtime at
+        `crates/pqcd/src/devnet.rs::handle_attestation` and by the
+        api-only handler at `crates/pqcd/src/api.rs::handle_attestation`.
+      operationId: getAttestation
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+          description: Attestation id (64 hex characters)
+      responses:
+        "200":
+          description: Attestation details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AttestationResponse"
+        "400":
+          description: Invalid attestation id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Attestation not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Proofs ───────────────────────────────────────────────────────────────────
+  /v1/proofs/{anchor_id}:
+    get:
+      tags: [Proofs]
+      summary: Get proof anchor by anchor id
+      description: >
+        Returns a finalized proof anchor record by its 32-byte anchor
+        id (64 hex characters). Implemented by the node runtime at
+        `crates/pqcd/src/devnet.rs::handle_get_proof_anchor` and by the
+        api-only handler at `crates/pqcd/src/api.rs::handle_proof_anchor`.
+      operationId: getProofAnchor
+      parameters:
+        - name: anchor_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+          description: Anchor id (64 hex characters)
+      responses:
+        "200":
+          description: Proof anchor details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProofAnchorResponse"
+        "400":
+          description: Invalid anchor id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Proof anchor not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/proofs/anchor:
+    post:
+      tags: [Proofs]
+      summary: Anchor a proof
+      description: >
+        Validates proof anchoring parameters and returns a structured response
+        describing the transaction that would be built. This is a convenience
+        endpoint for building proof anchor transactions.
+      operationId: anchorProof
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ProofAnchorRequest"
+            example:
+              owner_address: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+              claim_type: "ownership"
+              document_hash: "aabbccdd00112233aabbccdd00112233aabbccdd00112233aabbccdd00112233"
+              proof_hash: "11223344556677881122334455667788112233445566778811223344556677aa"
+      responses:
+        "200":
+          description: Proof anchoring accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProofAnchorApiResponse"
+              example:
+                status: "accepted"
+                proof_id: "f1e2d3c4b5a6..."
+                msg_type: "proof_anchor"
+                verify_url: "/api/proofs/f1e2d3c4b5a6..."
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/proofs/{id}:
+    get:
+      tags: [Proofs]
+      summary: Get proof by id
+      description: >
+        Returns a proof anchor record with business-friendly field names.
+        Wraps the on-chain proof anchor data.
+      operationId: getProof
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+          description: Proof ID (64 hex characters)
+      responses:
+        "200":
+          description: Proof details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ProofResponse"
+        "400":
+          description: Invalid proof id format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Proof not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Governance ───────────────────────────────────────────────────────────────
+  /v1/governance/receipts/{proposal_id}:
+    get:
+      tags: [Governance]
+      summary: Get governance proposal execution receipt (specified, not implemented)
+      description: >
+        Returns the execution receipt for a finalized governance
+        proposal. Implemented by
+        `crates/pqcd/src/api.rs::handle_governance_receipt`.
+      operationId: getGovernanceReceipt
+      parameters:
+        - name: proposal_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+          description: Proposal id (tx hash, 64 hex characters)
+      responses:
+        "200":
+          description: Governance receipt
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GovernanceReceiptResponse"
+        "400":
+          description: Invalid proposal id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Governance receipt not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/governance/proposals:
+    get:
+      tags: [Governance]
+      summary: List pending governance proposals
+      description: |
+        Lists governance proposals currently in `voting`, `executed`,
+        `expired`, `rejected`, or `execution_failed` state. Includes a
+        per-proposal `vote_summary` ({yes, no, total}). For per-voter
+        ballot detail use `/v1/governance/proposals/{proposal_id}/votes`.
+      operationId: getProposals
+      responses:
+        "200":
+          description: Proposal list (possibly empty)
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ProposalSummary"
+
+  /v1/governance/proposals/{proposal_id}:
+    get:
+      tags: [Governance]
+      summary: Get a single governance proposal (specified, not implemented)
+      operationId: getProposal
+      parameters:
+        - name: proposal_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+      responses:
+        "200":
+          description: Proposal detail
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    $ref: "#/components/schemas/ProposalSummary"
+        "400":
+          description: Malformed proposal id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Proposal not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /v1/governance/proposals/{proposal_id}/votes:
+    get:
+      tags: [Governance]
+      summary: Per-voter ballot for a governance proposal (specified, not implemented)
+      description: |
+        Returns the per-voter ballot record for a proposal. Voter records
+        are sorted by validator address for deterministic output.
+      operationId: getProposalVotes
+      parameters:
+        - name: proposal_id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+      responses:
+        "200":
+          description: Votes
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: object
+                    required: [proposal_id, voting_deadline, status, votes]
+                    properties:
+                      proposal_id:
+                        type: string
+                      voting_deadline:
+                        type: integer
+                        format: uint64
+                      status:
+                        type: string
+                        enum: [voting, executed, expired, rejected, execution_failed]
+                      votes:
+                        type: array
+                        items:
+                          type: object
+                          required: [voter, vote]
+                          properties:
+                            voter:
+                              type: string
+                              pattern: "^[0-9a-f]{64}$"
+                            vote:
+                              type: string
+                              enum: [yes, no]
+        "400":
+          description: Malformed proposal id
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Proposal not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Archival overlay ─────────────────────────────────────────────────────────
+  /v1/archival/records:
+    get:
+      tags: [Archival]
+      summary: List archival records
+      description: >
+        Lists archival overlay records (SPEC-ARCHIVAL-001 §4.4) with
+        optional pagination via `since` and `limit`. Used by the M4.5
+        TSA sidecar (TASK-164) to find freshly-admitted records that
+        still need external anchoring. Implemented by
+        `crates/pqcd/src/devnet.rs::handle_archival_records_list`.
+      operationId: listArchivalRecords
+      parameters:
+        - name: since
+          in: query
+          required: false
+          schema:
+            type: integer
+            format: int64
+          description: Return only records with epoch_number >= since (default 0)
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Cap the number of returned records (default 256, max 4096)
+      responses:
+        "200":
+          description: Archival records list
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  records:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/ArchivalRecordSummary"
+              example:
+                records: []
+
+  /v1/archival/records/{epoch}:
+    get:
+      tags: [Archival]
+      summary: Get archival record by epoch (specified, not implemented)
+      description: >
+        Returns the archival overlay record for a specific epoch number.
+        Implemented by
+        `crates/pqcd/src/devnet.rs::handle_archival_record_by_epoch`.
+      operationId: getArchivalRecord
+      parameters:
+        - name: epoch
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+          description: Epoch number
+      responses:
+        "200":
+          description: Archival record details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ArchivalRecord"
+        "404":
+          description: Archival record not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Credentials ──────────────────────────────────────────────────────────────
+  /api/credentials/issue:
+    post:
+      tags: [Credentials]
+      summary: Issue a credential
+      description: >
+        Validates credential issuance parameters and returns a structured response
+        describing the transaction that would be built. This is a convenience
+        endpoint for building credential issuance transactions.
+      operationId: issueCredential
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CredentialIssueRequest"
+            example:
+              issuer_address: "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789"
+              subject: "1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef"
+              credential_type: "diploma"
+              content_hash: "aabbccdd00112233aabbccdd00112233aabbccdd00112233aabbccdd00112233"
+              schema_id: "edu-diploma-v1"
+      responses:
+        "200":
+          description: Credential issuance accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialIssueResponse"
+              example:
+                status: "accepted"
+                credential_id: "e3b0c44298fc1c149afbf4c8996fb924..."
+                msg_type: "attestation_create"
+                verify_url: "/api/credentials/e3b0c44298fc1c149afbf4c8996fb924..."
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/credentials/{id}:
+    get:
+      tags: [Credentials]
+      summary: Get credential by id
+      description: >
+        Returns a verifiable credential record with business-friendly field names.
+        Wraps the on-chain attestation data.
+      operationId: getCredential
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: "^[0-9a-f]{64}$"
+          description: Credential ID (64 hex characters)
+      responses:
+        "200":
+          description: Credential details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CredentialResponse"
+        "400":
+          description: Invalid credential id format
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Credential not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Transactions ─────────────────────────────────────────────────────────────
+  /v1/txs:
+    post:
+      tags: [Transactions]
+      summary: Submit a transaction
+      description: >
+        Broadcasts a signed transaction to the network. The transaction must be
+        encoded as base64 bytes in the request body.
+      operationId: submitTransaction
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TxSubmitRequest"
+            example:
+              encoding: "cbor-base64"
+              tx_bytes: "base64-encoded-transaction-bytes..."
+      responses:
+        "200":
+          description: Transaction accepted into mempool
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TxSubmitResponse"
+        "400":
+          description: Invalid transaction
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "429":
+          description: Rate limited
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── Notarization ─────────────────────────────────────────────────────────────
+  /api/notarize:
+    post:
+      tags: [Notarization]
+      summary: Notarize a document (served by the optional notary service, not by pqcd)
+      description: >
+        Submits a document hash for on-chain notarization. Returns a receipt
+        that can be used to verify the notarization later.
+      operationId: notarize
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotarizeRequest"
+            example:
+              document_hash: "aabbccdd00112233aabbccdd00112233aabbccdd00112233aabbccdd00112233"
+              metadata:
+                filename: "contract.pdf"
+                description: "Signed partnership agreement"
+      responses:
+        "200":
+          description: Notarization submitted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotarizeResponse"
+        "400":
+          description: Invalid input
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "500":
+          description: Internal server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /api/verify/{id}:
+    get:
+      tags: [Notarization]
+      summary: Verify a notarization (served by the optional notary service, not by pqcd)
+      description: >
+        Verifies a previously submitted notarization by its id. Returns the
+        notarization status and associated metadata.
+      operationId: verifyNotarization
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+          description: Notarization id
+      responses:
+        "200":
+          description: Notarization verification result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerifyResponse"
+        "404":
+          description: Notarization not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  # ── System ───────────────────────────────────────────────────────────────────
+  /api/health:
+    get:
+      tags: [System]
+      summary: Health check
+      description: Returns the health status of the node including chain height and uptime.
+      operationId: healthCheck
+      responses:
+        "200":
+          description: Node is healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+              example:
+                status: "ok"
+                chain_height: 3465
+                node_id: "validator-1"
+                uptime_seconds: 5271
+
+  /v1/metrics:
+    get:
+      tags: [System]
+      summary: Prometheus metrics
+      description: >
+        Returns the node's Prometheus text-format metrics (counters and
+        gauges). Stable metric names are part of the API contract — any
+        renaming is a breaking change recorded in CHANGELOG.md.
+        Implemented by `crates/pqcd/src/devnet.rs::handle_metrics`.
+      operationId: getMetrics
+      responses:
+        "200":
+          description: Prometheus exposition text
+          content:
+            text/plain:
+              schema:
+                type: string
+              example: |
+                # HELP pqchain_chain_height Current chain tip height
+                # TYPE pqchain_chain_height gauge
+                pqchain_chain_height 3465
+
+components:
+  schemas:
+    # ── Error ──────────────────────────────────────────────────────────────────
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Machine-readable error code
+            message:
+              type: string
+              description: Human-readable error description
+          required: [code, message]
+
+    # ── Chain ──────────────────────────────────────────────────────────────────
+    NetworkResponse:
+      type: object
+      description: >
+        Returned by GET /v1/network. `chain_id` is the hex-encoded chain id
+        bytes (e.g. `viper-testnet-1` is `76697065722d746573746e65742d31`).
+      properties:
+        chain_id:
+          type: string
+          description: Hex-encoded chain id bytes
+        height:
+          type: integer
+          format: int64
+        tip_hash:
+          type: string
+        state_root:
+          type: string
+        recovery_source:
+          type: string
+          enum: [full_replay, trusted_checkpoint]
+
+    StatusResponse:
+      type: object
+      description: Returned by GET /v1/status (node runtime surface).
+      properties:
+        node_id:
+          type: string
+        chain_id:
+          type: string
+          description: Plain chain id string (e.g. `viper-testnet-1`)
+        height:
+          type: integer
+          format: int64
+        tip_hash:
+          type: string
+        state_root:
+          type: string
+        syncing:
+          type: boolean
+        base_fee:
+          type: integer
+          format: int64
+          description: Compute-dimension base fee (alias for fee_market.compute.base_fee)
+        epoch_number:
+          type: integer
+          format: int64
+        epoch_length_blocks:
+          type: integer
+          format: int64
+
+    BlockResponse:
+      type: object
+      properties:
+        height:
+          type: integer
+          format: int64
+        block_hash:
+          type: string
+        prev_hash:
+          type: string
+        state_root:
+          type: string
+        tx_root:
+          type: string
+        proposer:
+          type: string
+        timestamp:
+          type: integer
+          format: int64
+          description: >
+            Block timestamp. ADR-053 §T1.1 defines on-chain timestamps
+            as uint64 nanoseconds UTC; the explorer surface continues
+            to expose seconds for backwards compatibility, see
+            CHANGELOG.md.
+        tx_count:
+          type: integer
+        tx_hashes:
+          type: array
+          items:
+            type: string
+        bytes_used:
+          type: integer
+          format: int64
+
+    TransactionResponse:
+      type: object
+      description: >
+        Live shape from `crates/pqcd/src/devnet.rs::handle_tx_lookup`.
+        Includes both the canonical fields (tx_hash, block_height,
+        sender, op_type, nonce, fee_venom, fee_tip, alg_id) and the
+        signature/payload bytes for replay verification.
+      properties:
+        tx_hash:
+          type: string
+        block_height:
+          type: integer
+          format: int64
+        sender:
+          type: string
+        op_type:
+          type: string
+          description: Debug-formatted MsgType
+        nonce:
+          type: integer
+        fee_venom:
+          type: string
+          description: Declared fee budget in venom (string to avoid u64 precision loss)
+        fee_tip:
+          type: integer
+        alg_id:
+          type: string
+        signature:
+          type: string
+        op_payload:
+          type: string
+        status:
+          type: string
+          enum: [pending, finalized, failed, not_found]
+
+    FeeMarketDimension:
+      type: object
+      description: One per-dimension entry of the multi-dim EIP-4844 market (ADR-053 §T2.1, SPEC-FEE-002 §6.1).
+      properties:
+        base_fee:
+          type: integer
+          format: int64
+          description: Adaptive base fee for this dimension (venom)
+        limit:
+          type: integer
+          format: int64
+          description: Hard per-block cap; governance-tunable
+        target:
+          type: integer
+          format: int64
+          description: EIP-4844 target per-block utilisation; 0 = dimension reserved (inactive)
+        excess:
+          type: integer
+          format: int64
+          description: Accumulated excess usage (saturating_sub of used − target)
+        reserve_floor:
+          type: integer
+          format: int64
+          description: Non-zero reserve floor (ungovernable to zero, ADR-053 §T2.1 / EIP-7918 lesson)
+        update_fraction:
+          type: integer
+          format: int64
+          description: EIP-4844 update fraction; controls reactivity of the exponential curve
+
+    FeeMarketResponse:
+      type: object
+      description: >
+        Multi-dimensional fee market state. `base_fee` and
+        `block_gas_limit` at the top level are backwards-compatible
+        aliases for `compute.base_fee` and `compute.limit`.
+      properties:
+        base_fee:
+          type: integer
+          format: int64
+        block_gas_limit:
+          type: integer
+          format: int64
+        burn_rate_bps:
+          type: integer
+        compute:
+          $ref: "#/components/schemas/FeeMarketDimension"
+        storage:
+          $ref: "#/components/schemas/FeeMarketDimension"
+        witness:
+          $ref: "#/components/schemas/FeeMarketDimension"
+        contention:
+          $ref: "#/components/schemas/FeeMarketDimension"
+
+    # ── Accounts ───────────────────────────────────────────────────────────────
+    AccountResponse:
+      type: object
+      properties:
+        address:
+          type: string
+        nonce:
+          type: integer
+        balance:
+          type: string
+          description: Balance as decimal string
+
+    # ── Validators ─────────────────────────────────────────────────────────────
+    Validator:
+      type: object
+      properties:
+        address:
+          type: string
+        node_id:
+          type: string
+        consensus_alg_id:
+          type: integer
+          description: Numeric alg_id (e.g. 2 = ML-DSA-65)
+        status:
+          type: string
+          enum: [candidate, active, jailed, unbonding, exited]
+        self_bond:
+          type: string
+          description: Reserved (token economics, not active on the public chain); always "0" on viper-testnet-1
+        registered_height:
+          type: integer
+          format: int64
+
+    ValidatorDetail:
+      description: |
+        Single-validator response (`GET /v1/validators/{address}`).
+        Adds `consensus_pk_hex` and `tombstoned` to the list-shape `Validator`.
+      type: object
+      properties:
+        address:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        node_id:
+          type: string
+        consensus_alg_id:
+          type: integer
+        consensus_pk_hex:
+          type: string
+          description: Validator consensus public key (hex)
+        self_bond:
+          type: string
+          description: Reserved (token economics, not active on the public chain)
+        status:
+          type: string
+          enum: [candidate, active, jailed, unbonding, exited]
+        registered_height:
+          type: integer
+          format: int64
+        tombstoned:
+          type: boolean
+
+    # ── Algorithms ─────────────────────────────────────────────────────────────
+    AlgorithmEntry:
+      description: |
+        On-chain algorithm registry entry — public projection.
+        Internal calibration (`benchmark_verify_per_sec`,
+        per-algorithm `min_fee` floor) is intentionally NOT exposed
+        in the public response.
+      type: object
+      required: [alg_id, spec_ref, pk_size, sig_size, lifecycle]
+      properties:
+        alg_id:
+          type: integer
+          format: uint16
+        spec_ref:
+          type: string
+          example: "FIPS 204"
+        pk_size:
+          type: integer
+          description: Public-key size in bytes
+        sig_size:
+          type: integer
+          description: Signature size in bytes
+        sig_class:
+          type: string
+          nullable: true
+          enum: [reduced, standard, premium, null]
+          description: |
+            Verification-cost class. `null` for KEM algorithms.
+        lifecycle:
+          type: string
+          enum: [active, discouraged, deprecated, banned]
+
+    # ── Governance proposals ───────────────────────────────────────────────────
+    ProposalSummary:
+      type: object
+      required: [proposal_id, proposal_type, proposer, voting_deadline, execute_after, status, rationale_hash, vote_summary]
+      properties:
+        proposal_id:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        proposal_type:
+          type: string
+          enum: [registry_update, burn_rate_update, fee_param_update, software_upgrade, add_algorithm, add_slashing_verifier, add_hash, add_auth_template]
+        proposer:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        voting_deadline:
+          type: integer
+          format: uint64
+        execute_after:
+          type: integer
+          format: uint64
+        status:
+          type: string
+          enum: [voting, executed, expired, rejected, execution_failed]
+        rationale_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+        vote_summary:
+          type: object
+          required: [yes, no, total]
+          properties:
+            yes:
+              type: integer
+            no:
+              type: integer
+            total:
+              type: integer
+
+    # ── Attestations ───────────────────────────────────────────────────────────
+    AttestationResponse:
+      type: object
+      properties:
+        attestation_id:
+          type: string
+        issuer:
+          type: string
+        subject:
+          type: string
+        schema_id:
+          type: string
+        payload_hash:
+          type: string
+        issued_at_height:
+          type: integer
+          format: int64
+        revoked_at_height:
+          type: integer
+          format: int64
+          nullable: true
+        attestation_type:
+          type: integer
+
+    # ── Proofs ─────────────────────────────────────────────────────────────────
+    ProofAnchorData:
+      type: object
+      properties:
+        anchor_id:
+          type: string
+        claimer:
+          type: string
+        claim_type:
+          type: integer
+        claim_type_name:
+          type: string
+          nullable: true
+        asset_id_hash:
+          type: string
+        proof_hash:
+          type: string
+        schema_id:
+          type: string
+          nullable: true
+        anchor_height:
+          type: integer
+          format: int64
+
+    ProofAnchorResponse:
+      type: object
+      description: Wrapper returned by GET /v1/proofs/{anchor_id}.
+      properties:
+        data:
+          $ref: "#/components/schemas/ProofAnchorData"
+
+    ProofAnchorRequest:
+      type: object
+      required: [owner_address, claim_type, document_hash, proof_hash]
+      properties:
+        owner_address:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Owner account address (64 hex characters)
+        claim_type:
+          type: string
+          description: Type of claim (e.g. "ownership", "custody", "asset_metadata")
+        document_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Hash of the document being proven (64 hex characters)
+        proof_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Hash of the proof material (64 hex characters)
+
+    ProofAnchorApiResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [accepted]
+        proof_id:
+          type: string
+          description: Computed proof identifier
+        msg_type:
+          type: string
+          enum: [proof_anchor]
+        verify_url:
+          type: string
+          description: URL to verify this proof
+
+    ProofResponse:
+      type: object
+      properties:
+        proof_id:
+          type: string
+        owner:
+          type: string
+        claim_type:
+          type: string
+        document_hash:
+          type: string
+        proof_hash:
+          type: string
+        anchored_at_block:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [anchored]
+        verify_url:
+          type: string
+
+    # ── Governance ─────────────────────────────────────────────────────────────
+    GovernanceReceiptResponse:
+      type: object
+      properties:
+        proposal_id:
+          type: string
+        proposal_type:
+          type: integer
+        proposal_type_name:
+          type: string
+        proposer:
+          type: string
+        target_alg_id:
+          type: integer
+        lifecycle_before:
+          type: string
+          enum: [active, discouraged, deprecated, banned]
+        lifecycle_after:
+          type: string
+          enum: [active, discouraged, deprecated, banned]
+        min_fee_before:
+          type: integer
+          format: int64
+        min_fee_after:
+          type: integer
+          format: int64
+        rationale_hash:
+          type: string
+        executed_at_height:
+          type: integer
+          format: int64
+
+    # ── Archival ───────────────────────────────────────────────────────────────
+    ArchivalRecordSummary:
+      type: object
+      properties:
+        epoch_number:
+          type: integer
+          format: int64
+        epoch_root:
+          type: string
+        signer_addresses:
+          type: array
+          items:
+            type: string
+        slh_signatures_count:
+          type: integer
+        timestamp_anchors_count:
+          type: integer
+        evidence_record_version:
+          type: integer
+
+    ArchivalRecord:
+      type: object
+      properties:
+        epoch_number:
+          type: integer
+          format: int64
+        epoch_root:
+          type: string
+        signer_addresses:
+          type: array
+          items:
+            type: string
+        slh_signatures:
+          type: array
+          items:
+            type: string
+        timestamp_anchors:
+          type: array
+          items:
+            type: object
+            properties:
+              kind:
+                type: integer
+              external_hash:
+                type: string
+              posted_at_height:
+                type: integer
+                format: int64
+        evidence_record_version:
+          type: integer
+
+    # ── Credentials ────────────────────────────────────────────────────────────
+    CredentialIssueRequest:
+      type: object
+      required: [issuer_address, subject, credential_type, content_hash, schema_id]
+      properties:
+        issuer_address:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Issuer account address (64 hex characters)
+        subject:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Subject identifier (64 hex characters)
+        credential_type:
+          type: string
+          description: Human-readable credential type (e.g. "diploma", "license")
+        content_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Hash of the credential content (64 hex characters)
+        schema_id:
+          type: string
+          description: Schema identifier for the credential format
+
+    CredentialIssueResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [accepted]
+        credential_id:
+          type: string
+          description: Computed credential identifier
+        msg_type:
+          type: string
+          enum: [attestation_create]
+        verify_url:
+          type: string
+          description: URL to verify this credential
+
+    CredentialResponse:
+      type: object
+      properties:
+        credential_id:
+          type: string
+        issuer:
+          type: string
+        subject:
+          type: string
+        credential_type:
+          type: string
+        issued_at_block:
+          type: integer
+          format: int64
+        status:
+          type: string
+          enum: [active, revoked]
+        content_hash:
+          type: string
+        verify_url:
+          type: string
+
+    # ── Transactions ───────────────────────────────────────────────────────────
+    TxSubmitRequest:
+      type: object
+      required: [encoding, tx_bytes]
+      properties:
+        encoding:
+          type: string
+          enum: [cbor-base64]
+          description: Encoding format (only "cbor-base64" is supported)
+        tx_bytes:
+          type: string
+          description: Base64-encoded transaction bytes
+
+    TxSubmitResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            tx_hash:
+              type: string
+            status:
+              type: string
+              enum: [pending]
+            min_fee_used:
+              type: string
+
+    # ── Notarization ───────────────────────────────────────────────────────────
+    NotarizeRequest:
+      type: object
+      required: [document_hash]
+      properties:
+        document_hash:
+          type: string
+          pattern: "^[0-9a-f]{64}$"
+          description: Hash of the document to notarize (64 hex characters)
+        metadata:
+          type: object
+          properties:
+            filename:
+              type: string
+            description:
+              type: string
+
+    NotarizeResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Notarization id
+        status:
+          type: string
+        tx_hash:
+          type: string
+
+    VerifyResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        status:
+          type: string
+          enum: [verified, not_found, pending]
+        document_hash:
+          type: string
+        notarized_at:
+          type: string
+          format: date-time
+
+    # ── System ─────────────────────────────────────────────────────────────────
+    HealthResponse:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        chain_height:
+          type: integer
+          format: int64
+        node_id:
+          type: string
+        uptime_seconds:
+          type: integer
+          format: int64

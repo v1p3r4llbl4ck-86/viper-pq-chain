@@ -1,0 +1,111 @@
+---
+# Flush any queued handlers (e.g. "restart pqcd" from configure role) before
+# probing. Without this, a config change would be on disk but pqcd would still
+# be running the old config when the health check fires.
+- name: Flush handlers before service readiness check
+  meta: flush_handlers
+
+- name: Enable and start pqcd service
+  systemd:
+    name:         pqcd
+    enabled:      yes
+    state:        started
+    daemon_reload: yes
+
+# Give the node a moment to initialize before we probe it.
+# 10s is more forgiving for nodes with a large on-disk block history that needs
+# to be scanned at startup before the API listener is ready.
+- name: Wait 10 seconds for node to initialize
+  wait_for:
+    timeout: 10
+  delegate_to: localhost
+  become: no
+
+# Validator: poll /v1/metrics until it responds (devnet-serve exposes Prometheus metrics on the API port).
+# 60 retries × 5 s = 5 min window, enough for startup with a deep block history.
+- name: Wait for validator API to become available
+  uri:
+    url:            "http://{{ ansible_host }}:{{ viper_api_port }}/v1/metrics"
+    return_content: yes
+    status_code:    200
+  register: api_probe
+  retries: 60
+  delay:   5
+  until:   api_probe.status == 200
+  failed_when: false
+  when: viper_role == 'validator'
+
+# Capture the last 60 journal lines whenever the validator API is unreachable.
+# This is the primary diagnostic tool: STATE_ROOT_MISMATCH (incompatible chain data),
+# bind failures, panics, and config parse errors all appear here.
+- name: Capture pqcd journal for diagnostics (validator)
+  command: journalctl -u pqcd -n 60 --no-pager --output=short-iso
+  register: pqcd_journal
+  changed_when: false
+  when: viper_role == 'validator' and (api_probe.status | default(-1)) != 200
+
+- name: Show pqcd journal (validator API did not respond)
+  debug:
+    msg: "{{ pqcd_journal.stdout_lines }}"
+  when: viper_role == 'validator' and (api_probe.status | default(-1)) != 200
+
+# Fail explicitly with an actionable message after showing the logs.
+- name: Assert validator API is reachable
+  assert:
+    that: (api_probe.status | default(-1)) == 200
+    fail_msg: >-
+      Validator API did not respond on http://{{ ansible_host }}:{{ viper_api_port }}/v1/metrics.
+      If the journal above shows STATE_ROOT_MISMATCH or CHECKPOINT_STATE_ROOT_MISMATCH,
+      the stored chain data is incompatible with this binary (e.g. state root computation
+      changed in a recent commit). Fix: run  make reset-chain  to wipe block data and
+      restart from genesis.
+  when: viper_role == 'validator'
+
+- name: Show validator chain status
+  debug:
+    msg: >-
+      Validator {{ viper_node_id }} ready. Metrics endpoint responding.
+  when: viper_role == 'validator'
+
+# Full nodes: check that P2P port opens within 120 s.
+# Non-fatal — a slow replay or a state-root mismatch won't abort the whole play;
+# the journal below will show the root cause.
+- name: Wait for full node P2P port to be open
+  wait_for:
+    host:    "127.0.0.1"
+    port:    "{{ viper_p2p_port }}"
+    timeout: 120
+  when: viper_role == 'full'
+  failed_when: false
+  register: p2p_probe
+
+# Always capture the full node journal so we have diagnostics regardless of outcome.
+- name: Capture pqcd journal (full node)
+  command: journalctl -u pqcd -n 60 --no-pager --output=short-iso
+  register: pqcd_journal_full_node
+  changed_when: false
+  when: viper_role == 'full'
+  failed_when: false
+
+- name: Show full node journal
+  debug:
+    msg: "{{ pqcd_journal_full_node.stdout_lines | default(['(no journal output)']) }}"
+  when: viper_role == 'full'
+
+- name: Show full node P2P status
+  debug:
+    msg: >-
+      {{ viper_node_id }} P2P port {{ viper_p2p_port }}:
+      {{ 'UP' if (p2p_probe.elapsed | default(-1)) >= 0 and p2p_probe.failed is not defined else 'NOT YET OPEN (see journal above)' }}
+  when: viper_role == 'full'
+
+# Final service-state check — always runs on every node.
+- name: Check pqcd service state
+  command: systemctl is-active pqcd
+  register: svc_state
+  changed_when: false
+  failed_when: false
+
+- name: Report service state
+  debug:
+    msg: "{{ viper_node_id }} ({{ viper_role }}) — pqcd service: {{ svc_state.stdout }}"

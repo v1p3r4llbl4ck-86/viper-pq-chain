@@ -1,0 +1,29 @@
+[package]
+name = "pqc-mempool"
+description = "Mempool admission, replacement policy, and per-sender budgets"
+version.workspace = true
+edition.workspace = true
+license = "BUSL-1.1"
+authors.workspace = true
+publish = false
+
+[dependencies]
+pqc-crypto  = { path = "../pqc-crypto" }
+pqc-types   = { path = "../pqc-types", default-features = false }
+pqc-tx      = { path = "../pqc-tx", default-features = false }
+pqc-state   = { path = "../pqc-state", default-features = false }
+hex.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[features]
+default = ["token_economics"]
+## Cross-workspace `token_economics` propagation. See pqc-state/Cargo.toml.
+token_economics = [
+    "pqc-state/token_economics",
+    "pqc-types/token_economics",
+    "pqc-tx/token_economics",
+]
+
+[dev-dependencies]
+pqc-crypto = { path = "../pqc-crypto", features = ["stub-verifier"] }

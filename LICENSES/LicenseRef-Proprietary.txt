@@ -1,0 +1,8 @@
+Proprietary — all rights reserved
+
+Copyright (c) 2026 Alberto Galassi.
+
+Files under this licence identifier are part of a product that is NOT part of
+the public release of Viper PQ Chain (the notary service and its frontend).
+They are kept in the private repository only. No licence, express or implied,
+is granted to anyone else to use, copy, modify or distribute them.

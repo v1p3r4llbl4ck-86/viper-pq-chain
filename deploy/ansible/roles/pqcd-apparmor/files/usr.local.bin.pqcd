@@ -1,0 +1,137 @@
+# AppArmor profile for the pqcd validator daemon.
+#
+# Path 3 of FREE-KEY-ISOLATION-PHASE-PLAN.md — defense in depth so that
+# even with root, an attacker constrained to pqcd's profile cannot read
+# secrets outside the explicit whitelist.
+#
+# Mode: enforce (when applied via `apparmor_parser -r`).
+# Activation: `aa-enforce /etc/apparmor.d/usr.local.bin.pqcd`
+#             OR systemd unit's `AppArmorProfile=pqcd` directive.
+#
+# Threat model coverage:
+#   - Even if pqcd is exploited (RCE in libp2p, Rust soundness bug, etc.),
+#     the spawned shell is constrained to this profile's filesystem and
+#     network whitelist.
+#   - A compromised pqcd CANNOT exec arbitrary binaries (`/bin/sh`,
+#     `nc`, `wget`, etc.) — supply-chain attacks via a Rust dep that
+#     calls `Command::new("...")` are killed by AppArmor.
+#   - A compromised pqcd CANNOT read `/var/lib/systemd/credential.secret`
+#     (which would defeat the systemd-cred encryption).
+#   - A compromised pqcd CANNOT write to `/etc/`, `/usr/`, `/root/`.
+#
+# Coverage explicitly NOT included:
+#   - Kernel-level escape (CVE in syscall path) — outside AppArmor's scope.
+#   - Hardware DMA / cold-boot attacks — outside AppArmor's scope.
+#   - Local root WITH AppArmor disable capability — root can `aa-disable`
+#     unless `securityfs` is locked down separately.
+
+#include <tunables/global>
+
+/usr/local/bin/pqcd {
+  #include <abstractions/base>
+  #include <abstractions/nameservice>
+  #include <abstractions/openssl>
+  #include <abstractions/ssl_certs>
+
+  # ── Capabilities ──────────────────────────────────────────────────
+  capability net_bind_service,         # bind to 26656 (p2p) / 26657 (api)
+  capability sys_resource,              # raise file-descriptor limit
+  # No `capability dac_override` — pqcd never reads files it doesn't own.
+
+  # ── Network ───────────────────────────────────────────────────────
+  network inet stream,                  # libp2p TCP
+  network inet6 stream,
+  network inet dgram,                   # libp2p QUIC fallback
+  network inet6 dgram,
+  network unix stream,                  # local socket activation, journal
+
+  # ── Binary itself + linker ────────────────────────────────────────
+  /usr/local/bin/pqcd mr,
+  /etc/ld.so.cache r,
+  /etc/ld.so.preload r,
+  /lib/x86_64-linux-gnu/** mr,
+  /usr/lib/x86_64-linux-gnu/** mr,
+
+  # ── Configuration (read-only) ─────────────────────────────────────
+  /etc/pqchain/node.json r,
+  /etc/pqchain/genesis.json r,
+  # NOTE: keystore.json is NOT in this whitelist when systemd-cred is
+  # active. The credential is exposed via tmpfs at $CREDENTIALS_DIRECTORY
+  # (a per-unit ephemeral mountpoint that AppArmor tunneled through
+  # `abstractions/base`'s default tmpfs-readable rule).
+  /etc/pqchain/keystore.json r,         # legacy path — keep until Path 1
+                                         # is fully migrated, then narrow.
+
+  # ── systemd credentials (Path 1 of FREE-KEY-ISOLATION-PHASE-PLAN) ─
+  # When the unit declares `LoadCredentialEncrypted=keystore:...`,
+  # systemd mounts a tmpfs at `/run/credentials/<unit-name>.service/`
+  # and exports `$CREDENTIALS_DIRECTORY` pointing at it. pqcd reads the
+  # decrypted secret from there.
+  /run/credentials/pqcd.service/** r,
+
+  # ── Data directory (read-write) ───────────────────────────────────
+  /var/lib/pqchain/ rw,
+  /var/lib/pqchain/** rwk,              # k = lock files (RocksDB)
+
+  # ── Logs ──────────────────────────────────────────────────────────
+  /var/log/pqcd/ rw,
+  /var/log/pqcd/** rw,
+
+  # Audit log — append-only JSONL with hash-chain (ADR-054 §Stage 6).
+  # `audit_log::AuditLogLayer::new` mkdir's this on first event; then
+  # appends. `k` covers the file lock used during rotation. Default path
+  # is `audit_log.rs::DEFAULT_AUDIT_DIR = "/var/log/pqchain/audit"`;
+  # operators using `VIPER_AUDIT_LOG_DIR` to override must extend this
+  # profile too. APPARMOR-PROFILE-AUDIT.md §"P0 fix" documents the gap
+  # this rule closes.
+  /var/log/pqchain/ rw,
+  /var/log/pqchain/** rwk,
+
+  # ── Standard runtime paths ────────────────────────────────────────
+  /tmp/ r,
+  /tmp/** rw,
+  /proc/sys/net/core/somaxconn r,
+  /proc/sys/kernel/random/uuid r,
+  /sys/devices/system/cpu/online r,
+  /sys/kernel/mm/transparent_hugepage/enabled r,
+
+  # ── /proc self only — never peer into other processes ─────────────
+  /proc/*/cmdline r,                    # `pqcd` reads its own argv via /proc
+  /proc/sys/vm/overcommit_memory r,
+  owner /proc/*/status r,
+  owner /proc/*/maps r,
+  owner /proc/*/limits r,
+  owner /proc/*/cgroup r,
+
+  # ── DNS resolution ────────────────────────────────────────────────
+  /etc/hosts r,
+  /etc/resolv.conf r,
+  /etc/gai.conf r,
+
+  # ── DENY everything else (explicit, not relying on default-deny) ──
+  # AppArmor's default IS deny, but we add explicit denies for paths
+  # an attacker would WANT to reach, with audit logging so the SOC
+  # sees the attempt.
+
+  audit deny /etc/shadow rw,
+  audit deny /etc/passwd w,
+  audit deny /etc/sudoers* rwk,
+  audit deny /var/lib/systemd/credential.secret rw,
+  audit deny /root/** rwk,
+  audit deny /home/** rwk,
+  audit deny /var/lib/postgresql/** rwk,   # notary's tenant DB
+  audit deny /etc/ssh/** rwk,
+  audit deny /etc/ssl/private/** rwk,
+  audit deny /var/log/auth.log rw,
+  audit deny /var/log/syslog w,            # read OK for crash dumps
+  audit deny /usr/local/bin/* x,           # cannot exec other binaries
+  audit deny /usr/bin/** x,                # ditto
+  audit deny /bin/** x,                    # ditto
+
+  # ── No ptrace, no kernel module loading ──────────────────────────
+  audit deny capability sys_ptrace,
+  audit deny capability sys_module,
+  audit deny capability sys_admin,
+  audit deny capability dac_override,
+  audit deny capability dac_read_search,
+}

@@ -1,0 +1,55 @@
+---
+# time-sync-deploy.yml — install NTS-enabled chrony on the entire fleet.
+#
+# TASK-150 — slashing DB safety requires a bounded clock skew between
+# honest validators. This playbook installs chrony 4+, configures 4
+# independent NTS (RFC 8915) sources, and arms a systemd timer
+# (chrony-drift-check.timer) that fires every 60 s and fails if the
+# last observed offset exceeds 100 ms.
+#
+# First-run blast radius: chrony replaces systemd-timesyncd on every
+# host. The clock may step up to ±1 s during the initial sync (makestep
+# 1.0 3). pqcd is resilient to small clock steps (RocksDB + libp2p do
+# not persist wall-clock timestamps in tight loops) but the operator
+# should run this during a low-traffic window and verify `chronyc
+# tracking` on each host post-deploy before declaring success.
+#
+# Use:
+#   ansible-playbook -i inventory/hosts.ini playbooks/time-sync-deploy.yml
+#
+# Rollback: re-enable systemd-timesyncd:
+#   ansible all -m systemd -a 'name=chrony state=stopped enabled=no'
+#   ansible all -m systemd -a 'name=systemd-timesyncd state=started enabled=yes'
+
+- name: Install NTS-enabled chrony on validator + full node hosts
+  hosts: all
+  become: yes
+  gather_facts: yes
+  roles:
+    - time-sync
+
+  post_tasks:
+    - name: Wait 10 s for chrony to pick NTS peers
+      pause:
+        seconds: 10
+
+    - name: Verify chrony tracking (offset must be finite + under 500 ms)
+      shell: |
+        set -euo pipefail
+        out=$(chronyc tracking)
+        echo "$out"
+        offset=$(printf '%s' "$out" | awk '/Last offset/ {print $4}')
+        abs=$(awk -v s="$offset" 'BEGIN { printf "%.6f", (s < 0 ? -s : s) }')
+        awk -v a="$abs" 'BEGIN { exit !(a < 0.5) }'
+      register: chrony_tracking
+      changed_when: false
+
+    - name: Print chrony tracking output
+      debug:
+        var: chrony_tracking.stdout_lines
+
+    - name: Verify at least one NTS source is authenticated
+      shell: |
+        set -euo pipefail
+        chronyc -N authdata | awk '$2 == "NTS" && $4 > 0 {n++} END {exit !(n >= 1)}'
+      changed_when: false

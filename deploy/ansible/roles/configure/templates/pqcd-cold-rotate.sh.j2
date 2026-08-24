@@ -1,0 +1,91 @@
+#!/bin/bash
+# Managed by Ansible — do not edit manually
+#
+# Viper PQ Chain — TASK-188 / TASK-188b cold-storage rotation wrapper.
+#
+# Stops pqcd, runs `pqcd cold-storage-export` for the heights
+# `1..(tip - viper_cold_rotate_keep_tail_blocks)`, optionally signs the
+# manifest with the operator's archival_sk, optionally anchors against
+# an RFC 3161 TSA, optionally pushes the directory to S3, and restarts
+# pqcd. Output streams to /var/log/pqchain/cold-rotate.log + journald.
+#
+# Invariants enforced by `pqcd cold-storage-export` itself:
+#   - cutoff > 0 (genesis preserved in the live store)
+#   - cutoff <= tip
+#   - --batch-size > 0
+#   - --sign-with-operator address must resolve to a keystore entry
+#     with an `archival_sk_hex` slot
+#
+# The wrapper computes the cutoff from `pqcd status` so the operator
+# does not have to track absolute heights manually. Upload to S3 is
+# in-band when the binary was built with `--features s3-upload` AND
+# `viper_cold_rotate_s3_uri` is set; otherwise the directory is left
+# on disk for an out-of-band `aws s3 sync`.
+
+set -u
+set -o pipefail
+
+PQCD={{ viper_binary_path }}
+CONFIG={{ viper_config_dir }}/node.json
+KEEP_TAIL_BLOCKS={{ viper_cold_rotate_keep_tail_blocks | default(1209600) }}
+BATCH_SIZE={{ viper_cold_rotate_batch_size | default(10000) }}
+SIGN_OPERATOR={{ viper_cold_rotate_sign_operator_hex | default('') }}
+ANCHOR_TSA={{ viper_cold_rotate_anchor_tsa_url | default('') }}
+S3_URI={{ viper_cold_rotate_s3_uri | default('') }}
+TSA_BEST_EFFORT={{ viper_cold_rotate_tsa_best_effort | default(true) | string | lower }}
+OUTPUT_ROOT={{ viper_cold_rotate_output_root | default('/var/cache/pqchain/cold') }}
+
+LOGFILE=/var/log/pqchain/cold-rotate.log
+RUN_TS=$(date -u +%FT%TZ)
+RUN_DIR="$OUTPUT_ROOT/$(date -u +%Y-%m-%d)"
+
+mkdir -p "$(dirname $LOGFILE)" "$OUTPUT_ROOT"
+chown pqchain:pqchain "$LOGFILE" 2>/dev/null || true
+chmod 644 "$LOGFILE" 2>/dev/null || true
+
+echo "[$RUN_TS] cold_rotate_start node_id={{ viper_node_id }} keep_tail_blocks=$KEEP_TAIL_BLOCKS \
+batch_size=$BATCH_SIZE sign=${SIGN_OPERATOR:+yes} anchor=${ANCHOR_TSA:+yes} upload=${S3_URI:+yes}" >> "$LOGFILE"
+
+# Restart pqcd on every exit path — even if the rotation fails, the
+# chain MUST come back up. Same pattern as pqcd-prune.sh.
+trap 'echo "[$(date -u +%FT%TZ)] restarting pqcd.service after cold-rotate" >> "$LOGFILE"; systemctl start pqcd.service || true' EXIT
+
+systemctl stop pqcd.service
+sleep 3
+
+# Resolve the live tip via `pqcd status`; the wrapper computes
+# cutoff = tip - keep_tail_blocks. status writes a single line of the
+# form `... chain_height: N ...` to stdout.
+TIP=$("$PQCD" status "$CONFIG" 2>/dev/null | awk -F': *' '/^chain_height:/ { print $2; exit }')
+if [[ -z "$TIP" || "$TIP" == "0" ]]; then
+    echo "[$(date -u +%FT%TZ)] cold_rotate_skip reason=empty_chain tip=$TIP" >> "$LOGFILE"
+    exit 0
+fi
+if (( TIP <= KEEP_TAIL_BLOCKS )); then
+    echo "[$(date -u +%FT%TZ)] cold_rotate_skip reason=tip_below_tail tip=$TIP keep=$KEEP_TAIL_BLOCKS" >> "$LOGFILE"
+    exit 0
+fi
+CUTOFF=$(( TIP - KEEP_TAIL_BLOCKS ))
+
+EXPORT_ARGS=(cold-storage-export "$CONFIG" --cutoff-height "$CUTOFF" --output-dir "$RUN_DIR" --batch-size "$BATCH_SIZE")
+if [[ -n "$SIGN_OPERATOR" ]]; then
+    EXPORT_ARGS+=(--sign-with-operator "$SIGN_OPERATOR")
+fi
+if [[ -n "$ANCHOR_TSA" ]]; then
+    EXPORT_ARGS+=(--anchor-tsa "$ANCHOR_TSA")
+    if [[ "$TSA_BEST_EFFORT" == "true" ]]; then
+        EXPORT_ARGS+=(--tsa-best-effort)
+    fi
+fi
+if [[ -n "$S3_URI" ]]; then
+    EXPORT_ARGS+=(--upload-to "$S3_URI/$(basename "$RUN_DIR")/")
+fi
+
+if "$PQCD" "${EXPORT_ARGS[@]}" 2>&1 | tee -a "$LOGFILE"; then
+    echo "[$(date -u +%FT%TZ)] cold_rotate_ok cutoff=$CUTOFF dir=$RUN_DIR" >> "$LOGFILE"
+    exit 0
+else
+    rc=$?
+    echo "[$(date -u +%FT%TZ)] cold_rotate_failed rc=$rc cutoff=$CUTOFF" >> "$LOGFILE"
+    exit "$rc"
+fi

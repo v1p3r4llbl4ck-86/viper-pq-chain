@@ -1,0 +1,95 @@
+# Known Issues and Accepted Risks
+
+This is the disclosure register of Viper PQ Chain. It lists what the
+author knows to be **incomplete**, **deferred**, or **accepted as risk**
+in this repository at the time of the public release. It is written for
+an external reviewer: if a limitation is not here, it is not known.
+
+Status of the network: **there is no live public chain.** The public
+chain `viper-testnet-1` is created after this release with
+`pqcd ceremony`; §2 lists what must be closed before its genesis. The
+chains that preceded it (`viper-pq-1`, `viper-research-1` and a
+single-validator lab) are retired; §5 records what they taught.
+
+Conventions: `R-nn` accepted risk, `G-nn` gap to close before genesis,
+`D-nn` deferred by design, `V-nn` development-only limitation.
+`TASK-nnn` and `ADR-nnn` refer to `TASKS.md` and `DECISIONS.md`.
+Every row was checked against the tree on 2026-08-24 (Rust 1.92.0,
+`cargo test --workspace --all-features`: 935 passed, 8 ignored).
+
+---
+
+## 1. Accepted risks
+
+Documented, not actionable now. Each row states the compensating control
+and, where one exists, the trigger that turns it into work.
+
+| ID | Area | Risk | Compensating control / trigger |
+|---|---|---|---|
+| R-01 | Crypto | No formally verified implementation is wired in. The stack is RustCrypto `ml-dsa` 0.1.0-rc.8 and `slh-dsa` 0.1.0 (the latter as a vendored patch, see V-01): peer-reviewed, not formally verified. | NIST ACVP vectors for ML-DSA-{44,65,87} and SLH-DSA-SHAKE-{128s,192s,256s} run from `tests/acvp/` (`cargo test -p pqc-crypto -- --ignored`). The external cryptographic audit (TASK-115) covers `pqc-crypto`. A swap to libcrux is a single-crate change behind `PqVerifier`. |
+| R-02 | Crypto | The SLH-DSA signing context is the empty string everywhere (`try_sign_with_context(preimage, b"", None)` in `crates/pqc-crypto/src/sign.rs`). | FIPS 205 permits an empty context. Domain separation happens one level up: every consensus and archival preimage carries the ForkDigest signing-domain prefix (ADR-053), so an SLH-DSA key cannot be tricked into signing a preimage from another domain. Low priority; a non-empty context would be a wire-format change and belongs to a genesis. |
+| R-03 | Crypto | ML-DSA-44 (NIST Category 2) is an active entry of the algorithm registry. | Allowed for **transactions only**. ADR-046 restricts consensus keys to Category ≥ 3 and the binary enforces it (`AlgId::allowed_for_consensus`); consensus keys default to ML-DSA-65. Governance can discourage or ban ML-DSA-44 without a code change (lifecycle transitions are governance-mutable). |
+| R-04 | Randomness | Proposer selection is hash-based sortition over a RANDAO accumulator (`crates/pqc-consensus/src/epoch.rs`). The block timestamp is the only fresh entropy mixed in, so a Byzantine proposer that skews its timestamp within the drift tolerance can bias future selection slightly. | Bias is bounded by the timestamp validation window and is negligible below epoch granularity. There is no post-quantum VRF standard yet; PQ-VRF migration is reserved as ADR-062 and re-opens when NIST/IETF publish one. |
+| R-05 | Supply chain | `libp2p` 0.56.0 and `rocksdb` 0.22.0 (per `Cargo.lock`) are not individually audit-pinned; the project relies on their public audit record. | `cargo deny check` (advisories, licences, bans, sources) is a quality gate and was green with zero advisories on 2026-08-24; `cargo audit` runs in CI. Any published CVE surfaces at the next run. |
+| R-06 | Ops | No authenticated time source (NTS or Roughtime) in the deployment playbooks; hosts rely on plain NTP via `chrony`. Consensus timestamp validation and equivocation evidence assume bounded clock drift. | The launch playbook refuses to proceed unless `chronyc tracking` reports stratum ≤ 4. A validator whose drift exceeds the freshness window stops signing rather than double-signing. NTS deployment is TASK-150. |
+| R-07 | Crypto agility | ML-DSA signing is deterministic (FIPS 204 §3.7, `ml_dsa_sign_with_seed`), which is the variant exposed to differential fault analysis if an attacker can inject faults into the signing device. | Physical fault injection is outside the threat model (`specs/threat-model.md`). Hedged signing is available in the upstream `ml-dsa` crate and is a one-line API swap for a future security release; HSM-backed signing (D-05) removes the seed from the host altogether. |
+| R-08 | Consensus | Byzantine fault-injection coverage is bounded: `bft_consensus.rs` (7 tests), `fault_injection.rs` (4), and `malicious_node.rs` (5, built only with `--features attack-modes`) exercise single-fault scenarios, not ≥ f+1 colluding validators. | Safety of the three-phase protocol is modelled in `specs/bft_consensus.qnt` (Quint, TASK-153; its liveness fairness assumption is TASK-238). A larger fault-injection harness is TASK-151. |
+| R-09 | Consensus / state | The `state_root` layout is not self-describing: a binary whose state tree differs from the one that wrote the chain data skips every checkpoint and falls back to a full replay from genesis. | Policy P-COMPAT-001 (ADR-052): every change to `state_root`, `BlockHeader` or consensus material ships with an ADR, an activation height, a dual-path decoder and a replay-equivalence test. The always-on `cold_sync_replay` gate (TASK-198, `crates/pqc-consensus/tests/cold_sync_replay.rs`) pins byte-identical state roots at every height. |
+| R-10 | Storage | Empty-block chatter is high by construction: with three validators, each commit carries 3 × ~3.3 KB ML-DSA-65 signatures, about 20 KB per empty block; at the 500 ms block time of the reference validator config that is roughly 4 GB/day before any transaction. This is the intrinsic footprint of a lattice-signed BFT chain. | Full and rpc nodes prune with `pqcd snapshot-prune` (ADR-057); history is rotated to cold storage with `pqcd cold-storage-export` under SLH-DSA-signed manifests and RFC 3161 anchors (ADR-058, ADR-060); `archive` nodes keep everything and feed the archival sidecar. The final block-time decision for `viper-testnet-1` is TASK-186; a longer block time reduces the idle cost linearly. |
+| R-11 | Supply chain | The runtime layer of the three images (`docker/*.Dockerfile`, `FROM debian:12-slim`) ships `libgnutls30`; the last scan (2026-05) flagged CVE-2026-33845 (DTLS zero-length fragment, remote DoS). | Not reachable: `pqcd` and the sidecar use rustls for every TLS path and never open a DTLS socket; GnuTLS is present only through `curl`. **Re-evaluate at release build** with an image scan; the fixed package is picked up when the base layer is rebuilt. |
+| R-12 | Supply chain | The same base layer ships `zlib1g` affected by CVE-2023-45853 (MiniZip heap overflow), which upstream marks will-not-fix. | Not reachable: no binary in the images calls the MiniZip API, and `cargo deny` shows no Rust-side equivalent in the dependency graph. **Re-evaluate at release build**; it becomes actionable only if a feature ingests zip archives. |
+| R-13 | Build | The optional `s3-upload` feature of `pqcd` (direct upload from `pqcd cold-storage-export`) pulls `aws-sdk-s3` 1.132 / `aws-config` 1.8.16, whose MSRV is above the older 1.88 toolchain. | **Resolved**: `rust-toolchain.toml` pins 1.92.0, and the feature builds on it. Operators whose distribution ships an older rustc must use `rustup`, which honours the pinned toolchain. |
+| R-14 | P2P / crypto agility | The GossipSub envelope signature is classical Ed25519 (`MessageAuthenticity::Signed` in `crates/pqc-p2p/src/behaviour.rs`), the last classical primitive on the P2P hot path now that the transport negotiates X25519MLKEM768 (feature `hybrid-kem-tls`). A quantum adversary could forge envelopes under a victim's PeerId. | Bounded harm: every block, vote and transaction inside an envelope carries its own ML-DSA-65 or SLH-DSA signature, verified independently by `pqc-consensus` and `pqc-state`. Forging the envelope buys peer-score grief and a bounded topic flood (`max_transmit_size` 64 KB, graylist threshold), not block or vote forgery. Validators can rotate their PeerId on chain (`ValidatorRotatePeerId`, ADR-047; `pqcd wallet rotate-peer-id`). Remediation is an application-layer post-quantum envelope; it re-opens at the first of: FIPS 206 (FN-DSA, ~0.7 KB signatures), the `viper-testnet-1` genesis (a free wire-format break), or an audit finding. |
+
+---
+
+## 2. Known gaps to close before `viper-testnet-1` genesis
+
+Exit criteria for the genesis ceremony. None of them is a consensus bug.
+
+| ID | Gap | State today | Closure |
+|---|---|---|---|
+| G-01 | **Transport identities derived from a public value.** Unless `node.json` sets `devnet.kem_seed_salt_hex` and `devnet.libp2p_seed_salt_hex`, the ML-KEM identity keypair and the libp2p identity (hence the PeerId) are derived from `node_id` alone, and `node_id` is public (status endpoint, logs, ceremony output). Anyone who knows it can recompute both long-term transport secrets without touching the disk. | The node logs a warning at boot on each missing salt (`crates/pqcd/src/devnet.rs`, `crates/pqcd/src/p2p.rs`). `pqcd wallet kem-init` and `pqcd wallet libp2p-init` generate the 32-byte salts; the KEM keyset also re-derives per epoch with a one-epoch grace window. `pqcd ceremony` does **not** emit the salts yet. Consensus is unaffected: validators are identified by their ML-DSA address, not by their PeerId, and the libp2p TLS handshake uses ephemeral keys. | Ceremony writes both salts into every generated `node.json`; the chart mounts them as Secrets; the boot warning becomes an error for `validator` and `sentry` roles. |
+| G-02 | **Validator memory grows with height** (TASK-241). On the retired internal lab the validator's RSS started around 280 MiB and grew with height until the 1 GiB container limit killed it every few hours; the chain resumed cleanly each time. `compact_chain_to_checkpoint` evicts in-memory blocks at checkpoints, so the growth is elsewhere (candidates: mempool and gossip caches, per-height metrics, RocksDB memtables). | Reproducible on any long-running node; not observed to corrupt state. | Heap profile under a synthetic long run, fix the leak or cap the cache, then re-run with a memory limit for at least a week. A chain meant to run for years cannot use the OOM killer as its garbage collector. |
+| G-03 | **Multi-node integration test is load-sensitive** (TASK-239). `external_validator_registers_and_participates_in_quorum` spins several in-process nodes over loopback with fixed deadlines; it fails under a loaded machine and passes alone (`--test-threads=1`, ~136 s). | Documented in `TESTING.md`. | Scale the deadlines with an environment knob or move the multi-node product workflows behind a serial harness, so CI on shared runners is deterministic. |
+| G-04 | **The Helm chart receives `node.json` from the ceremony instead of rendering it** (TASK-242). The whole file lands in `chainNode.<role>.config.nodeJson`, so bootstrap multiaddrs embed the release name chosen at ceremony time. | The chart refuses to render when `_release_name` / `_namespace` differ from the release (ADR-069), so the mismatch cannot pass silently. | Move chain constants, validator set and fee parameters to `chain.*` values and compose the per-role `node.json` in `_helpers.tpl`; keep `config.nodeJson` as an escape hatch. |
+| G-05 | **Two vocabularies for node roles** (TASK-243). The binary, the chart and the ceremony speak `validator / sentry / full / rpc / archive / bootnode` (ADR-069); the Ansible path (`viper_role ∈ {producer, follower}`, `when:` guards, the `node.json` template) and some scripts still say producer/follower. The binary accepts the old names as aliases, so nothing breaks. | Root documents already use the new names. | One commit per directory under `deploy/ansible` and `scripts/`; the aliases are removed at the first public minor release after genesis. |
+
+Other open items that are not genesis blockers: TASK-238 (Quint model: state the fairness assumption liveness relies on), TASK-186 (final block time).
+
+---
+
+## 3. Deferred by design
+
+| ID | Item | Why |
+|---|---|---|
+| D-01 | **Native token and fee economy.** Transfer, storage fund, slashing dispatch and fee revenue exist behind the `token_economics` Cargo feature and are compiled out of the public chain. The corresponding specifications are marked *Reserved*. | `viper-testnet-1` is a tokenless proof-of-authority network. There is no offering and nothing to buy; the feature stays dormant until a governance decision that is not on the roadmap. |
+| D-02 | **Permissionless validator entry** (ADR-066 three-tier plan). | The testnet validator set is operator-run and admitted by the author; the `permissionless_enabled` parameter defaults to false at genesis. |
+| D-03 | **PQ-VRF** (ADR-062, reserved), **STARK signature aggregation** (ADR-061, reserved), **third signature family** (ADR-063, reserved), **FN-DSA** (ADR-067: `AlgId 0x0010` reserved, evaluation after FIPS 206 is final). | Each waits on a standard or on measured need; each has a reserved ADR slot with its trigger condition. |
+| D-04 | **Runtime addition of a signature algorithm** lands in two steps (ADR-049): governance registers the metadata, a coordinated software upgrade (ADR-031) teaches the binary the new `AlgId`. | The verifier dispatch is a static match by design; there is no plugin loading in a consensus binary. |
+| D-05 | **HSM-backed consensus signing.** `pqc-hsm` defines the `CommitSigner` trait with a boot-time self-test and ships the local keystore signer and a SoftHSM (PKCS#11) backend behind the `softhsm` feature; cloud and hardware HSM backends are not implemented. | Validators at genesis sign from an encrypted keystore (Argon2id + XChaCha20-Poly1305). Automatic time-based key rotation is deliberately not offered until the key lives in an HSM, because rotating a key generated on the same disk gains nothing. |
+| D-06 | **Light-client sync committee in production.** `pqc-light-client` implements SPEC-LIGHT-CLIENT-001 (committee selection, compact headers, attestation codec, ADR-068) and is verified by tests; nodes do not yet publish sync-committee attestations on the wire. | Ships when an external consumer needs it; the verifier can be built without the node today, which is the property ADR-068 guarantees. |
+| D-07 | **Read-API list endpoints** (`GET /v1/txs`, `GET /v1/attestations`, `/v1/anchors/{id}`, `/v1/governance/parameters`) are specified in `API.md` but not implemented. | Point lookups cover the explorer and the SDKs; list queries need an index that the archive role will own. |
+| D-08 | GraphQL, WebSocket subscriptions, batch submission, historical state queries, smart contracts, bridges. | Out of scope until the trust layer proves itself (see `ROADMAP.md`). |
+
+---
+
+## 4. Development-only limitations
+
+| ID | Item | Note |
+|---|---|---|
+| V-01 | `vendor/slh-dsa` | Patch of upstream `slh-dsa` 0.1.0 that removes the `RandomizedSigner` impl, incompatible with the `signature` pre-release that libp2p pulls transitively (see the patch block in the root `Cargo.toml`). Returns to upstream when `slh-dsa` releases against `signature` 2.3. |
+| V-02 | `vendor/libp2p-tls-pq`, `vendor/libp2p-quic-pq` | Patches of upstream `libp2p-tls` 0.6.2 and `libp2p-quic` 0.13.0 adding a `with_crypto_provider()` seam so `rustls-post-quantum` can be injected for the X25519MLKEM768 handshake (about 80 lines in total, behaviour-preserving). Dropped the day upstream `rust-libp2p#6236` lands. Submitting the diff upstream is an open follow-up. |
+| V-03 | `attack-modes` feature | Compiles the malicious-node behaviours used by `crates/pqcd/tests/malicious_node.rs`. Off by default; release builds must never enable it. |
+| V-04 | Two API routers | `pqcd api-serve` serves a read-only snapshot router (`crates/pqcd/src/api.rs`); the node runtime `pqcd devnet-serve` serves the live router (`crates/pqcd/src/devnet.rs`). The two route sets overlap but are not identical; `API.md` lists which endpoint lives where. Unifying them is a follow-up. |
+| V-05 | SDKs | `@v1p3r4llbl4ck/sdk` 0.2.0 (npm) and `viper-pqchain` 0.2.0 (PyPI) were published against the retired `viper-pq-1` chain; the tree carries 0.3.0 unpublished. Both must be re-aligned with `viper-testnet-1` before republishing. |
+| V-06 | Ignored tests | 8 tests are `#[ignore]` on purpose: ACVP conformance and timing profiles (`pqc-crypto`, auditor evidence, run with `--ignored`), and two long three-node runs in `crates/pqcd/tests/product_workflows.rs` (gossipsub mesh formation, 20× determinism at 5–7 minutes) meant for explicit soaks. |
+| V-07 | Local devnet file names | `configs/producer.json`, `configs/follower-a.json`, `configs/follower-b.json` keep their historical file names; their `devnet.role` fields use the current vocabulary (`validator`, `full`). |
+
+---
+
+## 5. Historical
+
+Phases 0–8.5 ran on two retired chains. `viper-pq-1` (2026-04-25 → 2026-05-12, archived at height 33,976) was the first chain operated under a no-reset policy; it produced ADR-054 (a full node that diverged from the validator during block reception, fixed with a BFT-correct reception pipeline and a regression test) and the `cold_sync_replay` gate after a release candidate whose state-tree change silently invalidated every checkpoint. `viper-research-1` (2026-05 → 2026-08, tokenless, three validators) carried the hybrid post-quantum TLS activation: rolling one host to a binary with a different state layout stalled the quorum, which is why the wire-format change was done as a coordinated restart from height 0 and why P-COMPAT-001 now requires a replay-equivalence test for every such change. The single-validator lab that followed surfaced G-02 (memory growth over millions of empty blocks) and G-04. Everything those chains produced that is still true lives in `DECISIONS.md`; the chains themselves are gone.
+
+Last reviewed: 2026-08-24.

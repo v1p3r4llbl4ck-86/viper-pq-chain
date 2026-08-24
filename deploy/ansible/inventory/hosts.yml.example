@@ -1,0 +1,59 @@
+---
+# Copy this file to hosts.yml and fill in real IPs and SSH key path.
+# hosts.yml is gitignored — never commit it (it contains your infrastructure details).
+
+all:
+  vars:
+    ansible_user: root
+    ansible_ssh_private_key_file: ~/.ssh/id_ed25519
+
+    # -------------------------------------------------------------------------
+    # Chain identity
+    # -------------------------------------------------------------------------
+    # chain_id_hex is derived automatically from viper_chain_id in configure/tasks/main.yml.
+    # Do not set chain_id_hex manually here.
+    viper_chain_id: "viper-devnet-2"
+    viper_repo_url: "https://github.com/YOUR_USER/viper-pq-chain.git"
+    viper_repo_branch: "develop"
+
+    # -------------------------------------------------------------------------
+    # Filesystem layout — must be the same on every node
+    # -------------------------------------------------------------------------
+    viper_data_dir:   /var/lib/pqchain
+    viper_config_dir: /etc/pqchain
+    viper_binary_path: /usr/local/bin/pqcd
+
+    # -------------------------------------------------------------------------
+    # Timing — shared across all nodes
+    # -------------------------------------------------------------------------
+    viper_block_time_ms:   500
+    viper_sync_interval_ms: 100
+
+  children:
+    validators:
+      hosts:
+        producer-1:
+          ansible_host: YOUR_VALIDATOR_IP   # e.g. 203.0.113.10
+          viper_node_id: "producer"
+          viper_p2p_port: 26656
+          viper_api_port: 26657
+          viper_role: validator
+          # Notary service account — override the devnet defaults in validators.yml.
+          # In production: generate an air-gapped keypair and store seed in a vault.
+          # notary_service_account_seed_hex: "{{ lookup('community.hashi_vault.hashi_vault', 'secret/notary/seed') }}"
+          # notary_service_account_address_hex: "..."
+          # notary_cors_origin: "https://notary.viper-chain.io"
+
+    full_nodes:
+      hosts:
+        follower-1:
+          ansible_host: YOUR_FULL_NODE_1_IP  # e.g. 203.0.113.11
+          viper_node_id: "follower-a"
+          viper_p2p_port: 26666
+          viper_role: full
+
+        follower-2:
+          ansible_host: YOUR_FULL_NODE_2_IP  # e.g. 203.0.113.12
+          viper_node_id: "follower-b"
+          viper_p2p_port: 26676
+          viper_role: full

@@ -1,0 +1,43 @@
+{{- if .Values.frontend.enabled -}}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "viper-pq-chain.frontendName" . }}-static
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.frontendLabels" . | nindent 4 }}
+binaryData:
+{{- range $path, $_ := .Files.Glob "files/frontend/**" }}
+  {{ base $path }}: {{ $.Files.Get $path | b64enc | quote }}
+{{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "viper-pq-chain.frontendName" . }}-nginx
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.frontendLabels" . | nindent 4 }}
+data:
+  default.conf: |
+    server {
+      listen 80;
+      server_name _;
+      root /usr/share/nginx/html;
+      index index.html;
+
+      # Frontend was retrofitted with APP_BASE="/app" — alias strips the prefix
+      # so the same bundle works whether the SPA is mounted at "/" or "/app/".
+      location /app/ {
+        alias /usr/share/nginx/html/;
+        try_files $uri $uri/ /index.html;
+      }
+      location = /app { return 302 /app/; }
+
+      # SPA client-side router handles /notarize, /verify, /explorer, /docs/*
+      location / {
+        try_files $uri $uri/ /index.html;
+      }
+    }
+{{- end }}

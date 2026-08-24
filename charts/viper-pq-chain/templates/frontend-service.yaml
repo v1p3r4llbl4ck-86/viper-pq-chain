@@ -1,0 +1,19 @@
+{{- if .Values.frontend.enabled -}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "viper-pq-chain.frontendName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.frontendLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.frontend.service.type }}
+  selector:
+    {{- include "viper-pq-chain.frontendSelectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.frontend.service.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}

@@ -1,0 +1,36 @@
+---
+# pqcd-apparmor role — install + enforce the AppArmor profile for
+# /usr/local/bin/pqcd. See files/usr.local.bin.pqcd for the profile
+# itself and FREE-KEY-ISOLATION-PHASE-PLAN.md Path 3 for rationale.
+#
+# Idempotent. First run: copies profile + parses + enforces. Subsequent
+# runs: no-op unless the profile file content changed (handler reloads).
+#
+# Hosts: every chain node (validators + full nodes).
+
+- name: Ensure apparmor + utils are installed
+  ansible.builtin.apt:
+    name:
+      - apparmor
+      - apparmor-utils
+    state: present
+    update_cache: true
+  become: true
+
+- name: Deploy AppArmor profile for pqcd
+  ansible.builtin.copy:
+    src: usr.local.bin.pqcd
+    dest: /etc/apparmor.d/usr.local.bin.pqcd
+    owner: root
+    group: root
+    mode: "0644"
+  become: true
+  notify: reload-apparmor-profile-pqcd
+
+- name: Enforce the pqcd profile
+  ansible.builtin.command: aa-enforce /etc/apparmor.d/usr.local.bin.pqcd
+  become: true
+  changed_when: false  # idempotent at the AppArmor layer
+  # Soak window: before flipping enforce, run with `complain` mode for
+  # 24h via `aa-complain` to gather any aa-denied messages from real
+  # pqcd traffic. Then move to enforce. This task is the END state.

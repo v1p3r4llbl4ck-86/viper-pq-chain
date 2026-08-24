@@ -1,0 +1,19 @@
+# Patterns to ignore when packaging the chart.
+.DS_Store
+.git/
+.gitignore
+.idea/
+.vscode/
+*.tmproj
+*.tgz
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+.project
+.tox/
+# CI / test outputs
+.helm-tests/
+ci/
+README.md.tpl

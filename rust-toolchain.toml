@@ -1,0 +1,12 @@
+# Kept in lockstep with `.gitlab-ci.yml` (`rust:1.92` baseline image +
+# `RUSTUP_TOOLCHAIN: "1.92"`) and `flake.nix` (rust-bin "1.92.0"). The
+# rust-toolchain.toml takes precedence over `RUSTUP_TOOLCHAIN` for cargo
+# invocations: leaving these out of sync silently switches CI back to the
+# pinned-here channel (the failure mode that surfaced 2026-05-06 when the
+# CI image was bumped 1.88 → 1.92 to satisfy the AWS SDK 1.91+ MSRV but
+# the toolchain file stayed on 1.88 → cargo activated 1.88 inside the
+# 1.92 container → AWS dep tree failed to resolve).
+[toolchain]
+channel = "1.92.0"
+components = ["rustfmt", "clippy"]
+profile = "minimal"

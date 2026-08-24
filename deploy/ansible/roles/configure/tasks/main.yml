@@ -1,0 +1,414 @@
+---
+# Derive viper_validators from the canonical genesis-viper-pq-1.json
+# (CONCERNS.md HIGH-2 closure, ANSIBLE-VIPER-VALIDATORS-PROPOSAL.md Option B.2).
+# The genesis file is the single source of truth for the validator set; the
+# `genesis_to_validators` custom Jinja2 filter (deploy/ansible/filter_plugins/)
+# performs the field-name remap (genesis on-chain names → template's historical
+# names). Without this set_fact the template at
+# `node-config.json.j2:39` fires `AnsibleUndefinedVariable: 'viper_validators'
+# is undefined` and `make deploy-config` halts.
+- name: Derive viper_validators from genesis-viper-pq-1.json (HIGH-2 closure)
+  set_fact:
+    viper_validators: "{{
+      (lookup('file', _genesis_path) | from_json).genesis_validators
+      | genesis_to_validators
+    }}"
+  vars:
+    # Genesis path is derived from viper_chain_id (set in inventory) so the
+    # same playbook serves both viper-pq-1 today and viper-research-1 after
+    # the 2026-05-11 pivot cutover (Fase 5). When the operator flips
+    # viper_chain_id in the inventory, ansible automatically reads the
+    # matching genesis file.
+    _genesis_path: "{{ playbook_dir }}/../files/genesis-{{ viper_chain_id }}.json"
+  delegate_to: localhost
+  become: no
+
+- name: Assert viper_validators has at least one entry
+  assert:
+    that:
+      - viper_validators is defined
+      - viper_validators | length >= 1
+    fail_msg: >
+      viper_validators is empty after `genesis_to_validators` filter — check
+      that deploy/ansible/files/genesis-viper-pq-1.json::genesis_validators[]
+      has the expected (node_id, address, consensus_alg_id, consensus_pk)
+      shape.
+  run_once: yes
+  delegate_to: localhost
+  become: no
+
+- name: Derive viper_genesis_accounts from chain-id-derived genesis (tokenless-safe)
+  set_fact:
+    viper_genesis_accounts: "{{
+      ((lookup('file', _genesis_path) | from_json).get('genesis_accounts', []))
+      | genesis_to_accounts
+    }}"
+  vars:
+    # Genesis path is derived from viper_chain_id (set in inventory) so the
+    # same role serves both viper-pq-1 (token-bearing, genesis_accounts[]
+    # populated) and viper-research-1 (tokenless, genesis_accounts omitted by
+    # design — see genesis-viper-research-1.json::_genesis_accounts_omitted_doc).
+    # The `.get('genesis_accounts', [])` defaults the field to an empty list
+    # for the tokenless chain so the template emits `"genesis_accounts": []`.
+    _genesis_path: "{{ playbook_dir }}/../files/genesis-{{ viper_chain_id }}.json"
+  delegate_to: localhost
+  become: no
+
+- name: Assert viper_genesis_accounts shape (allows empty for tokenless chains)
+  assert:
+    that:
+      - viper_genesis_accounts is defined
+    fail_msg: >
+      viper_genesis_accounts is undefined — the preceding set_fact did not run
+      or the genesis file at {{ playbook_dir }}/../files/genesis-{{ viper_chain_id }}.json
+      could not be parsed. For viper-pq-1 this list must be non-empty; for
+      tokenless chains like viper-research-1 an empty list is expected.
+  run_once: yes
+  delegate_to: localhost
+  become: no
+
+# Compute chain_id_hex: hex encoding of the UTF-8 bytes of the chain_id string.
+# e.g. "viper-devnet-1" -> "76697065722d6465766e65742d31"
+- name: Compute chain_id_hex from chain_id string
+  command: >
+    python3 -c "print('{{ viper_chain_id }}'.encode().hex(), end='')"
+  register: chain_id_hex_result
+  changed_when: false
+  run_once: false   # Must run per-host; each host validates its own fact
+
+- name: Set chain_id_hex fact
+  set_fact:
+    viper_chain_id_hex: "{{ chain_id_hex_result.stdout }}"
+
+# Resolve validator P2P address for full node peer configuration.
+# Full nodes need to know the IP of the first validator; we read it from hostvars.
+- name: Set validator peer address fact
+  set_fact:
+    viper_upstream_p2p_addr: >-
+      {{ viper_upstream_p2p_addr_override | default(
+           hostvars[groups['validators'][0]]['ansible_host'] ~ ':' ~
+           hostvars[groups['validators'][0]]['viper_p2p_port']
+         ) }}
+    viper_upstream_node_id: >-
+      {{ hostvars[groups['validators'][0]]['viper_node_id'] }}
+  when: viper_role == 'full'
+
+- name: Create node data directory
+  file:
+    path:  "{{ viper_data_dir }}/{{ viper_node_id }}"
+    state: directory
+    owner: pqchain
+    group: pqchain
+    mode:  '0750'
+
+- name: Template node config
+  template:
+    src:   node-config.json.j2
+    dest:  "{{ viper_config_dir }}/node.json"
+    owner: pqchain
+    group: pqchain
+    mode:  '0640'
+  notify: restart pqcd
+
+- name: Template systemd unit
+  template:
+    src:   pqcd.service.j2
+    dest:  /etc/systemd/system/pqcd.service
+    owner: root
+    group: root
+    mode:  '0644'
+  notify:
+    - reload systemd
+    - restart pqcd
+
+# ── Audit log directory (target of crates/pqcd/src/audit_log.rs) ──────────
+- name: Create audit log directory
+  file:
+    path:  /var/log/pqchain/audit
+    state: directory
+    owner: pqchain
+    group: pqchain
+    mode:  '0750'
+
+# ── Local alert watcher (scripts/log-alert-watcher.sh + systemd timer) ────
+#
+# The .service / .timer templates ship with the role, but the shell
+# implementation `scripts/log-alert-watcher.sh` is not yet checked into
+# the repo. Until it lands the whole block is gated on the script's
+# presence on the admin host so `make deploy-config` doesn't fail on a
+# stale half-built feature. When the script is added later, the deploy
+# automatically picks it up — no role edit required.
+- name: Stat log-alert-watcher source script
+  stat:
+    path: "{{ playbook_dir }}/../../scripts/log-alert-watcher.sh"
+  register: _log_alert_src
+  delegate_to: localhost
+  become: no
+  run_once: yes
+  changed_when: false
+
+- name: Install log-alert-watcher script
+  copy:
+    src:   "{{ playbook_dir }}/../../scripts/log-alert-watcher.sh"
+    dest:  /usr/local/sbin/viper-log-alert-watcher.sh
+    owner: root
+    group: root
+    mode:  '0755'
+  when: _log_alert_src.stat.exists
+
+- name: Create alert log directory
+  file:
+    path:  /var/log/viper-alerts
+    state: directory
+    owner: root
+    group: root
+    mode:  '0755'
+  when: _log_alert_src.stat.exists
+
+- name: Create node_exporter textfile collector directory
+  file:
+    path:  /var/lib/node_exporter/textfile_collector
+    state: directory
+    owner: root
+    group: root
+    mode:  '0755'
+  when: _log_alert_src.stat.exists
+
+- name: Template log-alert-watcher service
+  template:
+    src:   log-alert-watcher.service.j2
+    dest:  /etc/systemd/system/viper-log-alert-watcher.service
+    owner: root
+    group: root
+    mode:  '0644'
+  notify: reload systemd
+  when: _log_alert_src.stat.exists
+
+- name: Template log-alert-watcher timer
+  template:
+    src:   log-alert-watcher.timer.j2
+    dest:  /etc/systemd/system/viper-log-alert-watcher.timer
+    owner: root
+    group: root
+    mode:  '0644'
+  notify: reload systemd
+  when: _log_alert_src.stat.exists
+
+- name: Enable log-alert-watcher timer
+  systemd:
+    name:   viper-log-alert-watcher.timer
+    state:  started
+    enabled: true
+    daemon_reload: true
+  when: _log_alert_src.stat.exists
+
+# ── TASK-187a — full-node prune timer ─────────────────────────────────────
+# Gated by `viper_prune_enabled`. Default `false` in group_vars/all so a
+# fresh playbook run never enables prune on validators (or any full-history host) by
+# accident. Full nodes opt-in via `group_vars/full_nodes.yml` or per-host
+# inventory. The pqcd binary's own role guard (snapshot-prune refuses
+# Validator / SingleNode without --force) is the second layer of defence.
+
+- name: Template pqcd-prune wrapper script
+  template:
+    src:   pqcd-prune.sh.j2
+    dest:  /usr/local/sbin/pqcd-prune.sh
+    owner: root
+    group: root
+    mode:  '0755'
+  when: viper_prune_enabled | default(false) | bool
+
+- name: Template pqcd-prune service
+  template:
+    src:   pqcd-prune.service.j2
+    dest:  /etc/systemd/system/pqcd-prune.service
+    owner: root
+    group: root
+    mode:  '0644'
+  when: viper_prune_enabled | default(false) | bool
+  notify: reload systemd
+
+- name: Template pqcd-prune timer
+  template:
+    src:   pqcd-prune.timer.j2
+    dest:  /etc/systemd/system/pqcd-prune.timer
+    owner: root
+    group: root
+    mode:  '0644'
+  when: viper_prune_enabled | default(false) | bool
+  notify: reload systemd
+
+- name: Enable pqcd-prune timer (full nodes only — gated by viper_prune_enabled)
+  systemd:
+    name:   pqcd-prune.timer
+    state:  started
+    enabled: true
+    daemon_reload: true
+  when: viper_prune_enabled | default(false) | bool
+
+- name: Disable pqcd-prune timer (validators — viper_prune_enabled false)
+  systemd:
+    name:   pqcd-prune.timer
+    state:  stopped
+    enabled: false
+  when: not (viper_prune_enabled | default(false) | bool)
+  failed_when: false  # ignore "no such unit" on a host that never had the timer
+  changed_when: false
+
+# ── TASK-188 / TASK-188b — cold-storage rotation timer ───────────────────
+# Gated by `viper_cold_rotate_enabled`. Default `false` in group_vars/all
+# so a fresh playbook run never enables rotation by accident. Operators
+# opt in per-host, typically on archival full nodes (the ones that already
+# hold the full chain history). Validators can also rotate but the natural
+# operator pattern is to offload that to full nodes.
+#
+# Sub-flags (all optional):
+#   viper_cold_rotate_keep_tail_blocks    default 1209600 (~7 days @ 500 ms)
+#   viper_cold_rotate_batch_size          default 10000
+#   viper_cold_rotate_calendar            default "*-*-01 02:00:00 UTC"
+#   viper_cold_rotate_sign_operator_hex   default "" (no signing)
+#   viper_cold_rotate_anchor_tsa_url      default "" (no TSA anchor)
+#   viper_cold_rotate_tsa_best_effort     default true
+#   viper_cold_rotate_s3_uri              default "" (no in-band upload)
+#   viper_cold_rotate_output_root         default /var/cache/pqchain/cold
+
+- name: Template pqcd-cold-rotate wrapper script
+  template:
+    src:   pqcd-cold-rotate.sh.j2
+    dest:  /usr/local/sbin/pqcd-cold-rotate.sh
+    owner: root
+    group: root
+    mode:  '0755'
+  when: viper_cold_rotate_enabled | default(false) | bool
+
+- name: Template pqcd-cold-rotate service
+  template:
+    src:   pqcd-cold-rotate.service.j2
+    dest:  /etc/systemd/system/pqcd-cold-rotate.service
+    owner: root
+    group: root
+    mode:  '0644'
+  when: viper_cold_rotate_enabled | default(false) | bool
+  notify: reload systemd
+
+- name: Template pqcd-cold-rotate timer
+  template:
+    src:   pqcd-cold-rotate.timer.j2
+    dest:  /etc/systemd/system/pqcd-cold-rotate.timer
+    owner: root
+    group: root
+    mode:  '0644'
+  when: viper_cold_rotate_enabled | default(false) | bool
+  notify: reload systemd
+
+- name: Enable pqcd-cold-rotate timer (gated by viper_cold_rotate_enabled)
+  systemd:
+    name:   pqcd-cold-rotate.timer
+    state:  started
+    enabled: true
+    daemon_reload: true
+  when: viper_cold_rotate_enabled | default(false) | bool
+
+- name: Disable pqcd-cold-rotate timer (viper_cold_rotate_enabled false)
+  systemd:
+    name:   pqcd-cold-rotate.timer
+    state:  stopped
+    enabled: false
+  when: not (viper_cold_rotate_enabled | default(false) | bool)
+  failed_when: false  # ignore "no such unit" on a host that never had the timer
+  changed_when: false
+
+# ── Stage B of PEER-ID-ROTATION-SCOPING-2026-05-11.md — 90-day libp2p ───
+# PeerId rotation timer. Closes R-14's operational guardrail by bounding
+# the HNDL recovery window on each validator's libp2p Ed25519 identity
+# to ≤ 90 days. Gated by `viper_peer_id_rotate_enabled` (default false);
+# operator opts in per-host once viper-research-1 has launched and the
+# Stage A.4 libp2p-init pass has staged the initial salt on each host.
+#
+# Sub-flags (all optional, with sensible defaults in group_vars/all):
+#   viper_peer_id_rotate_enabled         default false (master switch)
+#   viper_peer_id_rotate_months          per-host override of the default
+#                                        validator_node_id → month-list
+#                                        staggering (see template)
+#   viper_peer_id_rotate_calendar        full OnCalendar override (bypasses
+#                                        the months mapping entirely)
+#   viper_peer_id_rotate_log_tail_bytes  default 1 MiB
+#
+# Vault-sourced (REQUIRED when viper_peer_id_rotate_enabled is true):
+#   viper_keystore_passphrase            the validator keystore passphrase
+#                                        — ship via `ansible-vault edit`,
+#                                        NEVER commit plaintext.
+
+- name: Refuse to enable peer-id-rotate without a vault-sourced passphrase
+  # Belt-and-braces: the wrapper script fails clearly if cron.env is
+  # missing or empty, but it's friendlier to catch this at deploy time.
+  assert:
+    that:
+      - viper_keystore_passphrase is defined
+      - viper_keystore_passphrase | length > 0
+    fail_msg: >
+      viper_peer_id_rotate_enabled is true but `viper_keystore_passphrase`
+      is undefined or empty. Add it to your Ansible vault (typically
+      group_vars/all/vault.yml, encrypted with `ansible-vault edit`) and
+      rerun. See docs/historical/RUNBOOK-PEER-ID-ROTATION-viper-research-1.md §3.
+  when: viper_peer_id_rotate_enabled | default(false) | bool
+
+- name: Template /etc/pqchain/cron.env (passphrase for the 90-day rotation cron)
+  copy:
+    dest:    "{{ viper_config_dir }}/cron.env"
+    content: |
+      # Managed by Ansible — do not edit manually.
+      # Sourced by /usr/local/sbin/pqcd-peer-id-rotate.sh at every rotation tick.
+      # Vault-sourced — see docs/historical/RUNBOOK-PEER-ID-ROTATION-viper-research-1.md §3.
+      VIPER_PASSPHRASE={{ viper_keystore_passphrase }}
+    owner:   pqchain
+    group:   pqchain
+    mode:    '0400'
+  no_log: true
+  when: viper_peer_id_rotate_enabled | default(false) | bool
+
+- name: Template pqcd-peer-id-rotate wrapper script
+  template:
+    src:   pqcd-peer-id-rotate.sh.j2
+    dest:  /usr/local/sbin/pqcd-peer-id-rotate.sh
+    owner: root
+    group: root
+    mode:  '0755'
+  when: viper_peer_id_rotate_enabled | default(false) | bool
+
+- name: Template pqcd-peer-id-rotate service
+  template:
+    src:   pqcd-peer-id-rotate.service.j2
+    dest:  /etc/systemd/system/pqcd-peer-id-rotate.service
+    owner: root
+    group: root
+    mode:  '0644'
+  when: viper_peer_id_rotate_enabled | default(false) | bool
+  notify: reload systemd
+
+- name: Template pqcd-peer-id-rotate timer
+  template:
+    src:   pqcd-peer-id-rotate.timer.j2
+    dest:  /etc/systemd/system/pqcd-peer-id-rotate.timer
+    owner: root
+    group: root
+    mode:  '0644'
+  when: viper_peer_id_rotate_enabled | default(false) | bool
+  notify: reload systemd
+
+- name: Enable pqcd-peer-id-rotate timer (gated by viper_peer_id_rotate_enabled)
+  systemd:
+    name:   pqcd-peer-id-rotate.timer
+    state:  started
+    enabled: true
+    daemon_reload: true
+  when: viper_peer_id_rotate_enabled | default(false) | bool
+
+- name: Disable pqcd-peer-id-rotate timer (viper_peer_id_rotate_enabled false)
+  systemd:
+    name:   pqcd-peer-id-rotate.timer
+    state:  stopped
+    enabled: false
+  when: not (viper_peer_id_rotate_enabled | default(false) | bool)
+  failed_when: false  # ignore "no such unit" on a host that never had the timer
+  changed_when: false

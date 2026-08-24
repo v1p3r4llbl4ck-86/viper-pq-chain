@@ -1,0 +1,103 @@
+# gitleaks allow-list for viper-pq-chain
+#
+# This config extends the default gitleaks ruleset. The `[allowlist]`
+# section tells gitleaks to ignore matches that are demonstrably not
+# real credential leaks. Every entry below is justified inline so a
+# future audit can re-verify by re-reading the comment + the cited
+# file.
+#
+# CI usage (the gitleaks job): the job invokes
+# `gitleaks detect --source .` which auto-discovers this file at the
+# repo root and applies the allow-list before producing the report.
+# With this file in place + the false-positives suppressed, the job
+# runs in `allow_failure: false` mode — a single un-allow-listed leak
+# blocks the pipeline.
+#
+# Update procedure when a NEW false positive appears:
+#   1. Verify it's truly not a secret (look at the actual `Secret`
+#      value via `gitleaks detect --redact false`).
+#   2. Add a `regexes` entry below with a justification comment.
+#   3. Prefer narrow regex (anchor to the literal string) over broad
+#      path patterns — a path allow-list silently masks future real
+#      leaks in the same file.
+#
+# DO NOT use `allowlist.paths` for source files where a real
+# credential leak could plausibly land in the future.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "viper-pq-chain known false positives — see comments for each entry"
+
+# ── ACVP test vectors ──────────────────────────────────────────────
+# NIST cryptographic test vectors (FIPS 204 ML-DSA, FIPS 205 SLH-DSA
+# ACVP responses). Long hex byte sequences in these JSON files
+# occasionally hit gitleaks' `aws-access-token` regex
+# (^ACCA[A-Z0-9]{16}$ approx) because random crypto bytes can start
+# with the `ACCA` prefix. The files contain ZERO credentials — only
+# test vector inputs/outputs used by `cargo test acvp_conformance`.
+paths = [
+    '''tests/acvp/.*\.json$''',
+]
+
+# Match specific false-positive secrets by their literal value so a
+# real credential added to the same file in a future commit still
+# fires (path-level exclusion would not).
+regexes = [
+    # Zabbix metric keys named with dots — not credentials, just
+    # Zabbix's metric-naming convention. Specific to the
+    # `envelope_mismatch.total` metric in the chain-level template.
+    '''viper\.p2p\.envelope_mismatch\.total''',
+
+    # GitLab CI cache key — derived from cargo-deny binary version.
+    # Located in the CI cache key for the cargo-deny binary.
+    '''cargo-deny-bin-v\d+\.\d+\.\d+''',
+
+    # SonarQube project key — literally the project name on
+    # the SonarQube instance. Public identifier, not a credential.
+    '''<sonar-project-key>''',
+
+    # Public test seeds shipped under configs/ for local dev work.
+    # Documented in configs/README.md as PUBLIC; not used on the live
+    # chain (the live seeds are in /etc/pqchain/keystore.json mode
+    # 0600 on each host since the 2026-05-11 keystore migration,
+    # CONCERNS.md HIGH-1 closure). These regexes enumerate the
+    # specific dev-fixture all-same-byte values; Go's regexp engine
+    # does not support backreferences so we match each one
+    # individually. Real validator seeds have high-entropy random
+    # byte distributions and will never match any of these literals.
+    # "11"*32, "22"*32, ..., "ff"*32 plus the "aa" repeat used by
+    # several ADR-051 pin tests.
+    '''"commit_seed_hex":\s*"1{64}"''',
+    '''"commit_seed_hex":\s*"2{64}"''',
+    '''"commit_seed_hex":\s*"3{64}"''',
+    '''"commit_seed_hex":\s*"4{64}"''',
+    '''"commit_seed_hex":\s*"5{64}"''',
+    '''"commit_seed_hex":\s*"6{64}"''',
+    '''"commit_seed_hex":\s*"7{64}"''',
+    '''"commit_seed_hex":\s*"8{64}"''',
+    '''"commit_seed_hex":\s*"9{64}"''',
+    '''"commit_seed_hex":\s*"a{64}"''',
+    '''"commit_seed_hex":\s*"b{64}"''',
+    '''"commit_seed_hex":\s*"c{64}"''',
+    '''"commit_seed_hex":\s*"d{64}"''',
+    '''"commit_seed_hex":\s*"e{64}"''',
+    '''"commit_seed_hex":\s*"f{64}"''',
+    '''"commit_seed_hex":\s*"(aa){32}"''',
+]
+
+# ── Historical leak in monitoring/zabbix-mobile/ ──────────────────
+# A Zabbix mobile-app token was committed in 5119d33a98551b... and
+# removed (along with the entire monitoring/zabbix-mobile/ directory)
+# in ab3d2c08. The token is no longer in the working tree but
+# gitleaks scans the full git history (GIT_DEPTH=0) so it still
+# fires. The Zabbix mobile app it belonged to is no longer used; the
+# token (if it ever actually authenticated, which is unclear from
+# context) is functionally retired. Allow-list by specific commit
+# fingerprint via the `commits` list — a future commit that adds a
+# NEW Zabbix mobile token would NOT match this specific commit and
+# would still fire.
+commits = [
+    "5119d33a98551b523e1ac3aea653d1ced274099f",
+]

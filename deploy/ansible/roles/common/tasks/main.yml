@@ -1,0 +1,44 @@
+---
+- name: Update apt cache
+  apt:
+    update_cache: yes
+    cache_valid_time: 3600
+
+- name: Install base dependencies
+  apt:
+    name:
+      - build-essential
+      - pkg-config
+      - libssl-dev
+      - clang
+      - libclang-dev
+      - curl
+      - git
+      - ufw
+      - jq
+      - python3
+    state: present
+
+- name: Create pqchain system user
+  user:
+    name: pqchain
+    system: yes
+    shell: /sbin/nologin
+    home: "{{ viper_data_dir }}"
+    create_home: no
+
+- name: Create data directory
+  file:
+    path: "{{ viper_data_dir }}"
+    state: directory
+    owner: pqchain
+    group: pqchain
+    mode: '0750'
+
+- name: Create config directory
+  file:
+    path: "{{ viper_config_dir }}"
+    state: directory
+    owner: pqchain
+    group: pqchain
+    mode: '0750'

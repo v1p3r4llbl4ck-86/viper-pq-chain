@@ -1,0 +1,61 @@
+{{- /*
+Per-role Services:
+  - Headless service (clusterIP: None) for stable in-cluster DNS for P2P
+    (each pod becomes <ordinal>.<role-headless>.<ns>.svc.cluster.local).
+  - Optional ClusterIP service for the read API (only if publicService.enabled).
+
+Bootnode special case: only headless (no API service).
+*/ -}}
+{{- range $role := list "validator" "sentry" "full" "rpc" "archive" "bootnode" }}
+{{- $cfg := index $.Values.chainNode $role | default dict -}}
+{{- if $cfg.enabled }}
+{{- $merged := include "viper-pq-chain.roleConfig" (dict "ctx" $ "role" $role) | fromYaml -}}
+{{- $name := printf "%s-pqcd-%s" (include "viper-pq-chain.fullname" $) $role | trunc 63 | trimSuffix "-" }}
+---
+# ── Headless service for P2P (stable DNS) — every role gets this ─────────
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-headless
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.roleLabels" (dict "ctx" $ "role" $role) | nindent 4 }}
+spec:
+  clusterIP: None
+  publishNotReadyAddresses: true
+  selector:
+    {{- include "viper-pq-chain.roleSelectorLabels" (dict "ctx" $ "role" $role) | nindent 4 }}
+  ports:
+    - name: p2p
+      port: {{ default 26656 (and $merged.p2p $merged.p2p.port) | int }}
+      protocol: TCP
+      targetPort: p2p
+{{- if not (eq $role "bootnode") }}
+    - name: api
+      port: {{ default 26657 (and $merged.api $merged.api.port) | int }}
+      protocol: TCP
+      targetPort: api
+{{- end }}
+
+{{- /* ── Public ClusterIP API service (only if publicService.enabled) ─── */ -}}
+{{- if and $merged.publicService $merged.publicService.enabled }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.roleLabels" (dict "ctx" $ "role" $role) | nindent 4 }}
+spec:
+  type: {{ default "ClusterIP" $merged.publicService.type }}
+  selector:
+    {{- include "viper-pq-chain.roleSelectorLabels" (dict "ctx" $ "role" $role) | nindent 4 }}
+  ports:
+    - name: api
+      port: {{ default 26657 (and $merged.api $merged.api.port) | int }}
+      protocol: TCP
+      targetPort: api
+{{- end }}
+{{- end }}
+{{- end }}

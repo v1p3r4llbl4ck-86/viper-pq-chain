@@ -1,0 +1,74 @@
+---
+# notary/tasks/main.yml — Build, configure, and start the Viper Notary backend.
+# Runs only on validator nodes (enforced in site.yml via `when: viper_role == 'validator'`).
+
+- name: Build viper-notary in release mode
+  shell: |
+    source /root/.cargo/env
+    cargo build --release -p viper-notary 2>&1
+  args:
+    chdir:      /opt/viper-pq-chain
+    executable: /bin/bash
+  register: notary_build_result
+  changed_when: "'Compiling' in notary_build_result.stdout or 'Compiling' in notary_build_result.stderr"
+  async:  1800
+  poll:   30
+
+- name: Copy viper-notary binary to install path
+  copy:
+    src:        /opt/viper-pq-chain/target/release/viper-notary
+    dest:       "{{ notary_binary_path }}"
+    remote_src: yes
+    mode:       '0755'
+    owner:      root
+    group:      root
+  notify: restart viper-notary
+
+- name: Create notary config directory
+  file:
+    path:  "{{ notary_config_dir }}"
+    state: directory
+    owner: pqchain
+    group: pqchain
+    mode:  '0750'
+
+- name: Create notary env file (secrets)
+  template:
+    src:   notary.env.j2
+    dest:  "{{ notary_config_dir }}/notary.env"
+    owner: pqchain
+    group: pqchain
+    mode:  '0640'
+  notify: restart viper-notary
+
+- name: Template notary systemd unit
+  template:
+    src:   viper-notary.service.j2
+    dest:  /etc/systemd/system/viper-notary.service
+    owner: root
+    group: root
+    mode:  '0644'
+  notify:
+    - reload systemd
+    - restart viper-notary
+
+- name: Allow notary port through firewall
+  command: ufw allow {{ notary_port }}/tcp
+  changed_when: false
+
+- name: Enable and start viper-notary
+  systemd:
+    name:          viper-notary
+    enabled:       yes
+    state:         started
+    daemon_reload: yes
+
+- name: Wait for notary health endpoint
+  uri:
+    url:            "http://127.0.0.1:{{ notary_port }}/health"
+    return_content: yes
+    status_code:    200
+  register: notary_health
+  until:    notary_health.status == 200
+  retries:  15
+  delay:    2

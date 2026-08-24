@@ -1,0 +1,23 @@
+[package]
+name = "pqc-fuzz-seed-gen"
+version = "0.0.0"
+publish = false
+edition = "2021"
+
+# Standalone workspace so this helper does not affect the main cargo workspace
+# or the fuzz/ cargo-fuzz workspace. Run one-shot with:
+#
+#   cd fuzz/seed && cargo run --release
+#
+# The .bin files it produces under ../corpus/ are the artefacts committed;
+# the target/ directory it builds here can be deleted after the one-shot run.
+[workspace]
+
+[dependencies]
+pqc-tx     = { path = "../../crates/pqc-tx", features = ["stub-verifier"] }
+pqc-crypto = { path = "../../crates/pqc-crypto", features = ["stub-verifier"] }
+pqc-types  = { path = "../../crates/pqc-types" }
+
+[[bin]]
+name = "seed_gen"
+path = "src/main.rs"
