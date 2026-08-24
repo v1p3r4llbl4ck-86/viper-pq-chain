@@ -313,7 +313,6 @@ Key sections:
 
 - Live chain status: https://pqchain.agwswebconsulting.it
 - Source: https://github.com/v1p3r4llbl4ck-86/viper-pq-chain
-- Docs: [`/notary/README.md`](../../notary/README.md), [`/docs/operators/RUNBOOK.md`](../../docs/operators/RUNBOOK.md)
 - Author: Alberto Galassi <galassi.alberto86@gmail.com>
 
 ## License

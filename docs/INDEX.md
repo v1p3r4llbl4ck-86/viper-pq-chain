@@ -28,8 +28,7 @@ an integrator or an auditor needs beyond that.
 | [multicodec-mapping.md](multicodec-mapping.md) | multicodec / multihash identifiers used on the wire |
 | [openapi.yaml](openapi.yaml) | OpenAPI 3.0 description of the HTTP API (served by the node at `/openapi.yaml`) |
 | [examples/three-network/](examples/three-network/) | worked example of the validator / VFN / public P2P networks |
-| [site/](site/) | static explorer and Swagger pages (the deployable frontend ships in the Helm chart) |
-| [outputs/viper-explorer.jsx](outputs/viper-explorer.jsx) | explorer component source |
+| [site/swagger.html](site/swagger.html) | Swagger UI page served by the node at `/docs` (the explorer ships in the Helm chart, `charts/viper-pq-chain/files/frontend`) |
 
 ## `historical/` — retained for the audit trail
 
