@@ -169,12 +169,13 @@ pub fn cmd_ceremony(args: &[String]) -> Result<()> {
         namespace: namespace.clone(),
         deploy_token,
     };
-    let (values, validator_entries) =
+    let (values, validator_entries, identity_salts) =
         generate_ceremony_values(&cfg).context("ceremony generation failed")?;
     let json_str = serde_json::to_string_pretty(&values)
         .context("failed to serialise ceremony values to JSON")?;
-    let secrets_yaml = build_secrets_manifest(&cfg, &namespace, &validator_entries)
-        .context("failed to build secrets manifest")?;
+    let secrets_yaml =
+        build_secrets_manifest(&cfg, &namespace, &validator_entries, &identity_salts)
+            .context("failed to build secrets manifest")?;
 
     // Operator-facing summary on stderr — even when stdout is piped to
     // a file the operator still sees the cohort manifest.
