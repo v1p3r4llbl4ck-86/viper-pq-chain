@@ -1,0 +1,499 @@
+# Default values for viper-pq-chain.
+# This is a YAML-formatted file. Documentation: charts/viper-pq-chain/README.md
+
+# ============================================================================
+# Global
+# ============================================================================
+nameOverride: ""
+fullnameOverride: ""
+
+# ============================================================================
+# Image registry — defaults applied to every image unless overridden per-role.
+# ============================================================================
+image:
+  registry: ghcr.io
+  repository: v1p3r4llbl4ck-86
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+  # Tag for each binary (pqcd / viper-notary / viper-archival-sidecar).
+  # Empty = use Chart.appVersion.
+  tags:
+    pqcd: ""
+    notary: ""
+    archivalSidecar: ""
+
+# ============================================================================
+# Chain identity
+# ============================================================================
+chain:
+  # Logical chain id. Use a name DIFFERENT from the live `viper-pq-1` so
+  # operators don't confuse the dev/test cluster with production.
+  id: viper-pq-2-test
+
+  # Block target time in ms (informational — actual config is in node.json).
+  blockTimeMs: 500
+
+  # Genesis bootstrap. Provide ONE of:
+  #   inline: <full JSON content of the genesis file>
+  #   configMapRef: name of an existing ConfigMap with key `genesis.json`
+  # If both empty the chart generates a placeholder genesis (NOT for production).
+  genesis:
+    inline: ""
+    configMapRef: ""
+
+# ============================================================================
+# Service account + RBAC + PSP
+# ============================================================================
+serviceAccount:
+  create: true
+  name: ""
+  annotations: {}
+
+rbac:
+  create: true
+
+# ============================================================================
+# Secret management strategy
+# ----------------------------------------------------------------------------
+# manual         — operator pre-creates Secrets; chart references them.
+# externalSecrets — render ExternalSecret CRs (external-secrets.io operator).
+# sealedSecrets   — render SealedSecret CRs (Bitnami sealed-secrets controller).
+# ============================================================================
+secrets:
+  provider: manual
+  externalSecrets:
+    storeRef:
+      kind: ClusterSecretStore
+      name: ""
+  sealedSecrets:
+    cluster: ""
+
+# ============================================================================
+# Chain node roles
+# ----------------------------------------------------------------------------
+# Each role is an independent StatefulSet templated from the same image.
+# Multiple roles can be enabled simultaneously. The 'common' map is merged
+# into each enabled role; per-role values override 'common'.
+# ============================================================================
+chainNode:
+
+  # Defaults applied to every enabled role unless explicitly overridden.
+  common:
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      fsGroup: 10001
+      seccompProfile:
+        type: RuntimeDefault
+    securityContext:
+      allowPrivilegeEscalation: false
+      readOnlyRootFilesystem: false   # pqcd writes RocksDB to mounted PVC
+      capabilities:
+        drop: [ALL]
+    storage:
+      size: 50Gi
+      storageClass: ""
+    resources:
+      requests: { cpu: "500m", memory: "1Gi"  }
+      limits:   { cpu: "2",    memory: "4Gi"  }
+    probes:
+      startup:
+        # Long start period — RocksDB recovery + replay on cold start.
+        periodSeconds: 10
+        failureThreshold: 60        # 10 min total
+      readiness:
+        periodSeconds: 10
+        failureThreshold: 3
+      liveness:
+        periodSeconds: 30
+        failureThreshold: 3
+    nodeSelector: {}
+    tolerations: []
+    affinity: {}
+    podAnnotations: {}
+    podLabels: {}
+    extraEnv: []
+    # Logging: tracing-subscriber RUST_LOG filter.
+    rustLog: "viper_notary=info,pqcd=info,tower_http=warn"
+    # Storage class is applied to PersistentVolumeClaim.
+    # leave empty to use cluster default.
+    persistence:
+      enabled: true
+      accessModes: [ReadWriteOnce]
+
+  # ─── VALIDATOR ─────────────────────────────────────────────
+  # Signs blocks. Has consensus key. NEVER public-facing — sentry/VFN
+  # bridges traffic. NetworkPolicy denies ingress from outside the
+  # validator's sentries.
+  validator:
+    enabled: false
+    replicas: 1                                 # always 1 per release; HA = cluster
+    consensusKey:
+      # Secret with key `consensus_seed` (32 bytes hex) for ML-DSA-65 signing.
+      secretName: ""
+    api:
+      bindAddress: "127.0.0.1"                  # private only
+      port: 26657
+    p2p:
+      bindAddress: "0.0.0.0"
+      port: 26656
+    networkPolicy:
+      enabled: true
+      # Egress: validator can reach sentries.
+      allowedSentryNamespaces: []
+      # Ingress: only sentries can reach the validator's P2P.
+    storage:
+      size: 100Gi
+
+  # ─── SENTRY (VFN — Validator-Friendly Node) ─────────────────
+  # Bridge between the private validator and the public network.
+  # Same image as full node, different network policy.
+  sentry:
+    enabled: true
+    replicas: 2
+    api:
+      bindAddress: "0.0.0.0"
+      port: 26657
+    p2p:
+      bindAddress: "0.0.0.0"
+      port: 26656
+    validatorPeer:
+      # If validator role is enabled in the same release, sentries auto-discover.
+      # Override here for cross-release / external validators.
+      peerId: ""
+      address: ""
+    publicService:
+      enabled: false                            # sentries don't expose API publicly
+
+  # ─── FULL NODE ─────────────────────────────────────────────
+  # Validates everything, doesn't sign. Public P2P + read-only API.
+  full:
+    enabled: true
+    replicas: 1
+    api:
+      bindAddress: "0.0.0.0"
+      port: 26657
+    p2p:
+      bindAddress: "0.0.0.0"
+      port: 26656
+    publicService:
+      enabled: true                             # ClusterIP service for the API
+      type: ClusterIP
+
+  # ─── RPC ───────────────────────────────────────────────────
+  # Read-only API server. HPA-friendly (no consensus state to coordinate).
+  # Still needs P2P to receive blocks from the network.
+  rpc:
+    enabled: false
+    replicas: 2
+    autoscaling:
+      enabled: false
+      minReplicas: 2
+      maxReplicas: 6
+      targetCPUUtilizationPercentage: 70
+    api:
+      bindAddress: "0.0.0.0"
+      port: 26657
+    p2p:
+      bindAddress: "0.0.0.0"
+      port: 26656
+    publicService:
+      enabled: true
+      type: ClusterIP
+
+  # ─── ARCHIVE ───────────────────────────────────────────────
+  # Full node + viper-archival-sidecar (RFC 3161 / 4998 anchoring).
+  # Heavy storage, used by explorers and audit-trail consumers.
+  archive:
+    enabled: false
+    replicas: 1
+    api:
+      bindAddress: "0.0.0.0"
+      port: 26657
+    p2p:
+      bindAddress: "0.0.0.0"
+      port: 26656
+    storage:
+      size: 500Gi
+    sidecar:
+      enabled: true
+      tsa:
+        url: "https://freetsa.org/tsr"
+        policy: "1.2.3.4.1"
+      # Sidecar config rendered as ConfigMap, mounted at /etc/viper-archival-sidecar/sidecar.toml.
+
+  # ─── BOOTNODE ──────────────────────────────────────────────
+  # Well-known seed peer with stable DNS. New nodes use it to join the mesh.
+  bootnode:
+    enabled: false
+    replicas: 2
+    api:
+      bindAddress: "127.0.0.1"   # bootnode's API is private (not RPC-grade)
+      port: 26657
+    p2p:
+      bindAddress: "0.0.0.0"
+      port: 26656
+    # Persistent PeerId — derived from a Secret-stored seed so the multiaddr
+    # stays stable across pod restarts and migrations.
+    persistentPeerId:
+      secretName: ""
+
+# ============================================================================
+# Notary backend (viper-notary)
+# ----------------------------------------------------------------------------
+# Stateless Deployment that wraps the chain's attestation_create primitive
+# behind ADR-055 + QEAA HTTP services.
+# ============================================================================
+notary:
+  # The notary service is a separate, private product; the chart can deploy it
+  # when its image and Secrets are available. Off by default in the public chart.
+  enabled: false
+  # Sprint 5.1: tenant store is now Postgres-backed, so replicas can
+  # safely scale beyond 1. Default 2 for cheap HA; bump for traffic.
+  replicas: 2
+  config:
+    # nodeUrl: pqcd API endpoint. If empty, auto-resolves to the first enabled
+    #          chain role's headless service in this release.
+    nodeUrl: ""
+    # chainId: empty = inherit from chain.id at the top of values.
+    chainId: ""
+    listenAddr: "0.0.0.0:3000"
+    listenPort: 3000
+    finalizationTimeoutMs: 30000
+    publicBaseUrl: ""
+    corsOrigin: "*"
+    evidenceDisabled: false
+  serviceAccountKey:
+    # Secret with key `service_account_seed` (32 bytes hex).
+    secretName: ""
+  # Sprint 1: admin sub-router bearer token. Operator MUST pre-create
+  # the Secret (with key `admin_token`) before installing — otherwise
+  # the admin endpoints stay disabled (404). Generation idiom:
+  #   kubectl create secret generic notary-admin-token \
+  #       --from-literal=admin_token="$(openssl rand -hex 32)"
+  adminToken:
+    secretName: ""
+  # Sprint 4.2: Prometheus /metrics bearer token. Independent from the
+  # admin token so a Prometheus operator can hold metrics access
+  # without holding tenant CRUD. When unset, /metrics returns 404.
+  # Generation idiom:
+  #   kubectl create secret generic notary-metrics-token \
+  #       --from-literal=metrics_token="$(openssl rand -hex 32)"
+  metricsToken:
+    secretName: ""
+  # Sprint 5.1: Postgres connection. Operator pre-creates a Secret
+  # holding NOTARY_TENANT_DB_URL pointed at a Postgres cluster
+  # (managed RDS / Cloud SQL / sidecar StatefulSet — anything that
+  # speaks vanilla Postgres ≥ 14). Required: the chart fails the
+  # deployment validation if unset.
+  #   kubectl create secret generic notary-tenant-db \
+  #       --from-literal=url="postgres://notary:pw@pg:5432/notary"
+  tenantDb:
+    secretName: ""
+    # Key inside the Secret holding the connection URL.
+    secretKey: "url"
+  # Sprint 5.9: audit-log + webhook-deliveries retention pruning.
+  # `days: 0` (default) disables pruning entirely; flip to a positive
+  # number when you need automatic GDPR-style hygiene. The pruner
+  # task wakes every `intervalSecs`; one DELETE per table per pass.
+  retention:
+    days: 0
+    intervalSecs: 86400
+  # Sprint 5.3: Stripe billing — opt-in. When `secretName` is unset,
+  # every Stripe path returns 503 and the background reporter is a
+  # no-op. Same Secret can hold both keys (recommended) or you can
+  # split if you want different IAM scopes per key.
+  #   kubectl create secret generic notary-stripe \
+  #       --from-literal=secret_key=sk_test_… \
+  #       --from-literal=webhook_secret=whsec_…
+  stripe:
+    secretName: ""
+    secretKeyKey: "secret_key"     # → STRIPE_SECRET_KEY
+    webhookSecretKey: "webhook_secret"  # → STRIPE_WEBHOOK_SECRET
+    # Reporter cadence. 1 h is fine until you cross ~10 K customers
+    # (Stripe Usage Records API has a per-item monthly cap).
+    reportIntervalSecs: 3600
+  # Sprint 5.10: transactional emails (welcome / api-key minted /
+  # suspended). When `secretName` is unset the SMTP transport is
+  # disabled and every send_* helper is a no-op. Operator pre-creates
+  # the Secret carrying the SASL credentials (key names below):
+  #   kubectl create secret generic notary-smtp \
+  #       --from-literal=user="apikey" \
+  #       --from-literal=password="$SMTP_PASSWORD"
+  # Host / port / from are non-secret values (kept in this file).
+  smtp:
+    secretName: ""        # Unset → emails disabled (no-op send_* helpers)
+    userKey: "user"       # Key inside the Secret holding NOTARY_SMTP_USER
+    passwordKey: "password" # → NOTARY_SMTP_PASSWORD
+    host: ""              # → NOTARY_SMTP_HOST (empty also disables)
+    port: 587             # → NOTARY_SMTP_PORT (STARTTLS default)
+    from: "notary@localhost" # → NOTARY_SMTP_FROM (RFC 5322 mailbox)
+  # Sprint 5.11: OpenTelemetry OTLP gRPC export. When `endpoint` is
+  # empty the OTel layer is skipped — only the existing `tracing::fmt`
+  # subscriber runs (no extra cost). Operator points it at a collector
+  # (Tempo, Jaeger, OTel Collector daemon-set) and dashboards pick up
+  # the spans tagged service.name="viper-notary".
+  otel:
+    endpoint: ""          # → NOTARY_OTEL_ENDPOINT (e.g. http://otel-collector:4317)
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10002
+    runAsGroup: 10002
+    fsGroup: 10002
+    seccompProfile:
+      type: RuntimeDefault
+  securityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities:
+      drop: [ALL]
+  resources:
+    requests: { cpu: "100m", memory: "256Mi" }
+    limits:   { cpu: "1",    memory: "1Gi"   }
+  # Sprint 5.16 — extra env vars passed straight to the notary
+  # container. Useful for the gates that don't have a dedicated
+  # chart value:
+  #   NOTARY_SIGNUP_INVITE_CODE
+  #   NOTARY_ADMIN_IP_ALLOWLIST
+  #   NOTARY_ALERT_WEBHOOK_URL
+  #   NOTARY_AUDIT_RETENTION_DAYS / NOTARY_RETENTION_INTERVAL_SECS (alt
+  #     to the dedicated notary.retention block)
+  # Format mirrors the k8s container env array — `value:` for plain
+  # strings, `valueFrom:` for secretKeyRef / configMapKeyRef.
+  extraEnv: []
+  # Example:
+  # extraEnv:
+  #   - name: NOTARY_SIGNUP_INVITE_CODE
+  #     valueFrom:
+  #       secretKeyRef:
+  #         name: notary-signup
+  #         key: invite_code
+  #   - name: NOTARY_ADMIN_IP_ALLOWLIST
+  #     value: "10.0.0.0/24,192.168.1.5"
+  # Sprint 5.16 — readiness probe path override. Default `/readyz`
+  # gates traffic on tenant DB + chain reachability; override to
+  # `/health` when running notary-only against an external pqcd that
+  # may not be reachable at chart-install time (so `helm install
+  # --wait` doesn't time out before chain comes up).
+  readinessProbe:
+    path: /readyz
+    periodSeconds: 10
+    failureThreshold: 3
+    timeoutSeconds: 5
+  service:
+    type: ClusterIP
+    port: 3000
+  ingress:
+    enabled: false
+    className: nginx
+    annotations:
+      cert-manager.io/cluster-issuer: letsencrypt-prod
+    host: notary.example.com
+    # Each entry: { path, pathType, backend? }. `backend` is one of
+    # "notary" (default, axum API) or "frontend" (the static SPA).
+    # Default list below preserves the API surface AND lights up the
+    # SPA at "/" — without this, "/" returned 404 because the axum
+    # backend doesn't serve a landing page.
+    paths:
+      - { path: /api,         pathType: Prefix, backend: notary   }
+      - { path: /health,      pathType: Prefix, backend: notary   }
+      - { path: /v1,          pathType: Prefix, backend: notary   }
+      - { path: /timestamp,   pathType: Prefix, backend: notary   }
+      - { path: /evidence,    pathType: Prefix, backend: notary   }
+      - { path: /attestation, pathType: Prefix, backend: notary   }
+      - { path: /notary,      pathType: Prefix, backend: notary   }
+      - { path: /,            pathType: Prefix, backend: frontend }
+    tls:
+      enabled: true
+      secretName: notary-tls
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 6
+    targetCPUUtilizationPercentage: 70
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ============================================================================
+# Notary frontend (static SPA served by nginx)
+# ----------------------------------------------------------------------------
+# Renders the React/Babel-standalone bundle shipped under
+# `files/frontend/` as a ConfigMap mounted into an nginx:alpine
+# Deployment. Required for `https://<host>/` to return the landing
+# page — the notary axum backend itself does not serve a UI.
+# Disable only if you expose a different frontend (e.g. an external
+# CDN bucket); in that case set `frontend.enabled: false` AND drop
+# the `backend: frontend` entry from `notary.ingress.paths`.
+# ============================================================================
+frontend:
+  enabled: true
+  replicas: 2
+  image:
+    repository: nginx
+    tag: 1.27-alpine
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 80
+  resources:
+    requests: { cpu: "20m",  memory: "32Mi"  }
+    limits:   { cpu: "200m", memory: "128Mi" }
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+
+# ============================================================================
+# NetworkPolicy — three-network segregation (validator / sentry / public)
+# ============================================================================
+networkPolicy:
+  enabled: true
+  # Allow these namespace-selectors to reach the public roles' API.
+  allowedFromNamespaces: []
+  # Operator/admin namespace (e.g. monitoring) — full access.
+  trustedNamespaceLabels:
+    name: kube-system
+
+# ============================================================================
+# Monitoring (Prometheus Operator)
+# ============================================================================
+monitoring:
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    scrapeTimeout: 10s
+    labels: {}
+    relabelings: []
+  prometheusRule:
+    enabled: false
+    labels: {}
+    # Default alerts — block-time stalled, high mempool rejections,
+    # follower lag too high. Override with empty list to disable.
+    rules:
+      - alert: ViperBlockProductionStalled
+        expr: rate(pqchain_blocks_produced_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Viper PQ Chain producer not producing blocks"
+
+# ============================================================================
+# Pod Disruption Budgets
+# ============================================================================
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# ============================================================================
+# Helm test pod
+# ============================================================================
+tests:
+  enabled: true
+  image:
+    repository: curlimages/curl
+    tag: 8.10.0

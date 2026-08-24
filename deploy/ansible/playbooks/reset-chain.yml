@@ -1,0 +1,67 @@
+---
+# reset-chain.yml — wipe on-disk chain data and restart pqcd from genesis.
+#
+# Use this when:
+#   - a checkpoint is invalid (e.g. written by an older binary that omitted
+#     validator state) and the node cannot start with PARTIAL_CHAIN_CANNOT_FULL_REPLAY
+#   - you want a clean devnet reset without reinstalling the binary or config
+#
+# WARNING: destroys all block history.  The devnet starts over at block 1.
+# Safe to re-run if the service is already stopped.
+
+- name: "RESET CHAIN — wipe block data and restart from genesis"
+  hosts: all
+  become: yes
+  serial: 1        # full nodes before we touch the validator to avoid sync-to-empty state
+  order: reverse_sorted   # full nodes first (follower-b, follower-a, then validator)
+  gather_facts: no
+
+  tasks:
+    - name: Stop pqcd service
+      systemd:
+        name:  pqcd
+        state: stopped
+      ignore_errors: yes
+
+    - name: Wipe chain data directory
+      file:
+        path:  "{{ viper_data_dir }}/{{ viper_node_id }}"
+        state: absent
+
+    - name: Re-create empty chain data directory
+      file:
+        path:  "{{ viper_data_dir }}/{{ viper_node_id }}"
+        state: directory
+        owner: pqchain
+        group: pqchain
+        mode:  '0750'
+
+    - name: Start pqcd service
+      systemd:
+        name:  pqcd
+        state: started
+
+    - name: "Wait 15 seconds for node to initialize"
+      wait_for:
+        timeout: 15
+      delegate_to: localhost
+      become: no
+
+    - name: "Verify validator API responds (validator only)"
+      uri:
+        url:         "http://{{ ansible_host }}:{{ viper_api_port }}/v1/metrics"
+        status_code: 200
+      retries: 24
+      delay:   5
+      until:   true
+      when: viper_role == 'validator'
+      register: _probe
+      failed_when: false
+
+    - name: "Report reset result"
+      debug:
+        msg: >-
+          {{ viper_node_id }} chain data wiped and service restarted.
+          {% if viper_role == 'validator' %}
+          API probe: {{ 'OK' if (_probe.status | default(0)) == 200 else 'NOT YET RESPONDING (check journalctl -u pqcd)' }}.
+          {% endif %}

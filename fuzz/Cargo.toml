@@ -1,0 +1,60 @@
+[package]
+name = "pqc-fuzz"
+version = "0.0.0"
+publish = false
+license = "BUSL-1.1"
+edition = "2021"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+ciborium = "0.2"
+pqc-tx        = { path = "../crates/pqc-tx", features = ["stub-verifier"] }
+pqc-crypto    = { path = "../crates/pqc-crypto", features = ["stub-verifier"] }
+pqc-types     = { path = "../crates/pqc-types" }
+pqc-consensus = { path = "../crates/pqc-consensus" }
+pqc-p2p       = { path = "../crates/pqc-p2p" }
+
+# Prevent this from being published or included in the standard workspace build.
+[workspace]
+
+[[bin]]
+name = "fuzz_decode_tx"
+path = "fuzz_targets/fuzz_decode_tx.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_validate_tx"
+path = "fuzz_targets/fuzz_validate_tx.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_shake256"
+path = "fuzz_targets/fuzz_shake256.rs"
+test = false
+doc = false
+
+# TASK-216 — extended targets covering block decoder, P2P envelope, and signed
+# vote decoder. Each is a contract test: the decoder must NEVER panic on any
+# byte sequence, only return Err(...).
+[[bin]]
+name = "fuzz_decode_block"
+path = "fuzz_targets/fuzz_decode_block.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_p2p_envelope"
+path = "fuzz_targets/fuzz_p2p_envelope.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "fuzz_signed_vote"
+path = "fuzz_targets/fuzz_signed_vote.rs"
+test = false
+doc = false

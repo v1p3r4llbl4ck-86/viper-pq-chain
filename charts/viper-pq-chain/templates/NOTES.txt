@@ -1,0 +1,198 @@
+{{- $name := include "viper-pq-chain.fullname" . -}}
+{{- $roles := include "viper-pq-chain.enabledRoles" . -}}
+
+╭─────────────────────────────────────────────────────────────────╮
+│   Viper PQ Chain — release "{{ .Release.Name }}"
+│   Chain id: {{ .Values.chain.id }}
+│   App version: {{ .Chart.AppVersion }}
+╰─────────────────────────────────────────────────────────────────╯
+
+{{ if eq .Values.chain.id "viper-pq-1" -}}
+⚠️  WARNING: chain.id is "viper-pq-1" — this is the LIVE production chain.
+    The chart is intended for new networks. Override `chain.id` to a
+    distinct value (e.g. "viper-pq-2-test", "viper-pq-eidas-pilot").
+{{ end }}
+
+Enabled chain-node roles: {{ if $roles }}{{ $roles }}{{ else }}(none — set chainNode.<role>.enabled=true){{ end }}
+
+Notary backend: {{ if .Values.notary.enabled }}enabled (replicas={{ .Values.notary.replicas }}){{ else }}disabled{{ end }}
+
+──────────────────────────────────────────────────────────────────
+1. Verify pods are running
+──────────────────────────────────────────────────────────────────
+
+  kubectl get pods -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+  kubectl get statefulsets,deployments,services -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+──────────────────────────────────────────────────────────────────
+2. Tail the chain-node logs
+──────────────────────────────────────────────────────────────────
+
+{{- range $r := list "validator" "sentry" "full" "rpc" "archive" "bootnode" }}
+{{- $cfg := index $.Values.chainNode $r | default dict }}
+{{- if $cfg.enabled }}
+  kubectl logs -n {{ $.Release.Namespace }} -f -l viper.pqchain.io/role={{ $r }} --max-log-requests=10
+{{- end }}
+{{- end }}
+
+──────────────────────────────────────────────────────────────────
+3. Hit the public read API
+──────────────────────────────────────────────────────────────────
+
+{{- $rpcSvc := include "viper-pq-chain.firstChainNodeService" . -}}
+{{- if $rpcSvc }}
+
+  # In-cluster:
+  kubectl run -i --rm tmp-curl --image=curlimages/curl -- \
+    curl -s "http://{{ $rpcSvc }}:26657/v1/status" | jq .
+
+  # Or port-forward:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ $rpcSvc }} 26657:26657
+  curl -s http://127.0.0.1:26657/v1/status | jq .
+{{- else }}
+
+  No chain-node role enabled — nothing to query. Set at least one of:
+    chainNode.{validator|sentry|full|rpc|archive}.enabled = true
+{{- end }}
+
+{{- if .Values.notary.enabled }}
+
+──────────────────────────────────────────────────────────────────
+4. Notary backend
+──────────────────────────────────────────────────────────────────
+
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "viper-pq-chain.notaryName" . }} 3000:{{ .Values.notary.service.port }}
+  curl -s http://127.0.0.1:3000/health
+  curl -s http://127.0.0.1:3000/api/qeaa/issuers | jq .
+  curl -s http://127.0.0.1:3000/.well-known/openid-credential-issuer | jq .
+{{- end }}
+
+──────────────────────────────────────────────────────────────────
+5. Run the helm test
+──────────────────────────────────────────────────────────────────
+
+  helm test {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+{{- if .Values.notary.enabled }}
+──────────────────────────────────────────────────────────────────
+6. Notary SaaS — admin token + tenant DB (Sprint 1+2)
+──────────────────────────────────────────────────────────────────
+
+The notary now runs as a multi-tenant SaaS surface (auth, rate-
+limit, audit log, usage meter, webhook dispatcher). Two operator
+steps before customer onboarding:
+
+a) Provision Postgres (Sprint 5.1 — required). Managed Postgres is
+   the prod target; for in-cluster dev:
+
+     helm install pg bitnami/postgresql --namespace {{ .Release.Namespace }} \
+       --set auth.database=notary,auth.username=notary,auth.password=CHANGE_ME
+
+     # Then make the URL available to the chart:
+     kubectl create secret generic notary-tenant-db \
+       --namespace {{ .Release.Namespace }} \
+       --from-literal=url="postgres://notary:CHANGE_ME@pg-postgresql:5432/notary"
+     helm upgrade {{ .Release.Name }} ./charts/viper-pq-chain \
+       --set notary.tenantDb.secretName=notary-tenant-db \
+       --reuse-values
+
+   The notary applies schema migrations at startup against an empty
+   database — no manual `psql` step.
+
+b) Mint and store the admin bearer token (REQUIRED for tenant CRUD;
+   without it /admin/* returns 404):
+
+     kubectl create secret generic notary-admin-token \
+       --namespace {{ .Release.Namespace }} \
+       --from-literal=admin_token="$(openssl rand -hex 32)"
+
+   helm upgrade {{ .Release.Name }} ./charts/viper-pq-chain \
+       --set notary.adminToken.secretName=notary-admin-token \
+       --reuse-values
+
+b) Create the first tenant + API key:
+
+     kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "viper-pq-chain.fullname" . }}-notary 3000:3000 &
+     ADMIN_TOKEN=$(kubectl get secret notary-admin-token -n {{ .Release.Namespace }} -o jsonpath='{.data.admin_token}' | base64 -d)
+     curl -X POST http://localhost:3000/admin/tenants \
+          -H "Authorization: Bearer $ADMIN_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d '{"name":"acme","rate_limit_qpm":120}'
+     # Then POST /admin/tenants/<id>/api-keys → captures the
+     # plaintext exactly once.
+
+PERSISTENCE (Sprint 5.1): the tenant store + audit log + webhook
+deliveries + evidence-stream owners now all live in Postgres. The
+notary backend itself is stateless — `replicas` defaults to 2 for
+cheap HA and can scale further without WAL-corruption risk.
+
+BACKUPS: use the Postgres cluster's standard snapshot mechanism
+(managed: RDS automated snapshots, Cloud SQL backups; self-hosted:
+`pg_dump`). The notary no longer ships an /admin/backup endpoint —
+that surface was SQLite-specific.
+
+   pg_dump "postgres://notary:pw@pg:5432/notary" \
+     --format=custom --file="notary-$(date -u +%Y%m%dT%H%M%SZ).dump"
+   aws s3 cp notary-*.dump s3://my-backup-bucket/notary/
+
+STRIPE (Sprint 5.3 + 5.4): test-mode billing — opt-in. When unset
+every Stripe path is 503 and the rest of the SaaS keeps working.
+
+   kubectl create secret generic notary-stripe \
+       --namespace {{ .Release.Namespace }} \
+       --from-literal=secret_key=sk_test_… \
+       --from-literal=webhook_secret=whsec_…
+   helm upgrade {{ .Release.Name }} ./charts/viper-pq-chain \
+       --set notary.stripe.secretName=notary-stripe \
+       --reuse-values
+
+   # In Stripe dashboard:
+   #   Developers → Webhooks → Add endpoint:
+   #     URL: https://notary.example.com/webhooks/stripe
+   #     Events: invoice.paid, invoice.payment_failed,
+   #             customer.subscription.deleted
+   #   Copy the signing secret into the Secret above.
+   #
+   # When P.IVA / company is ready: swap secret_key to sk_live_… and
+   # update the webhook endpoint URL — no code change.
+
+METRICS (Sprint 4.2): GET /metrics emits Prometheus exposition.
+Gated by NOTARY_METRICS_TOKEN; mint + wire similarly to the admin
+token:
+
+   kubectl create secret generic notary-metrics-token \
+       --namespace {{ .Release.Namespace }} \
+       --from-literal=metrics_token="$(openssl rand -hex 32)"
+   helm upgrade {{ .Release.Name }} ./charts/viper-pq-chain \
+       --set notary.metricsToken.secretName=notary-metrics-token \
+       --reuse-values
+
+   # Prometheus scrape config:
+   #   authorization:
+   #     type: Bearer
+   #     credentials_file: /etc/prometheus/secrets/notary-metrics
+
+Metrics emitted: notary_uptime_seconds, notary_tenants_total{status},
+notary_api_keys_total{state}, notary_audit_log_rows_total,
+notary_requests_recent{class}, notary_webhook_deliveries_recent{outcome}.
+All labels are server-controlled (no tenant_id, no per-path) so an
+attacker can't inflate the time-series index.
+
+──────────────────────────────────────────────────────────────────
+7. Uninstall
+──────────────────────────────────────────────────────────────────
+{{- else }}
+──────────────────────────────────────────────────────────────────
+6. Uninstall
+──────────────────────────────────────────────────────────────────
+{{- end }}
+
+  helm uninstall {{ .Release.Name }} -n {{ .Release.Namespace }}
+  # PVCs are NOT deleted by default — clean up manually if you want
+  # to drop chain state:
+  kubectl delete pvc -n {{ .Release.Namespace }} -l app.kubernetes.io/instance={{ .Release.Name }}
+
+──────────────────────────────────────────────────────────────────
+Documentation: charts/viper-pq-chain/README.md
+Project home:  https://pqchain.agwswebconsulting.it
+──────────────────────────────────────────────────────────────────

@@ -1,0 +1,18 @@
+[Unit]
+Description=Viper PQ Chain — monthly cold-storage rotation tick (TASK-188 / TASK-188b)
+Documentation=file://{{ viper_repo_path | default('/opt/viper-pq-chain') }}/docs/operators/RUNBOOK.md
+
+[Timer]
+# 1st of each month at 02:00 UTC. Pairs cleanly with the weekly prune
+# tick (Sunday 03:00 UTC) — the rotation can run on the same day a
+# prune scheduled-out, since both stop pqcd briefly. Persistent=true
+# catches up after extended downtime so a long power cut doesn't cause
+# skipped rotations to accumulate as missing cold-storage history.
+OnCalendar={{ viper_cold_rotate_calendar | default('*-*-01 02:00:00 UTC') }}
+RandomizedDelaySec=30min
+Persistent=true
+AccuracySec=1min
+Unit=pqcd-cold-rotate.service
+
+[Install]
+WantedBy=timers.target

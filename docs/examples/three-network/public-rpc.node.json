@@ -1,0 +1,54 @@
+{
+  "_comment": "Sentry / Public RPC node — TASK-219 three-network role. Binds public_listen (internet-facing). Dials VFN(s) outbound via libp2p.bootstrap_peers. Holds NO signing keys. Hosts the public HTTP API.",
+  "node_id": "sentry-rpc-1",
+  "chain_id_hex": "<chain_id_hex from the published genesis>",
+  "data_dir": "/var/lib/pqchain/sentry-rpc-1",
+  "anchor_prev_hash_hex": "<32-byte hex from genesis>",
+  "fee_params": {
+    "base_fee": 100,
+    "byte_fee": 10,
+    "sigverify_fee_v_a": 60,
+    "sigverify_fee_v_b": 600,
+    "sigverify_fee_v_c": 6000,
+    "exec_fee_per_gas": 1
+  },
+  "p2p_listen_addr": null,
+  "api_listen_addr": "0.0.0.0:26657",
+  "peers": [],
+  "devnet": {
+    "role": "rpc",
+    "sync_interval_ms": 1000,
+    "block_time_ms": 500,
+    "epoch_duration": 60,
+    "unbonding_period": 120,
+    "validators": [],
+    "snapshot_source": "<vfn bootstrap addr>"
+  },
+  "genesis_accounts": [],
+  "rate_limit": {
+    "_comment": "Public-facing RPC: aggressive rate limit. Tune to operator's CDN / WAF policy.",
+    "max_requests_per_window": 60,
+    "window_secs": 60
+  },
+  "sender_budget": {
+    "max_admits_per_window": 30,
+    "window_secs": 60
+  },
+  "libp2p": {
+    "_comment": "Three-network role: sentry / public RPC. Inbound on public_listen (internet) + vfn_listen (peer sentries). Outbound to vfn_listen of VFNs.",
+    "enable": true,
+    "validator_listen": null,
+    "vfn_listen": "/ip4/10.0.0.30/tcp/26666",
+    "public_listen": "/ip4/0.0.0.0/tcp/26676",
+    "bootstrap_peers": [
+      "/ip4/10.0.0.20/tcp/26666/p2p/<vfn-1 PeerId>",
+      "/ip4/10.0.0.21/tcp/26666/p2p/<vfn-2 PeerId>"
+    ],
+    "gossip_mesh_n": 8,
+    "gossip_mesh_n_low": 4,
+    "gossip_mesh_n_high": 16,
+    "quic_enabled": true,
+    "tcp_tls_fallback": true,
+    "max_peers_per_asn": 3
+  }
+}

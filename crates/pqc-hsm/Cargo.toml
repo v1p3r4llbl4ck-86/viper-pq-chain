@@ -1,0 +1,72 @@
+[package]
+name = "pqc-hsm"
+description = "Hardware Security Module (HSM) abstraction for validator commit signing — CommitSigner trait + backend implementations"
+version.workspace = true
+edition.workspace = true
+license = "BUSL-1.1"
+authors.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Algorithm identifier + ML-DSA primitives shared with the rest of the
+# tree. The `LocalKeystoreSigner` impl re-uses `ml_dsa_sign_with_seed`
+# for byte-identical behaviour with the pre-trait code path; downstream
+# callers (`pqcd::devnet`) consume the trait, not the seed bytes.
+pqc-crypto = { path = "../pqc-crypto", features = ["ml-dsa-backend", "pq-verifier"] }
+
+# Error plumbing — `SignerError` wraps backend-specific failures via
+# `anyhow::Error` for the catch-all variant; concrete error kinds use
+# `thiserror` so call sites can match on the discriminant.
+anyhow.workspace = true
+thiserror.workspace = true
+
+# Used by `LocalKeystoreSigner` to zeroise the in-memory seed on drop.
+zeroize = { version = "1", features = ["derive"] }
+
+# Logging — the boot-time self-test emits a structured `info!` event so
+# operators see the canary flow in node logs.
+tracing.workspace = true
+
+# `hex` for human-readable validator-address rendering inside
+# `LocalKeystoreSigner` error messages.
+hex.workspace = true
+
+# Serde derives for `SignerKind` + `SignerConfig` — DevnetConfig needs
+# them deserialisable from `node.json` (#[serde(default = ...)]).
+serde.workspace = true
+
+# SHA-256 hashing for the SoftHSM RSA-2048 placeholder signer — the
+# PKCS#11 RSA-PKCS mechanism signs the *hash* of the preimage, not the
+# preimage itself, so the signer pre-hashes with SHA-256. Optional;
+# only pulled when the `softhsm` feature is on.
+sha2 = { version = "0.10", optional = true }
+
+# PKCS#11 binding — SoftHsmSigner only. Optional behind the `softhsm`
+# feature so a `cargo build -p pqc-hsm` (default features) does NOT
+# require a system PKCS#11 module on the build host.
+cryptoki = { workspace = true, optional = true }
+
+[features]
+default = []
+# Enables `SoftHsmSigner` and the `viper-hsm-probe --backend softhsm`
+# code path. Requires the `cryptoki` crate (pulled transitively when
+# this feature is on); the binary itself still builds without the
+# feature — the `softhsm` arm of the backend selector then errors out
+# at runtime with a clear "build with --features softhsm" message.
+softhsm = ["dep:cryptoki", "dep:sha2"]
+
+[[bin]]
+name = "viper-hsm-probe"
+path = "src/bin/probe.rs"
+
+[dev-dependencies]
+# Round-trip self-test verification.
+hex.workspace = true
+# `serde_json` round-trip tests for `SignerKind` / `SignerConfig`.
+serde_json = "1"
+
+[lints]
+workspace = true

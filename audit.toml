@@ -1,0 +1,41 @@
+# cargo-audit configuration — kept in sync with deny.toml [advisories.ignore].
+#
+# `cargo audit` (used by .gitlab-ci.yml security:audit) reads this file at
+# the workspace root. The same advisories are also listed in deny.toml so
+# `cargo deny check` (security:deny) accepts them too. When you change one,
+# change the other and update KNOWN-ISSUES.md.
+
+[advisories]
+ignore = [
+    # `paste` 1.0.15 unmaintained — transitive via libp2p-tcp / libp2p-quic /
+    # libp2p-mdns → if-watch → netlink-packet-core → paste. No safe upgrade
+    # available upstream as of 2026-04-26; libp2p 0.55 still pins this.
+    "RUSTSEC-2024-0436",
+    # `lru` 0.12.5 unsound (IterMut Stacked Borrows) — transitive via
+    # libp2p-swarm. No safe upgrade in libp2p 0.55 yet.
+    "RUSTSEC-2026-0002",
+    # `hickory-proto` 0.25.0-alpha.5 NSEC3 unbounded loop — transitive via
+    # libp2p-mdns. Upstream advisory 2026-05-01 says "no fixed upgrade is
+    # available". Exposure: pqcd is not an authoritative DNS responder;
+    # libp2p uses mDNS for local peer discovery only.
+    "RUSTSEC-2026-0118",
+    # `hickory-proto` 0.25.0-alpha.5 O(n²) name compression CPU exhaustion —
+    # same transitive path. Fix in hickory-proto 0.26.1 but libp2p 0.55 pins
+    # 0.25.0-alpha.5 — workspace bump requires libp2p minor upgrade (tracked
+    # separately). Exposure bounded by LAN broadcast domain (mDNS only).
+    "RUSTSEC-2026-0119",
+    # `rustls-webpki` 0.101.7 — three Name Constraint handling advisories
+    # filed 2026-04-14 (RUSTSEC-2026-0098 URI names, -0099 wildcards, -0104
+    # additional name handling). Transitive via aws-sdk-s3 1.x →
+    # aws-smithy-http-client → hyper-rustls 0.24 → rustls 0.21 →
+    # rustls-webpki 0.101.7. Fix in rustls-webpki >= 0.103.12 / 0.104+;
+    # the AWS SDK still pins the older rustls. pqcd's primary TLS path
+    # uses rustls 0.23+ via reqwest/libp2p-tls so the workspace's main
+    # network surface is unaffected; exposure is limited to S3 upload
+    # (cold-storage-export) and only on certs carrying URI Name
+    # Constraints (AWS public S3 endpoints do not). Re-evaluate on each
+    # AWS SDK release.
+    "RUSTSEC-2026-0098",
+    "RUSTSEC-2026-0099",
+    "RUSTSEC-2026-0104",
+]

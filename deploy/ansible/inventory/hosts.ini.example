@@ -1,0 +1,25 @@
+# Example INI inventory (RFC 5737 documentation addresses). Copy to
+# inventory/hosts.ini (gitignored) and fill in your hosts. The scripts under
+# scripts/ read inventory/hosts.ini first and inventory/hosts.yml second.
+[validators]
+producer-1 ansible_host=203.0.113.10 viper_node_id=producer viper_p2p_port=26656 viper_api_port=26657 viper_role=validator viper_proposer_address_hex="<64-hex proposer address from the genesis roster>" viper_validator_node_id=validator-1
+
+[full_nodes]
+follower-1 ansible_host=203.0.113.11 viper_node_id=follower-a viper_p2p_port=26666 viper_role=full viper_validator_node_id=validator-2
+follower-2 ansible_host=203.0.113.12 viper_node_id=follower-b viper_p2p_port=26676 viper_role=full viper_validator_node_id=validator-3
+
+[all:vars]
+ansible_user=root
+ansible_port=22
+ansible_ssh_private_key_file=~/.ssh/your-deploy-key
+ansible_ssh_common_args=-o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes -o PasswordAuthentication=no
+
+viper_chain_id=viper-testnet-1
+viper_repo_url=https://github.com/v1p3r4llbl4ck-86/viper-pq-chain.git
+viper_repo_branch=main
+
+viper_data_dir=/var/lib/pqchain
+viper_config_dir=/etc/pqchain
+viper_binary_path=/usr/local/bin/pqcd
+viper_block_time_ms=500
+viper_sync_interval_ms=100

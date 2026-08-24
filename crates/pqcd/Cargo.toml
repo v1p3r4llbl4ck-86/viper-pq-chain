@@ -1,0 +1,153 @@
+[package]
+name = "pqcd"
+description = "PQ Chain node binary"
+version.workspace = true
+edition.workspace = true
+license = "BUSL-1.1"
+authors.workspace = true
+publish = false
+
+[lib]
+name = "pqcd"
+path = "src/lib.rs"
+
+[[bin]]
+name = "pqcd"
+path = "src/main.rs"
+
+[dependencies]
+pqc-crypto    = { path = "../pqc-crypto", features = ["stub-verifier", "pq-verifier", "kem-backend"] }
+pqc-types     = { path = "../pqc-types", default-features = false }
+pqc-tx        = { path = "../pqc-tx", default-features = false, features = ["stub-verifier"] }
+pqc-state     = { path = "../pqc-state", default-features = false }
+pqc-mempool   = { path = "../pqc-mempool", default-features = false }
+pqc-consensus = { path = "../pqc-consensus", default-features = false }
+pqc-p2p       = { path = "../pqc-p2p", default-features = false, features = ["libp2p-backend"] }
+pqc-tsa       = { path = "../pqc-tsa" }
+pqc-hsm       = { path = "../pqc-hsm" }
+pqc-keystore  = { path = "../pqc-keystore" }
+anyhow.workspace = true
+base64.workspace = true
+getrandom.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+toml = { version = "0.8", default-features = false, features = ["parse"] }
+axum = "0.8"
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "signal"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+# Optional, only pulled in when the `hybrid-kem-tls` feature is enabled.
+# Versions match the resolved set in pqc-p2p (which already pulls these
+# transitively via the same feature) so Cargo doesn't fork the dep tree.
+rustls = { version = "0.23", optional = true, default-features = false, features = ["std"] }
+rustls-post-quantum = { version = "0.2.4", optional = true }
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+bip39 = { version = "2", default-features = false }
+zeroize = { version = "1", features = ["derive"] }
+rand = "0.9"
+rpassword = "7"
+sha2 = "0.10"
+hmac = "0.12"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+sha3 = "0.10"
+ciborium.workspace = true
+# TASK-188a — cold-storage rotation (block batches → zstd → cold S3).
+# `default-features = false` drops the `arrays` feature pulling in
+# benchmark + experimental APIs; we only need the stable encoder.
+zstd = { version = "0.13", default-features = false }
+
+# TASK-188b §4 — optional S3 upload. Gated behind the `s3-upload`
+# feature so the standard build does not pull in ~30 AWS SDK
+# transitive crates. The SDK consumes `AWS_ROLE_ARN` +
+# `AWS_WEB_IDENTITY_TOKEN_FILE` env vars on EKS via IRSA, so chart-
+# side ServiceAccount wiring needs no in-process credential plumbing.
+aws-config  = { version = "1", optional = true, default-features = false, features = ["behavior-version-latest", "default-https-client"] }
+# `rt-tokio` re-enables the tokio file-streaming `ByteStream::from_path`
+# constructor used by `cold_storage::upload_to_s3` (default-features=false
+# strips it; without it the symbol is gone — surfaced 2026-05-06).
+aws-sdk-s3  = { version = "1", optional = true, default-features = false, features = ["behavior-version-latest", "default-https-client", "rt-tokio"] }
+
+# `libc::chown` for ownership preservation in `pqcd wallet kem-init`'s
+# atomic node.json rewrite. Cargo's std FS API doesn't expose chown.
+# Unix-only — Windows builds skip this.
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[features]
+## Default feature set — token_economics is ON by default so existing
+## builds (workspace tests, viper-pq-1 binary) continue to behave as
+## before. The tokenless viper-research-1 binary is built with:
+##
+##   cargo build -p pqcd --release --no-default-features
+##
+## See the private planning notes
+default = ["token_economics"]
+
+## Cross-workspace `token_economics` propagation. Disabling at this
+## level (via --no-default-features) cascades through every transitive
+## dep that imports pqc-state / pqc-types / pqc-tx / pqc-mempool /
+## pqc-consensus / pqc-p2p with `default-features = false`, so the
+## final binary really does elide the gated modules.
+token_economics = [
+    "pqc-state/token_economics",
+    "pqc-types/token_economics",
+    "pqc-tx/token_economics",
+    "pqc-mempool/token_economics",
+    "pqc-consensus/token_economics",
+    "pqc-p2p/token_economics",
+]
+
+# TASK-219 — runtime malicious-node attack modes for security testing.
+# OFF by default; release builds NEVER set this. The DevnetConfig::attack_mode
+# field is honoured ONLY when this feature is enabled (cfg-gated at every
+# signer/proposer site). See crates/pqcd/tests/malicious_node.rs for the
+# integration test that enables it.
+attack-modes = []
+
+# TASK-188b §4 — direct S3 upload from `pqcd cold-storage-export
+# --upload-to s3://...`. OFF by default to keep the standard build
+# slim (the AWS SDK pulls ~30 transitive crates).
+#
+# Toolchain requirement: enabling this feature requires rustc ≥ 1.91
+# (the AWS SDK 1.131+ raised its MSRV mid-2026). The default build
+# stays compatible with the rustc 1.88 baseline used by the rest of
+# the workspace; only operators that opt into in-band S3 push need
+# the newer toolchain. The chart's CI image-build job is the typical
+# consumer and pins a recent rustup nightly anyway.
+#
+# Without this feature, `--upload-to` errors out with a clear message
+# pointing the operator at `aws s3 sync` as the externally-driven
+# alternative.
+s3-upload = ["dep:aws-config", "dep:aws-sdk-s3"]
+
+# Compile-time activation of X25519MLKEM768 hybrid post-quantum TLS on the
+# wire. Cascades to `pqc-p2p/hybrid-kem-tls` (which already wires the
+# vendored libp2p-tls / libp2p-quic _with_provider() constructors at
+# crates/pqc-p2p/src/swarm.rs:411-432). The runtime `install_default()`
+# call in main.rs (added in Task 4) makes the same provider visible to
+# reqwest's internal rustls, so outbound HTTPS (TSA, cold-storage upload,
+# wallet RPC, notary outbound) also negotiates the PQ hybrid group. See
+# CHANGELOG.md, 2026-05-15 PQ coverage remediation.
+hybrid-kem-tls = [
+    "pqc-p2p/hybrid-kem-tls",
+    "dep:rustls",
+    "dep:rustls-post-quantum",
+]
+
+[dev-dependencies]
+pqc-consensus = { path = "../pqc-consensus", features = ["testing-utils"] }
+base64.workspace = true
+ciborium.workspace = true
+tokio = { version = "1", features = ["rt", "macros", "net", "sync", "time"] }
+tower = { version = "0.5", features = ["util"] }
+http-body-util = "0.1"
+http = "1"
+
+# The malicious-node scenarios only inject faults when `attack-modes` is on;
+# without it every assertion is vacuously true. Never run them vacuously.
+[[test]]
+name = "malicious_node"
+required-features = ["attack-modes"]

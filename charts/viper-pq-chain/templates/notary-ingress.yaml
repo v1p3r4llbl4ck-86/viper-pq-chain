@@ -1,0 +1,41 @@
+{{- if and .Values.notary.enabled .Values.notary.ingress.enabled -}}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "viper-pq-chain.notaryName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.notaryLabels" . | nindent 4 }}
+  {{- with .Values.notary.ingress.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  ingressClassName: {{ .Values.notary.ingress.className }}
+  {{- if .Values.notary.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.notary.ingress.host | quote }}
+      secretName: {{ .Values.notary.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.notary.ingress.host | quote }}
+      http:
+        paths:
+          {{- range .Values.notary.ingress.paths }}
+          - path: {{ .path }}
+            pathType: {{ .pathType }}
+            backend:
+              service:
+                {{- if eq (default "notary" .backend) "frontend" }}
+                name: {{ include "viper-pq-chain.frontendName" $ }}
+                port:
+                  name: http
+                {{- else }}
+                name: {{ include "viper-pq-chain.notaryName" $ }}
+                port:
+                  name: http
+                {{- end }}
+          {{- end }}
+{{- end }}

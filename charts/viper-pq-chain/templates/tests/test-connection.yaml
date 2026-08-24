@@ -1,0 +1,60 @@
+{{- if .Values.tests.enabled -}}
+{{- $rpcSvc := include "viper-pq-chain.firstChainNodeService" . -}}
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "viper-pq-chain.fullname" . }}-test-connection
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.labels" . | nindent 4 }}
+  annotations:
+    helm.sh/hook: test
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  serviceAccountName: {{ include "viper-pq-chain.serviceAccountName" . }}
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  securityContext:
+    runAsNonRoot: true
+    runAsUser: 65532
+    runAsGroup: 65532
+    seccompProfile:
+      type: RuntimeDefault
+  containers:
+    - name: test
+      image: "{{ .Values.tests.image.repository }}:{{ .Values.tests.image.tag }}"
+      imagePullPolicy: IfNotPresent
+      securityContext:
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: [ALL]
+      command:
+        - /bin/sh
+        - -ec
+        - |
+          set -e
+          {{ if $rpcSvc }}
+          echo "── chain RPC: /v1/status ─────────────────────────────"
+          curl --fail --silent --show-error --max-time 10 \
+            "http://{{ $rpcSvc }}-headless:26657/v1/status"
+          echo
+          {{ else }}
+          echo "(no chain-node role enabled — skipping chain RPC test)"
+          {{ end }}
+          {{ if .Values.notary.enabled }}
+          echo
+          echo "── notary: /health ──────────────────────────────────"
+          curl --fail --silent --show-error --max-time 10 \
+            "http://{{ include "viper-pq-chain.notaryName" . }}:{{ .Values.notary.service.port }}/health"
+          echo
+          echo "── notary: /api/qeaa/issuers (3 demo issuers expected) ──"
+          curl --fail --silent --show-error --max-time 10 \
+            "http://{{ include "viper-pq-chain.notaryName" . }}:{{ .Values.notary.service.port }}/api/qeaa/issuers"
+          echo
+          {{ else }}
+          echo "(notary disabled — skipping notary tests)"
+          {{ end }}
+          echo "All tests passed."
+{{- end }}

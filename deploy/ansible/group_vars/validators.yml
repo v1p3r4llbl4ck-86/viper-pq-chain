@@ -1,0 +1,66 @@
+---
+# group_vars/validators.yml — variables that apply only to validator nodes
+
+# The proposer_address_hex receives the priority fee share from each block.
+# For devnet testing, this is the genesis account address (validator-1).
+# For production, set this to your validator's fee-recipient address.
+viper_proposer_address_hex: "087024f943f46283fbfffd2536313d74a87c39aee943f5b4dce88a6f1ba53cfc"
+
+# Phase 8 M1 libp2p — validator role = NodeRole::Validator in pqcd, which
+# consumes `validator_listen` from the libp2p section (ADR-041 §3).
+# Templated via `viper_p2p_port` so the inventory remains the single
+# source of truth for ports; today producer-1 listens on TCP 26656.
+viper_libp2p: "{{ viper_libp2p_common | combine({'validator_listen': '0.0.0.0:' ~ viper_p2p_port}) }}"
+
+# ------------------------------------------------------------
+# Viper Notary backend — deployed on producer-1 only
+# ------------------------------------------------------------
+
+# HTTP port the notary backend listens on.
+notary_port: 3000
+
+# Install path for the viper-notary binary.
+notary_binary_path: /usr/local/bin/viper-notary
+
+# Directory for the notary env file (contains secrets — mode 0640, owner pqchain).
+notary_config_dir: /etc/viper-notary
+
+# CORS allowed origin for the React frontend.
+# Use "*" for devnet. In production set to your actual domain, e.g.:
+#   notary_cors_origin: "https://notary.viper-chain.io"
+notary_cors_origin: "https://pqchain.agwswebconsulting.it"
+
+# Chain ID the notary uses when building attestation transactions.
+# Must match the chain_id_hex in node.json (UTF-8 bytes of the string).
+notary_chain_id: "viper-pq-1"
+
+# VIPER-NOTARY-V1 schema ID (32 bytes, hex) — agreed in genesis or first gov proposal.
+# This placeholder must be replaced before mainnet.
+notary_schema_id_hex: "bf8312ff974b5343b9475b4a6bb9f71c7c196e9d59df952c052b24cfda61d7e5"
+
+# Notary service account — ML-DSA-65 keypair.
+#
+# WARNING: These are devnet test values — PUBLIC and used in CI.
+# For any real deployment:
+#   1. Generate a fresh air-gapped keypair (pqcd keygen --alg ml-dsa-65 --seed-hex <random>)
+#   2. Fund the address from the genesis account
+#   3. Store the seed in a secrets manager; inject via NOTARY_SEED_HEX at runtime
+#      (override notary_service_account_seed_hex with a vault lookup in hosts.yml)
+# Devnet: reuse genesis account (validator-1 keypair — already funded at genesis).
+# seed 1111...11 → same ML-DSA-65 keypair as validator-1 / genesis account.
+# WARNING: production must use a dedicated air-gapped keypair.
+# notary_service_account_seed_hex and notary_service_account_address_hex
+# are SECRET — defined in group_vars/all/mainnet_keys.yml (gitignored)
+
+# ------------------------------------------------------------
+# Web role — nginx + Let's Encrypt (producer-1 only)
+# ------------------------------------------------------------
+
+# Public domain for the Viper Notary service (proxied to notary_port).
+notary_domain: "pqchain.agwswebconsulting.it"
+
+# Public domain for the block explorer (static files + /v1/ proxy to viper_api_port).
+explorer_domain: "pqchain-status.agwswebconsulting.it"
+
+# Email address for Let's Encrypt registration (required by certbot).
+certbot_email: "admin@agwswebconsulting.it"

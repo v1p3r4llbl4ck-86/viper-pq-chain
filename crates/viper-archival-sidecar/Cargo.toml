@@ -1,0 +1,48 @@
+[package]
+name = "viper-archival-sidecar"
+version.workspace = true
+edition.workspace = true
+license = "BUSL-1.1"
+publish = false
+authors.workspace = true
+description = "Out-of-consensus RFC 3161 TSA anchoring daemon for Viper Chain's archival overlay (SPEC-ARCHIVAL-001 §6, ADR-045, TASK-164)"
+
+[[bin]]
+name = "viper-archival-sidecar"
+path = "src/main.rs"
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+pqc-crypto = { path = "../pqc-crypto", features = ["ml-dsa-backend"] }
+pqc-types  = { path = "../pqc-types", default-features = false }
+pqc-state  = { path = "../pqc-state", default-features = false }
+pqc-tx     = { path = "../pqc-tx", default-features = false }
+pqc-keystore = { path = "../pqc-keystore" }
+pqc-tsa    = { path = "../pqc-tsa" }
+
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+serde = { workspace = true }
+serde_json = "1"
+toml = { version = "0.8", default-features = false, features = ["parse"] }
+hex = { workspace = true }
+base64 = { workspace = true }
+sha2 = "0.10"
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "sync", "time", "signal"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+
+[features]
+default = ["token_economics"]
+## Cross-workspace `token_economics` propagation. See pqc-state/Cargo.toml.
+token_economics = [
+    "pqc-state/token_economics",
+    "pqc-types/token_economics",
+    "pqc-tx/token_economics",
+]
+
+[dev-dependencies]
+axum = "0.8"

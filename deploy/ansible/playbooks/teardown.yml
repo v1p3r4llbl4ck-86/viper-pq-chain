@@ -1,0 +1,53 @@
+---
+# teardown.yml — completely remove Viper PQ Chain from all nodes
+#
+# WARNING: This deletes ALL chain data. The devnet cannot be recovered
+# without rerunning `make deploy` from scratch.
+# Use only for a clean reset before a fresh deployment.
+
+- name: "TEARDOWN — Remove Viper PQ Chain from all nodes"
+  hosts: all
+  become: yes
+  gather_facts: no
+
+  tasks:
+    - name: Stop pqcd service
+      systemd:
+        name:    pqcd
+        state:   stopped
+        enabled: no
+      ignore_errors: yes
+
+    - name: Remove systemd unit file
+      file:
+        path:  /etc/systemd/system/pqcd.service
+        state: absent
+
+    - name: Reload systemd after unit removal
+      systemd:
+        daemon_reload: yes
+
+    - name: Remove pqcd binary
+      file:
+        path:  "{{ viper_binary_path }}"
+        state: absent
+
+    - name: Remove config directory
+      file:
+        path:  "{{ viper_config_dir }}"
+        state: absent
+
+    - name: Remove data directory
+      file:
+        path:  "{{ viper_data_dir }}"
+        state: absent
+
+    - name: Remove repo clone
+      file:
+        path:  /opt/viper-pq-chain
+        state: absent
+      ignore_errors: yes
+
+    - name: Teardown complete
+      debug:
+        msg: "Node {{ viper_node_id }} fully removed. Run 'make deploy' to redeploy."

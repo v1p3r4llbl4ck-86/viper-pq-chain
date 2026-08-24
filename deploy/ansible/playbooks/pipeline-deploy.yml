@@ -1,0 +1,49 @@
+---
+# pipeline-deploy.yml — push a pre-built binary from the CI pipeline to all nodes
+#
+# Called by the GitLab CI deploy:binary job. The binary is built once on the
+# runner and copied here; nodes do not need Rust or clang installed.
+#
+# Required variable:
+#   binary_src   absolute path to the pqcd binary on the Ansible controller
+#                (e.g. $CI_PROJECT_DIR/target/release/pqcd)
+#
+# Usage:
+#   ansible-playbook playbooks/pipeline-deploy.yml \
+#     -e "binary_src=/path/to/target/release/pqcd"
+
+- name: Deploy pre-built pqcd binary from CI pipeline
+  hosts: all
+  become: yes
+  gather_facts: yes
+
+  pre_tasks:
+    - name: Verify binary_src is defined
+      assert:
+        that: binary_src is defined and binary_src | length > 0
+        fail_msg: "binary_src is required: -e binary_src=/absolute/path/to/pqcd"
+
+    - name: Copy pre-built pqcd binary to node
+      copy:
+        src:   "{{ binary_src }}"
+        dest:  "{{ viper_binary_path }}"
+        mode:  '0755'
+        owner: root
+        group: root
+      notify: restart pqcd
+
+  roles:
+    - configure
+    - deploy
+    - role: notary
+      when: viper_role == 'validator'
+
+  post_tasks:
+    - name: Print deployment summary
+      debug:
+        msg: >-
+          {{ viper_node_id }} ({{ viper_role }}) updated from CI artifact.
+          Binary: {{ viper_binary_path }}
+          {% if viper_role == 'validator' %}
+          API: http://{{ ansible_host }}:{{ viper_api_port }}/v1/status
+          {% endif %}

@@ -1,0 +1,32 @@
+[Unit]
+Description=Viper PQ Chain — 90-day libp2p PeerId rotation (R-14 operational guardrail)
+Documentation=file://{{ viper_repo_path | default('/opt/viper-pq-chain') }}/docs/historical/RUNBOOK-PEER-ID-ROTATION-viper-research-1.md
+# Wants= rather than Requires= so a transient pqcd outage doesn't block
+# the rotation cycle. The wrapper script's EXIT trap re-starts pqcd
+# unconditionally on every exit path — same pattern as pqcd-prune /
+# pqcd-cold-rotate.
+After=network.target pqcd.service
+Wants=pqcd.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/pqcd-peer-id-rotate.sh
+StandardOutput=journal
+StandardError=journal
+# Soft-fail if pqcd-peer-id-rotate.sh exits non-zero: the wrapper's
+# rollback path leaves node.json in its pre-rotation state (the CLI's
+# atomic write means either the new salt is fully written or the
+# original file is intact). Operator wakes up to a failed-unit alert
+# via Zabbix; the chain continues on the OLD PeerId. This is strictly
+# better than a partial state where node.json carries one salt and
+# the on-chain binding carries another.
+#
+# Resource caps: rotation is cheap (one tx submit + one 64-byte file
+# write + one systemctl restart). The 10-min ceiling is generous —
+# typical rotation lands in <30 s including the pqcd restart.
+Nice=10
+TimeoutStartSec=10min
+
+[Install]
+WantedBy=multi-user.target

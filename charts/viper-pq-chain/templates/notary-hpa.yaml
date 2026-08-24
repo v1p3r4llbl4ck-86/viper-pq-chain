@@ -1,0 +1,24 @@
+{{- if and .Values.notary.enabled .Values.notary.autoscaling.enabled -}}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "viper-pq-chain.notaryName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.notaryLabels" . | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "viper-pq-chain.notaryName" . }}
+  minReplicas: {{ .Values.notary.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.notary.autoscaling.maxReplicas }}
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ .Values.notary.autoscaling.targetCPUUtilizationPercentage }}
+{{- end }}

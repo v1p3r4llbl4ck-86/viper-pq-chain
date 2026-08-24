@@ -1,0 +1,27 @@
+[Unit]
+Description=Viper PQ Chain — full node disk reclamation (TASK-187a)
+Documentation=file://{{ viper_repo_path | default('/opt/viper-pq-chain') }}/docs/operators/RUNBOOK.md
+# Wants= rather than Requires= so a transient pqcd outage doesn't block
+# the prune cycle. The wrapper script's EXIT trap re-starts pqcd
+# unconditionally, so this unit is safe to run even if pqcd is down.
+After=network.target pqcd.service
+Wants=pqcd.service
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/pqcd-prune.sh
+StandardOutput=journal
+StandardError=journal
+# Prune is I/O-heavy (RocksDB compaction). Give it generous resources but
+# de-prioritise vs. live work by other processes on the box.
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+# 30-min ceiling — a 7-day-tail prune on a healthy NVMe takes <2 min.
+# If we ever hit this we know the box is under unrelated I/O contention
+# and the operator wants a heads-up via systemd's failed-unit alert.
+TimeoutStartSec=30min
+
+[Install]
+WantedBy=multi-user.target

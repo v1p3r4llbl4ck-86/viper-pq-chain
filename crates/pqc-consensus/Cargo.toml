@@ -1,0 +1,41 @@
+[package]
+name = "pqc-consensus"
+description = "Block production, BFT voting, and finalization (Tendermint/CometBFT-like)"
+version.workspace = true
+edition.workspace = true
+license = "BUSL-1.1"
+authors.workspace = true
+publish = false
+
+[dependencies]
+pqc-crypto  = { path = "../pqc-crypto", features = ["ml-dsa-backend"] }
+pqc-mempool = { path = "../pqc-mempool", default-features = false }
+pqc-tx      = { path = "../pqc-tx", default-features = false }
+pqc-types   = { path = "../pqc-types", default-features = false }
+pqc-state   = { path = "../pqc-state", default-features = false }
+pqc-light-client = { path = "../pqc-light-client" }
+ciborium.workspace = true
+hex.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+rocksdb.workspace = true
+
+[features]
+default = ["token_economics"]
+testing-utils = []
+## Cross-workspace `token_economics` propagation. See pqc-state/Cargo.toml.
+token_economics = [
+    "pqc-state/token_economics",
+    "pqc-types/token_economics",
+    "pqc-tx/token_economics",
+    "pqc-mempool/token_economics",
+]
+
+[dev-dependencies]
+pqc-crypto = { path = "../pqc-crypto", features = ["stub-verifier"] }
+criterion.workspace = true
+
+[[bench]]
+name = "block_throughput"
+harness = false

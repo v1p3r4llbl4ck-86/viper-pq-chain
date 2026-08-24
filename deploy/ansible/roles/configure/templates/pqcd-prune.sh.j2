@@ -1,0 +1,52 @@
+#!/bin/bash
+# Managed by Ansible — do not edit manually
+#
+# Viper PQ Chain — TASK-187a full-node prune wrapper.
+#
+# Stops pqcd, runs `pqcd snapshot-prune`, restarts pqcd. Always restarts
+# pqcd on exit (success OR failure) so a transient prune error does not
+# leave the chain offline. Output streams to /var/log/pqchain/prune.log
+# and journald for the operator + the Zabbix `viper.alerts.*` watcher.
+#
+# Invariants enforced by `pqcd snapshot-prune` itself (refuses to run if
+# violated):
+#   - role guard: validator / single_node refuse without --force
+#   - cutoff > 0 (genesis preserved)
+#   - cutoff <= tip
+#   - latest trusted checkpoint at height >= cutoff (bootstrap-able)
+
+set -u
+set -o pipefail
+
+PQCD={{ viper_binary_path }}
+CONFIG={{ viper_config_dir }}/node.json
+KEEP_TAIL_BLOCKS={{ viper_prune_keep_tail_blocks | default(1209600) }}
+LOGFILE=/var/log/pqchain/prune.log
+
+mkdir -p "$(dirname $LOGFILE)"
+chown pqchain:pqchain "$LOGFILE" 2>/dev/null || true
+chmod 644 "$LOGFILE" 2>/dev/null || true
+
+echo "[$(date -u +%FT%TZ)] prune_start node_id={{ viper_node_id }} keep_tail_blocks=$KEEP_TAIL_BLOCKS" >> "$LOGFILE"
+
+# Restart pqcd on every exit path — even if `pqcd snapshot-prune` fails,
+# the chain MUST come back up. The `|| true` swallows a systemctl exit
+# code if pqcd is already restarting / masked / missing — the worst case
+# is an alert from the existing `viper.process.uptime_seconds`-based
+# trigger which is exactly what the operator wants in that scenario.
+trap 'echo "[$(date -u +%FT%TZ)] restarting pqcd.service after prune" >> "$LOGFILE"; systemctl start pqcd.service || true' EXIT
+
+systemctl stop pqcd.service
+# Give pqcd a moment to flush its WAL + close RocksDB — `snapshot-prune`
+# opens the store exclusively and would error out if pqcd were still
+# holding the lock.
+sleep 3
+
+if "$PQCD" snapshot-prune "$CONFIG" --keep-tail-blocks "$KEEP_TAIL_BLOCKS" 2>&1 | tee -a "$LOGFILE"; then
+    echo "[$(date -u +%FT%TZ)] prune_ok" >> "$LOGFILE"
+    exit 0
+else
+    rc=$?
+    echo "[$(date -u +%FT%TZ)] prune_failed rc=$rc" >> "$LOGFILE"
+    exit "$rc"
+fi

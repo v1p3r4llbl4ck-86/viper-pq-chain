@@ -1,0 +1,19 @@
+[package]
+name = "pqc-tsa"
+description = "Minimal RFC 3161 TimeStampReq DER encoder shared by viper-archival-sidecar and pqcd cold-storage rotation"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# No deps — the encoder is pure Rust over byte slices. Tagged-hash helpers
+# for callers that want to re-use the same domain-prefix pattern as the
+# rest of the codebase live in pqc-crypto, not here.
+
+[lints]
+workspace = true

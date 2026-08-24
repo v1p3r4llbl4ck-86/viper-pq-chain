@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Security vulnerability
+    url: https://github.com/v1p3r4llbl4ck-86/viper-pq-chain/security/advisories/new
+    about: Report privately. Never open a public issue for a vulnerability (SECURITY.md).
+  - name: Running a node
+    url: https://github.com/v1p3r4llbl4ck-86/viper-pq-chain/blob/main/docs/operators/RUNBOOK.md
+    about: The operator runbook answers most "how do I run / join" questions.

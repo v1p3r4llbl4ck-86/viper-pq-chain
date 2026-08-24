@@ -1,0 +1,48 @@
+# Build artefacts
+target/
+**/target/
+**/*.rs.bk
+
+# VCS
+.git/
+.gitignore
+.gitlab-ci.yml
+
+# Deploy / ops (not needed inside the image)
+deploy/
+configs/
+config/
+reports/
+audit/
+
+# Docs and meta files (not needed at build time) — except for the
+# OpenAPI spec + Swagger HTML that pqcd embeds via include_str! at
+# compile time (see crates/pqcd/src/devnet.rs:4323-4326).
+docs/*
+!docs/openapi.yaml
+!docs/site
+docs/site/*
+!docs/site/swagger.html
+specs/
+*.md
+!Cargo.lock
+!Cargo.toml
+
+# Editor / IDE state
+.vscode/
+.idea/
+*.swp
+
+# Node / frontend build artefacts (not in OCI images)
+node_modules/
+
+# Tests + benches stay (cargo-chef needs them to plan the workspace) but
+# anything heavy like big test fixtures should be excluded explicitly.
+fuzz/corpus/
+
+# Anything starting with the docker dir itself (the Dockerfiles still get
+# copied because they're listed via -f to buildx).
+.docker/
+
+# OS junk
+.DS_Store

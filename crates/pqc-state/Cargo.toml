@@ -1,0 +1,50 @@
+[package]
+name = "pqc-state"
+description = "State machine: account/key lifecycle, vault, attestation operations"
+version.workspace = true
+edition.workspace = true
+license = "BUSL-1.1"
+authors.workspace = true
+publish = false
+
+[dependencies]
+pqc-crypto  = { path = "../pqc-crypto" }
+pqc-types   = { path = "../pqc-types" }
+pqc-tx      = { path = "../pqc-tx" }
+ciborium.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[features]
+## Default feature set. Enables `token_economics` for backward compatibility
+## during the viper-pq-1 → viper-research-1 pivot (2026-05-11). The future
+## tokenless production build will use `--no-default-features` to elide
+## token-coupled modules (transfer, storage_fund, slashing economic penalty).
+default = ["token_economics"]
+
+## Enable real ML-DSA-65 signature verification for `SubmitEquivocationEvidence`.
+## Without this feature, a passthrough verifier is used (devnet only).
+pq-verifier = ["pqc-crypto/pq-verifier"]
+
+## Token economics: VPR balances, transfers, storage-fund fee escrow, and the
+## economic-penalty branch of slashing. Disabling this feature builds a
+## tokenless variant suitable for permissioned PoA research substrate
+## (chain-id viper-research-1 — see the private planning notes).
+##
+## When OFF:
+##   - `apply::transfer` module is elided (TokenTransfer txs rejected at dispatch)
+##   - `storage_fund` module is elided (StateStore.storage_fund field absent;
+##     state_merkle skips the storage-fund leaf)
+##   - `apply::slashing` keeps slashing-as-removal (validator tombstone),
+##     drops the economic penalty + treasury credit branch
+##
+## Slashing infrastructure (RecentSlashEntry storage, validator status tracking)
+## stays present in either variant — it's free if no economic penalty is applied.
+##
+## Phase 4 (cutover) will additionally add `default-features = false` to the
+## pqc-state imports in pqc-mempool, pqc-consensus, viper-archival-sidecar, and
+## pqcd to break Cargo's global feature unification across the workspace.
+token_economics = []
+
+[dev-dependencies]
+pqc-crypto = { path = "../pqc-crypto", features = ["stub-verifier"] }

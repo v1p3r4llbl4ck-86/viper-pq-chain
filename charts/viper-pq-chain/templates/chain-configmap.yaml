@@ -1,0 +1,78 @@
+{{- /*
+Per-role ConfigMap with the rendered node.json the role uses.
+
+Operators can override the rendered content by setting
+`chainNode.<role>.config.nodeJson` (raw JSON string) or by pointing
+to an externally-managed ConfigMap via
+`chainNode.<role>.config.configMapRef`.
+
+Genesis: chart-level (chain.genesis.inline OR chain.genesis.configMapRef).
+This template renders the genesis ConfigMap once per release; per-role
+StatefulSets mount it.
+*/ -}}
+
+{{- /* ── Genesis ConfigMap (release-scoped) ──────────────────────── */ -}}
+{{- if and (not .Values.chain.genesis.configMapRef) (not (eq (include "viper-pq-chain.enabledRoles" .) "")) }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "viper-pq-chain.fullname" . }}-genesis
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.labels" . | nindent 4 }}
+data:
+  genesis.json: |
+{{- if .Values.chain.genesis.inline }}
+{{ .Values.chain.genesis.inline | indent 4 }}
+{{- else }}
+    {
+      "chain_id": {{ .Values.chain.id | quote }},
+      "block_time_ms": {{ .Values.chain.blockTimeMs }},
+      "_chart_placeholder": "Default minimal genesis. For a real network, set chain.genesis.inline or chain.genesis.configMapRef in values.yaml. See charts/viper-pq-chain/README.md."
+    }
+{{- end }}
+{{- end }}
+
+{{- include "viper-pq-chain.guardCeremonyValues" $ -}}
+{{- /* ── Per-role ConfigMap with node.json ───────────────────────── */ -}}
+{{- range $role := list "validator" "sentry" "full" "rpc" "archive" "bootnode" }}
+{{- $cfg := index $.Values.chainNode $role | default dict -}}
+{{- if $cfg.enabled }}
+{{- $merged := include "viper-pq-chain.roleConfig" (dict "ctx" $ "role" $role) | fromYaml -}}
+{{- if not $merged.config }}
+{{- $merged = mustMerge $merged (dict "config" dict) -}}
+{{- end }}
+{{- if not $merged.config.configMapRef }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-pqcd-%s-config" (include "viper-pq-chain.fullname" $) $role | trunc 63 | trimSuffix "-" }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.roleLabels" (dict "ctx" $ "role" $role) | nindent 4 }}
+data:
+  node.json: |
+{{- if and $merged.config $merged.config.nodeJson }}
+{{ $merged.config.nodeJson | indent 4 }}
+{{- else }}
+    {
+      "data_dir": "/var/lib/pqchain/data",
+      "chain_id": {{ $.Values.chain.id | quote }},
+      "node": {
+        "role": {{ $role | quote }}
+      },
+      "api": {
+        "bind_addr": {{ printf "%s:%d" (default "0.0.0.0" $merged.api.bindAddress) (int (default 26657 $merged.api.port)) | quote }}
+      },
+      "p2p": {
+        "bind_addr": {{ printf "%s:%d" (default "0.0.0.0" $merged.p2p.bindAddress) (int (default 26656 $merged.p2p.port)) | quote }},
+        "advertise_addr": ""
+      },
+      "_chart_placeholder": "Default minimal node config. For a real deployment, set chainNode.{{ $role }}.config.nodeJson or chainNode.{{ $role }}.config.configMapRef. See charts/viper-pq-chain/README.md."
+    }
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

@@ -1,0 +1,175 @@
+# cargo-deny configuration for the Viper PQ Chain workspace.
+#
+# Scope: supply-chain linting (advisories, licenses, crate bans, source allow-lists)
+# Tracked under TASK-149 (KNOWN-ISSUES.md §5) — first landing, intentionally calibrated
+# so CI does not hard-fail on first run. Tightening passes are tracked in
+# docs/phase-8-audit-readiness.md §3 (gaps B3/B4).
+#
+# Schema: cargo-deny 0.14+ uses `version = 2` at the top of each table; the root
+# key shown here is the file-format version for the modern parser.
+# Ref: https://embarkstudios.github.io/cargo-deny/checks/cfg.html
+
+[graph]
+# Consider all targets we actually build for. x86_64-unknown-linux-gnu is the
+# primary release target per deploy/ansible; the musl/aarch64 entries are here
+# to cover future reproducible-build work (TASK-157).
+targets = [
+    { triple = "x86_64-unknown-linux-gnu" },
+    { triple = "aarch64-unknown-linux-gnu" },
+    { triple = "x86_64-unknown-linux-musl" },
+]
+# We intentionally traverse all-features so cargo-deny sees every cfg that any
+# workspace crate can enable.
+all-features = true
+
+[output]
+feature-depth = 1
+
+# ── Advisories (cargo-audit overlap, but enforced via deny too) ──────────────
+[advisories]
+version = 2
+# RustSec advisory DB — pulled from the default Git source.
+db-path = "~/.cargo/advisory-db"
+db-urls = ["https://github.com/RustSec/advisory-db"]
+# Any vulnerability in the dependency graph is a hard fail.
+# Duplicate of cargo-audit's check; kept here so `cargo deny check` alone is
+# sufficient signal for release gating if cargo-audit is skipped.
+# NOTE: modern cargo-deny (0.14+) infers `vulnerability = "deny"` / `unsound =
+# "deny"` from `version = 2`; we leave those keys off because setting them
+# explicitly emits a deprecation warning on new versions.
+yanked = "deny"
+ignore = [
+    # Add RUSTSEC IDs here with a justification + review date when temporarily
+    # accepting a flagged advisory (e.g. no-fix-available upstream).
+    #
+    # RUSTSEC-2024-0436 — `paste` 1.0.15 unmaintained.
+    #   Transitive dep through libp2p (libp2p-tcp / libp2p-quic / libp2p-mdns
+    #   → if-watch → netlink-packet-core → paste). No safe upgrade available
+    #   upstream as of 2026-04-26; libp2p 0.55 still pins this. Re-evaluate
+    #   when libp2p cuts a release that drops paste or replaces netlink-rs.
+    "RUSTSEC-2024-0436",
+    # RUSTSEC-2026-0002 (lru unsound) — REMOVED 2026-05-08: `cargo deny check
+    # advisories` reported `advisory-not-detected` on three consecutive runs
+    # (2026-05-05, 2026-05-06, 2026-05-08). The dep tree no longer pulls a
+    # vulnerable `lru` version (libp2p 0.55 transitive resolved away from it,
+    # likely via a sibling dep bump). Re-add if a future advisory matches.
+    # RUSTSEC-2026-0118 — `hickory-proto` 0.25.0-alpha.5 NSEC3 unbounded loop.
+    #   Transitive dep through libp2p-mdns → libp2p 0.55. Upstream advisory
+    #   2026-05-01 explicitly says "no fixed upgrade is available". We are
+    #   not exposed in practice: pqcd doesn't run an authoritative DNS
+    #   responder; libp2p uses mDNS for local peer discovery only. Re-evaluate
+    #   on every libp2p release until hickory-proto ships a 0.25.x patch or
+    #   libp2p drops to a fixed branch.
+    "RUSTSEC-2026-0118",
+    # RUSTSEC-2026-0119 — `hickory-proto` 0.25.0-alpha.5 O(n²) name compression
+    #   CPU exhaustion under crafted message floods. Same transitive path as
+    #   above (libp2p-mdns). Fix lands in hickory-proto 0.26.1, but libp2p
+    #   0.55 pins 0.25.0-alpha.5 and a workspace-wide bump requires a libp2p
+    #   minor upgrade — tracked separately. Same exposure analysis: mDNS
+    #   only, no public DNS surface; CPU-DoS via mDNS is bounded by the LAN
+    #   broadcast domain.
+    "RUSTSEC-2026-0119",
+    # RUSTSEC-2026-0098 / -0099 / -0104 (`rustls-webpki` 0.101.7) — REMOVED
+    #   2026-08-24: the closure plan landed. `pqcd`'s `s3-upload` feature now
+    #   enables the AWS SDK's `default-https-client` (hyper 1.x / rustls 0.23)
+    #   instead of the legacy `rustls` client, so hyper 0.14 / rustls 0.21 /
+    #   rustls-webpki 0.101 / h2 0.3 are no longer in the lock at all.
+]
+
+# ── Licenses ────────────────────────────────────────────────────────────────
+[licenses]
+version = 2
+# Allow-list. Everything else is deny.
+# Rationale: Apache-2.0 matches our own workspace license; MIT / BSD-*/ ISC /
+# Unicode-DFS-2016 / CC0-1.0 / MPL-2.0 / Zlib cover essentially all of the
+# permissively-licensed RustCrypto + libp2p + tokio + rocksdb dep tree.
+# Copy-left beyond MPL-2.0 (e.g. GPL/LGPL/AGPL) is deliberately NOT allow-listed:
+# for a blockchain L1 we do not want to inadvertently taint the release binary.
+allow = [
+    "Apache-2.0",
+    "Apache-2.0 WITH LLVM-exception",
+    "MIT",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "Unicode-DFS-2016",
+    "Unicode-3.0",
+    "CC0-1.0",
+    "MPL-2.0",
+    "Zlib",
+    # CDLA-Permissive-2.0 covers the public-key cert bundle in webpki-roots
+    # (a Linux-Foundation Community Data License). Permissive, no copyleft,
+    # safe for a blockchain L1 release. https://cdla.dev/permissive-2-0/
+    "CDLA-Permissive-2.0",
+    # 0BSD (BSD Zero Clause License) — public-domain-equivalent, OSI-approved,
+    # less restrictive than MIT/BSD-2-Clause. Pulled in 2026-05-08 via
+    # `quoted_printable` (transitive: lettre → quoted_printable for SMTP MIME
+    # encoding, Sprint 5.10 transactional emails). Strictly safer than the
+    # already-allowed MIT, so listing it is mechanical.
+    "0BSD",
+]
+confidence-threshold = 0.8
+# Workspace member crates (pqc-consensus, pqc-crypto, pqc-mempool, pqc-p2p,
+# pqc-state, pqc-tx, pqc-types, pqcd, viper-archival-sidecar, viper-notary)
+# inherit `license = "Apache-2.0"` from `[workspace.package]` in the root
+# Cargo.toml but their `[package]` blocks do NOT yet inline `license.workspace
+# = true`, so cargo-deny sees them as unlicensed. Until the per-crate inline
+# lands (cosmetic refactor, separate task), we ignore "private" workspace
+# members from license enforcement. Third-party deps are still strictly
+# allow-listed by the SPDX expressions above.
+private = { ignore = true }
+
+# Per-crate license clarifications. Populate as flags land (leave empty at first
+# landing; any mismatch will surface on the first CI run).
+[[licenses.clarify]]
+name = "ring"
+expression = "MIT AND ISC AND OpenSSL"
+license-files = [
+    { path = "LICENSE", hash = 0xbd0eed23 },
+]
+
+# ── Bans (duplicate versions + red-flag crates) ─────────────────────────────
+[bans]
+# Warn (not deny) on first landing. libp2p + rocksdb + tokio transitively drag
+# in several duplicate-versioned crates (windows-sys, syn, hashbrown, etc.)
+# and blocking CI on those would require a workspace-wide patch campaign that
+# is out of scope for this task.
+multiple-versions = "warn"
+# `wildcards` flags any dep declared with `version = "*"` OR with no version
+# field at all (path-only). Workspace-internal path deps (`pqc-foo = { path
+# = "../pqc-foo" }`) trigger this in pqc-consensus / pqc-mempool. Those are
+# safe — they resolve to the workspace member and are NOT pulled from a
+# registry. `allow-wildcard-paths = true` exempts path deps from the check
+# while still denying registry-fetched wildcards.
+wildcards = "deny"
+allow-wildcard-paths = true
+highlight = "all"
+# Crates we explicitly ban from ever entering the dependency tree.
+# Blockchain L1 projects should avoid hidden TLS/network stacks and known-unmaintained
+# packages. Add justified exceptions in `skip` if needed.
+deny = [
+    # openssl via openssl-sys is a red flag: we prefer rustls / ring everywhere.
+    # Placeholder rule per TASK-149 acceptance criteria; refine once the first
+    # CI run surfaces real regressions.
+    { name = "openssl-sys", wrappers = [] },
+    { name = "openssl" },
+    # `time` <0.2.23 had RUSTSEC-2020-0071 — block older versions outright.
+    { name = "time", version = "<0.2.23" },
+]
+# Duplicate versions we tolerate temporarily. Populate as the first CI run
+# reports actionable duplicates; keep a link to the upstream issue for each.
+skip = []
+# Subtrees we allow to duplicate. Used when an upstream crate pins an older
+# version of a common dep and we cannot force-upgrade it without vendoring.
+skip-tree = []
+
+# ── Sources (registry + git allow-list) ─────────────────────────────────────
+[sources]
+# Any registry not listed below is rejected; any git source not listed below is
+# rejected. Today the workspace pulls exclusively from crates.io (verified:
+# `grep -oE 'source = "git\+[^"]+"' Cargo.lock | sort -u` returns empty on
+# 2026-04-22), so no git allow-list entries are required.
+unknown-registry = "deny"
+unknown-git = "deny"
+allow-registry = ["https://github.com/rust-lang/crates.io-index"]
+allow-git = []

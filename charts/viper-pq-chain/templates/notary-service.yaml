@@ -1,0 +1,19 @@
+{{- if .Values.notary.enabled -}}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "viper-pq-chain.notaryName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.notaryLabels" . | nindent 4 }}
+spec:
+  type: {{ .Values.notary.service.type }}
+  selector:
+    {{- include "viper-pq-chain.notarySelectorLabels" . | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.notary.service.port }}
+      protocol: TCP
+      targetPort: http
+{{- end }}

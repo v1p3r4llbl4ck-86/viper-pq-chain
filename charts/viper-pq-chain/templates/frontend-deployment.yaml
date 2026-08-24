@@ -1,0 +1,71 @@
+{{- if .Values.frontend.enabled -}}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "viper-pq-chain.frontendName" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.frontendLabels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicas }}
+  selector:
+    matchLabels:
+      {{- include "viper-pq-chain.frontendSelectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "viper-pq-chain.frontendLabels" . | nindent 8 }}
+      annotations:
+        checksum/static: {{ include (print $.Template.BasePath "/frontend-configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.frontend.nodeSelector }}
+      nodeSelector: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.frontend.tolerations }}
+      tolerations: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.frontend.affinity }}
+      affinity: {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 101
+        runAsGroup: 101
+        fsGroup: 101
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nginx
+          image: "{{ .Values.frontend.image.repository }}:{{ .Values.frontend.image.tag }}"
+          imagePullPolicy: {{ .Values.frontend.image.pullPolicy }}
+          ports:
+            - { name: http, containerPort: 80, protocol: TCP }
+          readinessProbe:
+            httpGet: { path: /index.html, port: http }
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: { path: /index.html, port: http }
+            periodSeconds: 20
+          resources:
+            {{- toYaml .Values.frontend.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - { name: static,     mountPath: /usr/share/nginx/html }
+            - { name: nginx-conf, mountPath: /etc/nginx/conf.d }
+            - { name: run,        mountPath: /var/run }
+            - { name: cache,      mountPath: /var/cache/nginx }
+      volumes:
+        - name: static
+          configMap:
+            name: {{ include "viper-pq-chain.frontendName" . }}-static
+        - name: nginx-conf
+          configMap:
+            name: {{ include "viper-pq-chain.frontendName" . }}-nginx
+        - { name: run,   emptyDir: {} }
+        - { name: cache, emptyDir: {} }
+{{- end }}

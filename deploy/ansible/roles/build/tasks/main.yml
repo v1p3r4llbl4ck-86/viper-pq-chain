@@ -1,0 +1,43 @@
+---
+- name: Copy Git deploy key to target node
+  copy:
+    src: /root/.ssh/id_ed25519
+    dest: /root/.ssh/id_ed25519_deploy
+    mode: '0600'
+
+- name: Add the Git host to known_hosts on target node
+  known_hosts:
+    name: "{{ viper_repo_host | default('github.com') }}"
+    key: "{{ lookup('pipe', 'ssh-keyscan ' ~ (viper_repo_host | default('github.com')) ~ ' 2>/dev/null') }}"
+    state: present
+
+- name: Clone or update Viper PQ Chain repo
+  git:
+    repo:    "{{ viper_repo_url }}"
+    dest:    /opt/viper-pq-chain
+    version: "{{ viper_repo_branch }}"
+    force:   yes
+    key_file: /root/.ssh/id_ed25519_deploy
+  register: git_result
+
+- name: Build pqcd in release mode
+  shell: |
+    source /root/.cargo/env
+    cargo build --release -p pqcd --features hybrid-kem-tls 2>&1
+  args:
+    chdir:      /opt/viper-pq-chain
+    executable: /bin/bash
+  register: build_result
+  changed_when: "'Compiling' in build_result.stdout or 'Compiling' in build_result.stderr"
+  async:  1800
+  poll:   30
+
+- name: Copy binary to install path
+  copy:
+    src:        /opt/viper-pq-chain/target/release/pqcd
+    dest:       "{{ viper_binary_path }}"
+    remote_src: yes
+    mode:       '0755'
+    owner:      root
+    group:      root
+  notify: restart pqcd

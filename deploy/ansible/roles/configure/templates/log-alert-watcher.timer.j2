@@ -1,0 +1,15 @@
+[Unit]
+Description=Viper PQ Chain — alert watcher tick (every 60s)
+
+[Timer]
+# Fire 30 s after boot to give pqcd time to start producing logs, then
+# every 60 s. Persistent=true means catch-up runs are issued for missed
+# ticks across reboots.
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=10s
+Persistent=true
+Unit=viper-log-alert-watcher.service
+
+[Install]
+WantedBy=timers.target

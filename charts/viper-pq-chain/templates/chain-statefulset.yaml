@@ -1,0 +1,221 @@
+{{- /*
+Per-role StatefulSet for pqcd. One StatefulSet per enabled role; same
+image, different role label, different config, different storage class.
+
+Volumes:
+  - data        — PVC, RocksDB chain store, /var/lib/pqchain/data
+  - config      — ConfigMap, node.json read-only at /etc/pqchain/node.json
+  - genesis     — ConfigMap, genesis.json read-only at /etc/pqchain/genesis.json
+  - keystore    — Secret  (optional), validator/issuer keys at /etc/pqchain/keystore/
+*/ -}}
+{{- range $role := list "validator" "sentry" "full" "rpc" "archive" "bootnode" }}
+{{- $cfg := index $.Values.chainNode $role | default dict -}}
+{{- if $cfg.enabled }}
+{{- $merged := include "viper-pq-chain.roleConfig" (dict "ctx" $ "role" $role) | fromYaml -}}
+{{- $name := printf "%s-pqcd-%s" (include "viper-pq-chain.fullname" $) $role | trunc 63 | trimSuffix "-" -}}
+{{- $configMapName := default (printf "%s-config" $name) (and $merged.config $merged.config.configMapRef) -}}
+{{- $genesisCmName := default (printf "%s-genesis" (include "viper-pq-chain.fullname" $)) $.Values.chain.genesis.configMapRef }}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.roleLabels" (dict "ctx" $ "role" $role) | nindent 4 }}
+  {{- with $merged.podAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  serviceName: {{ $name }}-headless
+  replicas: {{ default 1 $merged.replicas }}
+  podManagementPolicy: Parallel
+  updateStrategy:
+    type: RollingUpdate
+  selector:
+    matchLabels:
+      {{- include "viper-pq-chain.roleSelectorLabels" (dict "ctx" $ "role" $role) | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "viper-pq-chain.roleLabels" (dict "ctx" $ "role" $role) | nindent 8 }}
+        {{- with $merged.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+      annotations:
+        # Roll the pods on config changes so a new node.json takes effect
+        # without manual intervention.
+        viper.pqchain.io/config-checksum: {{ printf "%s-%s" $configMapName $.Values.chain.id | sha256sum | trunc 16 }}
+        {{- with $merged.podAnnotations }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      serviceAccountName: {{ include "viper-pq-chain.serviceAccountName" $ }}
+      automountServiceAccountToken: false
+      {{- with $.Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        {{- toYaml $merged.podSecurityContext | nindent 8 }}
+      {{- with $merged.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $merged.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      affinity:
+        {{- if $merged.affinity }}
+        {{- toYaml $merged.affinity | nindent 8 }}
+        {{- else }}
+        # Default soft anti-affinity: spread replicas of the same role
+        # across nodes when possible.
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                topologyKey: kubernetes.io/hostname
+                labelSelector:
+                  matchLabels:
+                    {{- include "viper-pq-chain.roleSelectorLabels" (dict "ctx" $ "role" $role) | nindent 20 }}
+        {{- end }}
+      containers:
+        - name: pqcd
+          image: {{ include "viper-pq-chain.image" (dict "ctx" $ "binary" "pqcd") }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args:
+            - "devnet-serve"
+            - "/etc/pqchain/node.json"
+          env:
+            - name: RUST_LOG
+              value: {{ default "pqcd=info,tower_http=warn" $merged.rustLog | quote }}
+            - name: VIPER_API_PORT
+              value: {{ default 26657 (and $merged.api $merged.api.port) | quote }}
+            - name: VIPER_P2P_PORT
+              value: {{ default 26656 (and $merged.p2p $merged.p2p.port) | quote }}
+            - name: VIPER_ROLE
+              value: {{ $role | quote }}
+            # ADR-069 §3: pqcd takes its node_id from the pod name, so every
+            # replica of a role has its own libp2p / ML-KEM identity.
+            - name: VIPER_NODE_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: VIPER_CHAIN_ID
+              value: {{ $.Values.chain.id | quote }}
+            {{- if and (eq $role "validator") $merged.consensusKey $merged.consensusKey.secretName }}
+            - name: VIPER_CONSENSUS_SEED_FILE
+              value: /etc/pqchain/keystore/consensus_seed
+            {{- end }}
+            {{- with $merged.extraEnv }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          ports:
+            - name: p2p
+              containerPort: {{ default 26656 (and $merged.p2p $merged.p2p.port) | int }}
+              protocol: TCP
+            - name: api
+              containerPort: {{ default 26657 (and $merged.api $merged.api.port) | int }}
+              protocol: TCP
+          startupProbe:
+            httpGet:
+              path: /v1/status
+              port: api
+            periodSeconds: {{ $merged.probes.startup.periodSeconds }}
+            failureThreshold: {{ $merged.probes.startup.failureThreshold }}
+          readinessProbe:
+            httpGet:
+              path: /v1/status
+              port: api
+            periodSeconds: {{ $merged.probes.readiness.periodSeconds }}
+            failureThreshold: {{ $merged.probes.readiness.failureThreshold }}
+          livenessProbe:
+            httpGet:
+              path: /v1/status
+              port: api
+            periodSeconds: {{ $merged.probes.liveness.periodSeconds }}
+            failureThreshold: {{ $merged.probes.liveness.failureThreshold }}
+          resources:
+            {{- toYaml $merged.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $merged.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/pqchain
+            - name: config
+              mountPath: /etc/pqchain/node.json
+              subPath: node.json
+              readOnly: true
+            - name: genesis
+              mountPath: /etc/pqchain/genesis.json
+              subPath: genesis.json
+              readOnly: true
+            {{- if and (eq $role "validator") $merged.consensusKey $merged.consensusKey.secretName }}
+            - name: keystore
+              mountPath: /etc/pqchain/keystore
+              readOnly: true
+            {{- end }}
+        {{- /* ── Archive sidecar (only on the archive role) ──────────── */ -}}
+        {{- if and (eq $role "archive") $merged.sidecar $merged.sidecar.enabled }}
+        - name: archival-sidecar
+          image: {{ include "viper-pq-chain.image" (dict "ctx" $ "binary" "archivalSidecar") }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args:
+            - "--config"
+            - "/etc/viper-archival-sidecar/sidecar.toml"
+          resources:
+            requests: { cpu: "50m", memory: "128Mi" }
+            limits:   { cpu: "500m", memory: "512Mi" }
+          securityContext:
+            {{- toYaml $merged.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: archival-config
+              mountPath: /etc/viper-archival-sidecar/sidecar.toml
+              subPath: sidecar.toml
+              readOnly: true
+        {{- end }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ $configMapName }}
+            items:
+              - key: node.json
+                path: node.json
+        - name: genesis
+          configMap:
+            name: {{ $genesisCmName }}
+            items:
+              - key: genesis.json
+                path: genesis.json
+        {{- if and (eq $role "validator") $merged.consensusKey $merged.consensusKey.secretName }}
+        - name: keystore
+          secret:
+            secretName: {{ $merged.consensusKey.secretName }}
+            defaultMode: 0400
+        {{- end }}
+        {{- if and (eq $role "archive") $merged.sidecar $merged.sidecar.enabled }}
+        - name: archival-config
+          configMap:
+            name: {{ $name }}-sidecar-config
+        {{- end }}
+  {{- if $merged.persistence.enabled }}
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+        labels:
+          {{- include "viper-pq-chain.roleLabels" (dict "ctx" $ "role" $role) | nindent 10 }}
+      spec:
+        accessModes:
+          {{- toYaml $merged.persistence.accessModes | nindent 10 }}
+        resources:
+          requests:
+            storage: {{ $merged.storage.size }}
+        {{- if $merged.storage.storageClass }}
+        storageClassName: {{ $merged.storage.storageClass | quote }}
+        {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}

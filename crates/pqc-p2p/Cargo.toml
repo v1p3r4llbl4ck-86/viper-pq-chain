@@ -1,0 +1,73 @@
+[package]
+name = "pqc-p2p"
+description = "Post-quantum P2P network layer for Viper PQ Chain (libp2p + QUIC + X25519MLKEM768)"
+version.workspace = true
+edition.workspace = true
+license = "BUSL-1.1"
+authors.workspace = true
+publish = false
+
+[features]
+default = ["token_economics"]
+# Full libp2p implementation (requires libp2p deps). Default off for CI speed.
+libp2p-backend = ["dep:libp2p"]
+## Cross-workspace `token_economics` propagation. See pqc-state/Cargo.toml.
+token_economics = ["pqc-types/token_economics"]
+## Enable the X25519MLKEM768 hybrid post-quantum group on the libp2p TLS
+## handshake (TCP/TLS path) and the QUIC handshake. Pulls
+## `rustls-post-quantum` (which transitively pulls `aws-lc-rs` for the PQ
+## CryptoProvider). Off by default — opt in at build time:
+##
+##     cargo build -p pqcd --release --features pqc-p2p/hybrid-kem-tls
+##
+## Runtime activation is gated additionally by `P2pConfig::hybrid_kem_enabled`
+## so a single binary can ship both paths. The vendored libp2p-tls and
+## libp2p-quic patches under vendor/libp2p-{tls,quic}-pq/ are required for
+## this feature to actually do anything (the upstream 0.6.2 / 0.13.0 releases
+## hard-code the `ring` CryptoProvider). See
+## the private design notes.
+hybrid-kem-tls = ["dep:rustls-post-quantum", "dep:rustls"]
+
+[dependencies]
+pqc-types  = { path = "../pqc-types", default-features = false }
+pqc-crypto = { path = "../pqc-crypto" }
+anyhow.workspace = true
+thiserror.workspace = true
+tokio = { version = "1", features = ["full"] }
+tracing.workspace = true
+serde.workspace = true
+serde_repr = "0.1"
+ciborium.workspace = true
+futures = "0.3"
+
+## Optional rustls + rustls-post-quantum, only pulled in when the
+## `hybrid-kem-tls` feature is enabled. Versions match what libp2p-tls
+## 0.6.2 / libp2p-quic 0.13.0 (the vendored copies) already depend on, so
+## Cargo doesn't fork the dep tree.
+rustls = { version = "0.23", default-features = false, features = ["std"], optional = true }
+rustls-post-quantum = { version = "0.2.4", optional = true }
+
+[dependencies.libp2p]
+version = "0.56"
+optional = true
+features = [
+    "tokio",
+    "quic",
+    "tcp",
+    "tls",
+    "noise",
+    "yamux",
+    "gossipsub",
+    "kad",
+    "identify",
+    "ping",
+    "mdns",
+    "dns",
+    "macros",
+    "request-response",
+    "cbor",
+]
+
+[dev-dependencies]
+tokio = { version = "1", features = ["full", "test-util"] }
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }

@@ -1,0 +1,42 @@
+{
+  "_comment": "bootnode \u2014 DNS-stable seed peer: public P2P only, private API. Give it devnet.libp2p_seed_salt_hex so its peer id survives rebuilds. Reference example (ADR-069); fill the <placeholders> and devnet.validators from genesis. Run: pqcd devnet-serve /etc/pqchain/node.json",
+  "node_id": "bootnode-1",
+  "chain_id_hex": "76697065722d746573746e65742d31",
+  "data_dir": "/var/lib/pqchain/data",
+  "anchor_prev_hash_hex": "0000000000000000000000000000000000000000000000000000000000000000",
+  "fee_params": {
+    "base_fee": 100,
+    "byte_fee": 1,
+    "sigverify_fee_v_a": 500,
+    "sigverify_fee_v_b": 1000,
+    "sigverify_fee_v_c": 58000,
+    "exec_fee_per_gas": 10
+  },
+  "api_listen_addr": "127.0.0.1:26657",
+  "peers": [],
+  "devnet": {
+    "role": "bootnode",
+    "sync_interval_ms": 100,
+    "block_time_ms": 500,
+    "proposer_address_hex": "<validator-1-address-hex>",
+    "epoch_duration": 60,
+    "unbonding_period": 120,
+    "validators": [],
+    "libp2p_seed_salt_hex": "<openssl rand -hex 32>"
+  },
+  "api": {
+    "public_tx_submission": false,
+    "expose_token_state": false,
+    "expose_notary_routes": false
+  },
+  "libp2p": {
+    "enable": true,
+    "public_listen": "0.0.0.0:26656",
+    "bootstrap_peers": [
+      "/dns4/<sentry-host>/tcp/26656/p2p/<sentry-peer-id>"
+    ],
+    "quic_enabled": false,
+    "tcp_tls_fallback": true,
+    "max_peers_per_asn": 3
+  }
+}

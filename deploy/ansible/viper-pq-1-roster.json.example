@@ -1,0 +1,31 @@
+{
+  "_schema": "viper-pq-1 operator roster — populated at launch time (TASK-205, ADR-053). Feeds scripts/generate-bootstrap-peers.py (the same generator used by the cutover-devnet-3 + libp2p cutover playbooks). Each entry describes one independent validator node. Keep minimal: stake, signing algorithm, and on-chain labels live elsewhere (genesis-viper-pq-1.json::genesis_validators, the on-chain validator registry, the operator keystore).",
+  "_chain_id": "viper-pq-1",
+  "_fields": {
+    "node_id":     "matches pqcd's node_id config (^[A-Za-z0-9_-]+$). The libp2p PeerId is derived deterministically via `pqcd peer-id <node_id>` so the roster does not need to embed it.",
+    "public_ip":   "IPv4 or IPv6 address reachable by other validators on the validator-private libp2p network.",
+    "listen_port": "validator-private libp2p port (SPEC-P2P-002 §3a.3). Range 1024..65535. viper-pq-1 default 26656 (mirrors viper-devnet-3)."
+  },
+  "_consumed_by": [
+    "scripts/generate-bootstrap-peers.py — produces a multiaddr list for `viper_libp2p.bootstrap_peers` in group_vars/all.yml.",
+    "deploy/ansible/playbooks/launch-viper-pq-1.yml — Phase 6 bootstrap-peer publish step."
+  ],
+  "_post_launch_evolution": "From viper-pq-1 launch onwards any new operator joining the validator set arrives via the on-chain ValidatorRegister tx flow (TASK-113 Step 4/5), NOT by appending to this roster. The roster captures the genesis set only — it is a launch artefact, not a permanent operator directory.",
+  "operators": [
+    {
+      "node_id": "validator-genesis-1",
+      "public_ip": "203.0.113.11",
+      "listen_port": 26656
+    },
+    {
+      "node_id": "validator-genesis-2",
+      "public_ip": "203.0.113.12",
+      "listen_port": 26656
+    },
+    {
+      "node_id": "validator-genesis-3",
+      "public_ip": "203.0.113.13",
+      "listen_port": 26656
+    }
+  ]
+}

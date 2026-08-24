@@ -1,0 +1,23 @@
+[Unit]
+Description=Viper Notary Backend
+Documentation=https://github.com/viper-pqchain/viper-pq-chain
+After=network-online.target pqcd.service
+Wants=network-online.target
+# Notary depends on the local pqcd node being reachable.
+Requires=pqcd.service
+
+[Service]
+Type=simple
+User=pqchain
+Group=pqchain
+ExecStart={{ notary_binary_path }}
+EnvironmentFile={{ notary_config_dir }}/notary.env
+Restart=on-failure
+RestartSec=5
+LimitNOFILE=65535
+# Restrict filesystem access
+ReadWritePaths={{ notary_config_dir }}
+NoNewPrivileges=yes
+
+[Install]
+WantedBy=multi-user.target

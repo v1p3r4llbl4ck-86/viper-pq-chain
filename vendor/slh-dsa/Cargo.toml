@@ -1,0 +1,37 @@
+[package]
+name = "slh-dsa"
+version = "0.1.0"
+edition = "2021"
+rust-version = "1.75"
+description = "Pure Rust implementation of SLH-DSA (aka SPHINCS+) as described in the FIPS-205 standard"
+homepage = "https://github.com/RustCrypto/signatures/tree/master/slh-dsa"
+repository = "https://github.com/RustCrypto/signatures"
+readme = "README.md"
+license = "Apache-2.0 OR MIT"
+keywords = ["crypto", "signature"]
+categories = ["cryptography"]
+
+# Patch notes (PQ Chain vendor copy):
+# - Removed RandomizedSigner impl in signing_key.rs (broken with signature 2.3.0-pre.7+
+#   due to RandomizedSigner trait signature change between pre.4 and pre.7).
+# - Upgraded signature to stable ^2.2 (was =2.3.0-pre.4) — all used traits (Signer,
+#   Verifier, KeypairRef, Error) are present in stable 2.2+. The rand_core feature flag
+#   on signature is dropped because no code uses signature::rand_core re-export; rand_core
+#   is imported directly. This resolves workspace conflict with libp2p → ed25519-dalek.
+# - rand_core dependency kept at 0.6.4 (same as original; slh_dsa::SigningKey::new()
+#   requires rand_core 0.6's CryptoRngCore; callers must use rand_core 0.6 OsRng).
+
+[dependencies]
+hybrid-array = { version = "0.2.0-rc.8", features = ["extra-sizes"] }
+typenum = { version = "1.17.0", features = ["const-generics"] }
+sha3 = { version = "0.10.8", default-features = false }
+zerocopy = { version = "0.7.34", features = ["derive"] }
+rand_core = { version = "0.6.4" }
+signature = { version = ">=2.2, <3" }
+hmac = "0.12.1"
+sha2 = { version = "0.10.8", default-features = false }
+digest = "0.10.7"
+
+[features]
+alloc = []
+default = ["alloc"]

@@ -1,0 +1,131 @@
+---
+# time-sync role — TASK-150
+#
+# Installs and configures chrony with NTS (RFC 8915, Network Time
+# Security) on validator and full node hosts. Slashing DB safety
+# (SPEC-SLASH-001 + docs/phase-8-audit-readiness.md gap D17) requires
+# a bounded clock skew between honest validators; NTS gives us a
+# tamper-resistant time source even if a MitM intercepts NTP traffic.
+#
+# Targets Ubuntu 24.04 LTS (chrony 4.5+), which ships NTS support
+# out of the box. For Debian/RHEL variants, adjust the apt module.
+#
+# A deploy does NOT happen from the build-deploy or cutover playbooks.
+# Run `deploy/ansible/playbooks/time-sync-deploy.yml` explicitly when
+# you're ready to flip the fleet; the post-mortem in docs/operators/RUNBOOK.md
+# lists the verification steps to confirm NTS is live.
+
+- name: Stop systemd-timesyncd (conflicts with chrony)
+  systemd:
+    name: systemd-timesyncd
+    state: stopped
+    enabled: no
+  failed_when: false  # may not exist on all hosts
+
+- name: Install chrony (NTS-capable)
+  apt:
+    name:
+      - chrony
+    state: present
+    update_cache: yes
+
+- name: Install chrony configuration with NTS sources
+  template:
+    src: chrony.conf.j2
+    dest: /etc/chrony/chrony.conf
+    owner: root
+    group: root
+    mode: '0644'
+    backup: yes
+  notify: restart chrony
+
+- name: Ensure chrony is enabled and running
+  systemd:
+    name: chrony
+    state: started
+    enabled: yes
+
+- name: Install chrony-drift-check script
+  copy:
+    dest: /usr/local/bin/chrony-drift-check
+    mode: '0755'
+    owner: root
+    group: root
+    content: |
+      #!/usr/bin/env bash
+      # chrony-drift-check — audit helper for operator + Zabbix.
+      #
+      # Exits:
+      #   0  — tracking healthy, drift under threshold
+      #   1  — drift over threshold (DEGRADED)
+      #   2  — chronyc not responding (OFFLINE)
+      set -euo pipefail
+      THRESHOLD_MS="${THRESHOLD_MS:-100}"  # 100 ms slashing-safe window
+      if ! out=$(chronyc tracking 2>/dev/null); then
+        echo "OFFLINE: chronyc not responding"
+        exit 2
+      fi
+      offset_sec=$(printf '%s' "$out" | awk '/Last offset/ {print $4}')
+      if [ -z "$offset_sec" ]; then
+        echo "OFFLINE: chronyc did not report 'Last offset' field"
+        exit 2
+      fi
+      offset_ms=$(awk -v s="$offset_sec" 'BEGIN { printf "%.3f", (s < 0 ? -s : s) * 1000 }')
+      if awk -v a="$offset_ms" -v t="$THRESHOLD_MS" 'BEGIN { exit !(a > t) }'; then
+        echo "DEGRADED: offset ${offset_ms} ms > threshold ${THRESHOLD_MS} ms"
+        exit 1
+      fi
+      echo "OK: offset ${offset_ms} ms (threshold ${THRESHOLD_MS} ms)"
+
+- name: Install systemd unit for chrony-drift-check service
+  copy:
+    dest: /etc/systemd/system/chrony-drift-check.service
+    mode: '0644'
+    owner: root
+    group: root
+    content: |
+      [Unit]
+      Description=chrony-drift-check — fail if clock drift exceeds slashing-safe window
+      Documentation=file://{{ viper_repo_path | default('/opt/viper-pq-chain') }}/docs/operators/RUNBOOK.md
+
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/chrony-drift-check
+      Environment=THRESHOLD_MS={{ time_sync_drift_threshold_ms | default(100) }}
+
+- name: Install systemd timer (every 60 s) for chrony-drift-check
+  copy:
+    dest: /etc/systemd/system/chrony-drift-check.timer
+    mode: '0644'
+    owner: root
+    group: root
+    content: |
+      [Unit]
+      Description=chrony-drift-check every 60 s
+
+      [Timer]
+      OnBootSec=30s
+      OnUnitActiveSec=60s
+      AccuracySec=5s
+
+      [Install]
+      WantedBy=timers.target
+
+- name: Reload systemd after unit file changes
+  systemd:
+    daemon_reload: yes
+
+- name: Enable + start chrony-drift-check timer
+  systemd:
+    name: chrony-drift-check.timer
+    state: started
+    enabled: yes
+
+- name: Prime-check chrony sources are reaching peers
+  command: chronyc sources
+  changed_when: false
+  register: chronyc_sources
+
+- name: Display chronyc sources output (audit evidence)
+  debug:
+    var: chronyc_sources.stdout_lines

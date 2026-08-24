@@ -1,0 +1,34 @@
+[package]
+name = "pqc-keystore"
+description = "Wallet keystore (SPEC-WALLET-001): BIP39 mnemonics, HKDF-SHAKE256 ML-DSA seed derivation, Argon2id + XChaCha20-Poly1305 encrypted keystore, signing with seed zeroization"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+authors.workspace = true
+publish = false
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+# Extracted from pqcd on 2026-08-24: viper-archival-sidecar only needed
+# `Keystore`, yet had to link the entire node to get it. This crate MUST NOT
+# depend on pqcd / pqc-consensus / pqc-state / pqc-mempool / pqc-p2p.
+pqc-crypto = { path = "../pqc-crypto", features = ["ml-dsa-backend"] }
+pqc-types  = { path = "../pqc-types", default-features = false }
+pqc-tx     = { path = "../pqc-tx", default-features = false }
+anyhow.workspace = true
+hex.workspace = true
+serde.workspace = true
+serde_json = { version = "1", features = ["arbitrary_precision"] }
+zeroize = { version = "1", features = ["derive"] }
+sha2 = "0.10"
+sha3 = "0.10"
+pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
+bip39 = { version = "2", default-features = false }
+rand = "0.9"
+argon2 = "0.5"
+chacha20poly1305 = "0.10"
+
+[lints]
+workspace = true

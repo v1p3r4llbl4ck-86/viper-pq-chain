@@ -1,0 +1,65 @@
+# chrony.conf — rendered by deploy/ansible/roles/time-sync (TASK-150).
+#
+# NTS (RFC 8915, Network Time Security) sources — four geographically
+# and operationally diverse providers so no single NTS authority can
+# bias our clock. If an attacker compromises one source, chrony will
+# de-select it on statistical divergence (the `falseticker` logic).
+#
+# Slashing DB safety (SPEC-SLASH-001) depends on a bounded clock skew
+# across honest validators; audit-plan §5.1 flags this as CRITICAL.
+# The companion script /usr/local/bin/chrony-drift-check runs every
+# 60 s and alerts if drift exceeds {{ time_sync_drift_threshold_ms | default(100) }} ms.
+
+# ── NTS authoritative sources ─────────────────────────────────────────
+# Cloudflare — large deployment, well-audited. iburst = fast initial
+# sync (8 packets back-to-back instead of one per minute).
+server time.cloudflare.com iburst nts
+
+# Netnod — Swedish NTS stratum-1 operator, run by the national TLD.
+server nts.netnod.se iburst nts
+
+# PTB (Physikalisch-Technische Bundesanstalt) — German national
+# metrology institute, NTS-enabled, stratum-1.
+server ptbtime1.ptb.de iburst nts
+
+# System76 — US NTS deployment, useful as an Americas-region peer.
+server virginia.time.system76.com iburst nts
+
+# ── Local fallback (only used if all NTS peers unreachable) ───────────
+# Three geographically diverse non-NTS pools. These are NOT
+# authenticated and MUST NOT be relied on for slashing safety — they
+# exist so that a total NTS outage does not crash-loop the clock to
+# the epoch. A sustained period on non-NTS sources should page
+# oncall (see chrony-drift-check thresholds).
+pool 2.debian.pool.ntp.org iburst maxsources 3 prefer
+
+# ── Behaviour ─────────────────────────────────────────────────────────
+# Allow the clock to step (not just slew) if the initial offset is
+# >1 s, but only for the first 3 updates. Production clock jumps of
+# >1 s are pathological and should halt the validator, not be papered
+# over — chrony-drift-check will fail the next tick and the operator
+# decides whether to continue.
+makestep 1.0 3
+
+# Record the rate of gain/loss of time in this file. Helpful for
+# forensics after a drift incident.
+driftfile /var/lib/chrony/chrony.drift
+
+# NTS key store — chrony needs somewhere to persist the NTS-KE
+# (Network Time Security Key Establishment) cookies so it doesn't
+# have to re-do the TLS handshake on every authentic time request.
+ntsdumpdir /var/lib/chrony
+
+# Enable kernel RTC sync so the hardware clock drifts less during
+# reboots and power cycles.
+rtcsync
+
+# Explicit logging of measurement, statistics, and tracking — all
+# three go into /var/log/chrony, useful for the audit dossier.
+logdir /var/log/chrony
+log measurements statistics tracking
+
+# cmdport 323 — Explicitly disable the command port to avoid
+# chronyc being reachable over the network. We use local-socket
+# (chronyc default) exclusively.
+cmdport 0
