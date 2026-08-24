@@ -57,7 +57,10 @@ jobs:
           toolchain: 1.92.0
       - uses: Swatinem/rust-cache@v2
       - name: unit and integration tests
-        # The multi-node integration tests are timing-sensitive: one test thread.
+        # The multi-node integration tests are timing-sensitive: one test thread,
+        # and every deadline stretched ×3 on the 2-core hosted runners (TASK-239).
+        env:
+          PQCD_TEST_TIME_SCALE: "3"
         run: cargo test --workspace --all-features --no-fail-fast -- --test-threads=1
 
   softhsm:
