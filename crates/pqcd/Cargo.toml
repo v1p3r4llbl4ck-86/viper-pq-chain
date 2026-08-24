@@ -50,7 +50,7 @@ zeroize = { version = "1", features = ["derive"] }
 rand = "0.9"
 rpassword = "7"
 sha2 = "0.10"
-hmac = "0.12"
+hmac = "0.13"
 pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 sha3 = "0.10"
 ciborium.workspace = true

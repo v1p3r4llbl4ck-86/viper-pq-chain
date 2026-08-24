@@ -3631,7 +3631,7 @@ dependencies = [
  "ciborium",
  "getrandom 0.4.2",
  "hex",
- "hmac 0.12.1",
+ "hmac 0.13.0",
  "http 1.4.0",
  "http-body-util",
  "libc",
