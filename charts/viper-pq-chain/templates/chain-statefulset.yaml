@@ -110,6 +110,19 @@ spec:
             - name: VIPER_CONSENSUS_SEED_FILE
               value: /etc/pqchain/keystore/consensus_seed
             {{- end }}
+            {{- /* G-01: per-role identity salts from a Secret (libp2p + ML-KEM), never in node.json */ -}}
+            {{- if and $merged.identitySalts $merged.identitySalts.secretName }}
+            - name: VIPER_LIBP2P_SEED_SALT_HEX
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $merged.identitySalts.secretName }}
+                  key: libp2p_seed_salt_hex
+            - name: VIPER_KEM_SEED_SALT_HEX
+              valueFrom:
+                secretKeyRef:
+                  name: {{ $merged.identitySalts.secretName }}
+                  key: kem_seed_salt_hex
+            {{- end }}
             {{- with $merged.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}

@@ -813,6 +813,15 @@ pub(super) async fn handle_inbound_precommit(
 
     let block_hash = BlockHash(vote.block_hash);
     let key = (vote.height, block_hash);
+    // G-02 / TASK-241: both vote maps are height-scoped resources. Evict
+    // everything at or below the local tip on every insert so they stay
+    // bounded at O(validators × in-flight rounds) instead of growing by
+    // one entry per block for the life of the process.
+    let tip_now = guard.disk.height();
+    guard.pending_precommits.retain(|(h, _), _| *h > tip_now);
+    guard
+        .own_precommits_emitted
+        .retain(|(h, _, _)| *h > tip_now);
     let bucket = guard.pending_precommits.entry(key).or_default();
     let had_existing = bucket.insert(voter_addr_bytes, vote.clone()).is_some();
     let bucket_size = bucket.len();

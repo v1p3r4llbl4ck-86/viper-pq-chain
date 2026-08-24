@@ -148,3 +148,11 @@ viper_peer_id_rotate_enabled: false
 # no_log: true is set on the templating task so the passphrase never
 # appears in playbook output. NEVER commit plaintext.
 # viper_keystore_passphrase: <set in ansible-vault encrypted file>
+
+# G-01 (ADR-069): per-host secrets mixed into the libp2p and ML-KEM identity
+# derivations. Set them per host in a vault (`openssl rand -hex 32` each);
+# without them pqcd warns at startup that the identities are recomputable
+# from the public node_id. Rotating a salt rotates the PeerId (see
+# `pqcd wallet rotate-peer-id`).
+# viper_libp2p_seed_salt_hex: "<64 hex chars, per host, from vault>"
+# viper_kem_seed_salt_hex: "<64 hex chars, per host, from vault>"

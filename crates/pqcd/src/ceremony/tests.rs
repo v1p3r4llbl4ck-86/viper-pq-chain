@@ -193,9 +193,33 @@ fn libp2p_wires_validator_multiaddr_into_sentry_and_full_bootstrap_peers() {
         deploy_token: None,
     };
     let (values, _) = generate_ceremony_values(&cfg).unwrap();
+    // G-01: every role's node.json carries its own libp2p / KEM salts and the
+    // PeerIds the ceremony bakes into bootstrap lists are derived WITH them.
+    let salt_of = |role: &str| -> [u8; 32] {
+        let node_json = values["chainNode"][role]["config"]["nodeJson"]
+            .as_str()
+            .unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(node_json).unwrap();
+        let hex_salt = parsed["devnet"]["libp2p_seed_salt_hex"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{role}: libp2p_seed_salt_hex"));
+        let kem = parsed["devnet"]["kem_seed_salt_hex"].as_str().unwrap();
+        assert_eq!(hex_salt.len(), 64, "{role}: 32-byte libp2p salt");
+        assert_eq!(kem.len(), 64, "{role}: 32-byte KEM salt");
+        assert_ne!(hex_salt, kem, "{role}: the two salts differ");
+        hex::decode(hex_salt).unwrap().try_into().unwrap()
+    };
+    assert_ne!(
+        salt_of("validator"),
+        salt_of("sentry"),
+        "salts differ per role"
+    );
     // ADR-069 §3: the validator pod's node_id is its pod name.
-    let expected_validator_peer_id =
-        crate::p2p::deterministic_peer_id("alfa-viper-pq-chain-pqcd-validator-0", None).to_string();
+    let expected_validator_peer_id = crate::p2p::deterministic_peer_id(
+        "alfa-viper-pq-chain-pqcd-validator-0",
+        Some(&salt_of("validator")),
+    )
+    .to_string();
     let expected_multiaddr = format!(
         "/dns4/alfa-viper-pq-chain-pqcd-validator-headless.beta.svc.cluster.local/tcp/26656/p2p/{expected_validator_peer_id}"
     );
@@ -205,7 +229,7 @@ fn libp2p_wires_validator_multiaddr_into_sentry_and_full_bootstrap_peers() {
     let expected_sentry_multiaddrs: Vec<String> = (0..2)
         .map(|i| {
             let pod = format!("alfa-viper-pq-chain-pqcd-sentry-{i}");
-            let pid = crate::p2p::deterministic_peer_id(&pod, None);
+            let pid = crate::p2p::deterministic_peer_id(&pod, Some(&salt_of("sentry")));
             format!("/dns4/{pod}.alfa-viper-pq-chain-pqcd-sentry-headless.beta.svc.cluster.local/tcp/26656/p2p/{pid}")
         })
         .collect();
