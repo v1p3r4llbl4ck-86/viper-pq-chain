@@ -62,7 +62,8 @@ jobs:
 
   softhsm:
     name: pqc-hsm against SoftHSM
-    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    # Always GitHub-hosted: the job installs softhsm2 with apt-get.
+    runs-on: ubuntu-latest
     env:
       VIPER_HSM_TEST_MODULE: /usr/lib/softhsm/libsofthsm2.so
       VIPER_HSM_TEST_SLOT: "0"
