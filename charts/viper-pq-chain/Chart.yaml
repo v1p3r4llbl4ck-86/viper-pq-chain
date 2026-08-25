@@ -12,7 +12,7 @@ description: |
 type: application
 
 # Chart version — independent from app version, bumped on every chart change.
-version: 0.3.0
+version: 0.3.1
 
 # App version — pinned to the Cargo workspace.package.version at chart
 # publication time. Image tags default to this when values.image.<name>.tag

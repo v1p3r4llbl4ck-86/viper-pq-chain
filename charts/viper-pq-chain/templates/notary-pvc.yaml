@@ -1,0 +1,19 @@
+{{- if and .Values.notary.enabled .Values.notary.persistence.enabled -}}
+---
+# Evidence-chain index of the notary (see values.yaml `notary.persistence`).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "viper-pq-chain.notaryName" . }}-data
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.notaryLabels" . | nindent 4 }}
+spec:
+  accessModes: [ReadWriteOnce]
+  {{- with .Values.notary.persistence.storageClass }}
+  storageClassName: {{ . | quote }}
+  {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.notary.persistence.size }}
+{{- end }}

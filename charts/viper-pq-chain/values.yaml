@@ -388,6 +388,18 @@ notary:
     periodSeconds: 10
     failureThreshold: 3
     timeoutSeconds: 5
+  # 2026-08-25 — the evidence-chain index (`NOTARY_EVIDENCE_DB_PATH`, the
+  # stream heads that `POST /api/evidence` chains against) lives on disk.
+  # Off: it sits on the pod's emptyDir and a restart loses the heads (the
+  # chain receipts themselves survive). On: one PersistentVolumeClaim is
+  # mounted at `path`, the index is written under it, and the Deployment
+  # switches to the Recreate strategy (the claim is ReadWriteOnce). Meant
+  # for `replicas: 1` — the index is a per-process file, not a shared store.
+  persistence:
+    enabled: false
+    size: 1Gi
+    storageClass: ""     # empty = the cluster default
+    path: /var/lib/pqchain
   service:
     type: ClusterIP
     port: 3000
