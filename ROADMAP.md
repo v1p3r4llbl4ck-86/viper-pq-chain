@@ -76,7 +76,7 @@ release itself:
 
 ---
 
-## Next — `viper-testnet-1`
+## Next — `viper-testnet-2`
 
 The first public network. It is a tokenless proof-of-authority chain
 with an operator-run validator set; external participants join as

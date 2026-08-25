@@ -485,7 +485,7 @@ impl Default for DevnetConfig {
 /// `producer` and `follower` are the pre-ADR-069 names; they are still
 /// accepted when a `node.json` is read (as `validator` and `full`) and
 /// are never written back. They go away at the first public minor
-/// release after `viper-testnet-1` genesis.
+/// release after `viper-testnet-2` genesis.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum NodeRole {

@@ -7,7 +7,7 @@
 **Depends on**: SPEC-FEE-001, ADR-053 §T2.1, ADR-053 §T2.2, ADR-022, ADR-032, ADR-024, ADR-019, ADR-031, SPEC-GOV-001, SPEC-TX-001
 **Implementing TASK**: TASK-201 (commit `a8e94e4`); storage-fund framework TASK-199 (commit `eaa4b4d`)
 
-> **Reserved — `token_economics` (parts of this spec).** The public chain `viper-testnet-1` has no native token. The multi-dimensional base-fee market (§5–§8, §10–§12, §14) is active as the node's admission and anti-DoS accounting. The token-dependent parts — §9 fee distribution and burn, and the §13 storage fund — are implemented behind the `token_economics` Cargo feature, compiled out of the public chain build, and kept as a design reserve. The launch parameters and worked examples in §6 are those fixed for the retired `viper-pq-1` chain; the `viper-testnet-1` values are assigned at genesis. Nothing in this document is an offer, a sale or a promise of any token or other asset.
+> **Reserved — `token_economics` (parts of this spec).** The public chain `viper-testnet-2` has no native token. The multi-dimensional base-fee market (§5–§8, §10–§12, §14) is active as the node's admission and anti-DoS accounting. The token-dependent parts — §9 fee distribution and burn, and the §13 storage fund — are implemented behind the `token_economics` Cargo feature, compiled out of the public chain build, and kept as a design reserve. The launch parameters and worked examples in §6 are those fixed for the retired `viper-pq-1` chain; the `viper-testnet-2` values are assigned at genesis. Nothing in this document is an offer, a sale or a promise of any token or other asset.
 
 ---
 
@@ -477,7 +477,7 @@ pub struct FeeMarketState {
 
 ### 11.1 Activation height
 
-The multi-dim fee market activated at the `viper-pq-1` genesis (height 0) — every Tier-2 commitment in ADR-053 was active from launch — and is active from genesis on every later chain, including `viper-testnet-1`. Any future per-dimension activation (storage, witness, contention) lands via a Policy P-COMPAT-001 upgrade with a published activation height (timestamp-keyed, ADR-053 §T2.3).
+The multi-dim fee market activated at the `viper-pq-1` genesis (height 0) — every Tier-2 commitment in ADR-053 was active from launch — and is active from genesis on every later chain, including `viper-testnet-2`. Any future per-dimension activation (storage, witness, contention) lands via a Policy P-COMPAT-001 upgrade with a published activation height (timestamp-keyed, ADR-053 §T2.3).
 
 ### 11.2 Serde Default for Old Snapshots
 

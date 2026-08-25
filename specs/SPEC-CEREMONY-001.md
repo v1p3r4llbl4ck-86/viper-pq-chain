@@ -21,7 +21,7 @@
 
 ## 0. Status banner
 
-The chart ceremony tool exists to close a single operator gap: after a fresh-cluster `helm install ./charts/viper-pq-chain`, what genesis material does the chart need so that height 1 finalises? The 2026-04-25 launch of the (since retired) `viper-pq-1` chain was a hand-orchestrated air-gapped ceremony per SPEC-GENESIS-001 §4; that path remains appropriate for a public mainnet but is operator-overhead-heavy for the iterative dev / kind / staging clusters that run before a launch, and `pqcd ceremony` is also the tool that creates the public chain `viper-testnet-1` at genesis. `pqcd ceremony` produces a Helm values JSON + Kubernetes Secret manifests in one invocation, so a fresh cluster reaches block-1 finality in five minutes without manual key handling.
+The chart ceremony tool exists to close a single operator gap: after a fresh-cluster `helm install ./charts/viper-pq-chain`, what genesis material does the chart need so that height 1 finalises? The 2026-04-25 launch of the (since retired) `viper-pq-1` chain was a hand-orchestrated air-gapped ceremony per SPEC-GENESIS-001 §4; that path remains appropriate for a public mainnet but is operator-overhead-heavy for the iterative dev / kind / staging clusters that run before a launch, and `pqcd ceremony` is also the tool that creates the public chain `viper-testnet-2` at genesis. `pqcd ceremony` produces a Helm values JSON + Kubernetes Secret manifests in one invocation, so a fresh cluster reaches block-1 finality in five minutes without manual key handling.
 
 This spec governs the v0.1 contract. Like SPEC-COLD-STORAGE-001, future fields ride P-COMPAT-001 — additive schema evolution, no breaking renames inside `viper-pq-ceremony-genesis-v1`.
 
@@ -454,6 +454,6 @@ The following invariants MUST hold for any ceremony output:
 - `crates/pqcd/src/main.rs::cmd_ceremony` — CLI flag plumbing
 - `deploy/ansible/roles/configure/templates/node-config.json.j2` — the `node.json` schema this ceremony output mirrors
 - `deploy/ansible/group_vars/all/defaults.yml` — `viper_libp2p_common` defaults
-- `deploy/ansible/files/genesis-viper-pq-1.json` — the historical `viper-pq-1` launch artefact (genesis subset alignment target); the `viper-testnet-1` genesis is produced by this tool and its values are assigned at genesis
+- `deploy/ansible/files/genesis-viper-pq-1.json` — the historical `viper-pq-1` launch artefact (genesis subset alignment target); the `viper-testnet-2` genesis is produced by this tool and its values are assigned at genesis
 - `charts/viper-pq-chain` v0.1.0 — the values consumer this spec's output is shaped to
 - Commits `9d810a6` (TASK-233 ceremony tooling), `451dd53` (2026-05-05 schema fixes), `213c34c` (per-role libp2p binding wiring)

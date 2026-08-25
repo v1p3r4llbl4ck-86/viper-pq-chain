@@ -3,7 +3,7 @@
 Concrete use cases for Viper PQ Chain as digital-trust infrastructure,
 ordered by distance from a working deployment. This is a description of
 what the chain is designed to certify; it is not a commercial offer.
-`viper-testnet-1` has no native token and nothing is sold on it.
+`viper-testnet-2` has no native token and nothing is sold on it.
 
 Originally written 2026-04-17; revised for the public release.
 

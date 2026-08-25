@@ -16,7 +16,7 @@ serves two HTTP routers on port 26657:
 
 There is no live public network at the time of writing: the endpoints
 below are what a node built from this tree serves. Planned public names
-for `viper-testnet-1` (read API at `rpc.pqchain.agwswebconsulting.it`)
+for `viper-testnet-2` (read API at `rpc.pqchain.agwswebconsulting.it`)
 go live at genesis.
 
 Three configuration flags in the `api` section of `node.json` gate parts
@@ -504,7 +504,7 @@ Returns network metadata and public health signal. Serves as the minimal status 
 
 ```json
 {
-  "network_id": "viper-testnet-1",
+  "network_id": "viper-testnet-2",
   "chain_id_hex": "76697065722d72657365617263682d31",
   "status": "live",
   "syncing": false,

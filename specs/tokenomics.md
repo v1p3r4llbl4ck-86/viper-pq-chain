@@ -8,7 +8,7 @@
 **Produced by**: TASK-070 (Phase 5 — Mainnet Economics and Genesis Preparation)
 **Decision authority**: ADR-024
 
-> **Reserved — `token_economics`.** The public chain `viper-testnet-1` has no native token. Everything in this document (supply, distribution, staking minimums, slash amounts, fee coefficients denominated in VPR/venom) describes a design reserve: it is implemented behind the `token_economics` Cargo feature, which is compiled out of the public chain build, and it is not active on any network at the time of the public release. The parameters below were fixed for the retired `viper-pq-1` chain and are kept unchanged for reference. Nothing in this document is an offer, a sale or a promise of any token or other asset.
+> **Reserved — `token_economics`.** The public chain `viper-testnet-2` has no native token. Everything in this document (supply, distribution, staking minimums, slash amounts, fee coefficients denominated in VPR/venom) describes a design reserve: it is implemented behind the `token_economics` Cargo feature, which is compiled out of the public chain build, and it is not active on any network at the time of the public release. The parameters below were fixed for the retired `viper-pq-1` chain and are kept unchanged for reference. Nothing in this document is an offer, a sale or a promise of any token or other asset.
 
 ---
 

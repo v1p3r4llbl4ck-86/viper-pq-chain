@@ -13,7 +13,7 @@
 > 
 > A v0.3 deeper revision will fold these two mechanisms into the body and re-derive the worked examples; until then read this spec alongside SPEC-FEE-002 v0.2.
 
-> **Reserved — `token_economics` (parts of this spec).** The public chain `viper-testnet-1` has no native token. The fee algebra (§4–§11) stays in force as the admission and anti-DoS accounting of the node; `venom` is the unit of account of the reserved token design. The token-dependent parts — §12 fee distribution (proposer share, validator pool, burn) and the storage fund contribution described in the banner above — are implemented behind the `token_economics` Cargo feature, compiled out of the public chain build, and kept as a design reserve. Nothing in this document is an offer, a sale or a promise of any token or other asset.
+> **Reserved — `token_economics` (parts of this spec).** The public chain `viper-testnet-2` has no native token. The fee algebra (§4–§11) stays in force as the admission and anti-DoS accounting of the node; `venom` is the unit of account of the reserved token design. The token-dependent parts — §12 fee distribution (proposer share, validator pool, burn) and the storage fund contribution described in the banner above — are implemented behind the `token_economics` Cargo feature, compiled out of the public chain build, and kept as a design reserve. Nothing in this document is an offer, a sale or a promise of any token or other asset.
 
 ---
 

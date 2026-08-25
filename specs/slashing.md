@@ -8,7 +8,7 @@
 **Revised by**: ADR-042 (hardcoded offense parameters, pluggable verifier registry); ADR-048 (correlation penalty implementation, D-02 closed)  
 **Depends on**: ADR-030, ADR-024, ADR-042, ADR-048, SPEC-CONSENSUS-001, SPEC-VAL-001, SPEC-TX-001, SPEC-FEE-001
 
-> **Reserved — `token_economics`.** The public chain `viper-testnet-1` has no native token, so there is no bonded stake to slash. The on-chain slashing dispatch specified here (`SubmitEquivocationEvidence` apply path, slash amounts, treasury transfer, correlation penalty) is implemented behind the `token_economics` Cargo feature and compiled out of the public chain build; the evidence format and the `slashing_verifier_registry` schema remain seeded at genesis so the mechanism can be re-enabled by a software upgrade. Validator misbehaviour on the PoA public chain is handled by the operator-run validator set off-chain. Nothing in this document is an offer, a sale or a promise of any token or other asset.
+> **Reserved — `token_economics`.** The public chain `viper-testnet-2` has no native token, so there is no bonded stake to slash. The on-chain slashing dispatch specified here (`SubmitEquivocationEvidence` apply path, slash amounts, treasury transfer, correlation penalty) is implemented behind the `token_economics` Cargo feature and compiled out of the public chain build; the evidence format and the `slashing_verifier_registry` schema remain seeded at genesis so the mechanism can be re-enabled by a software upgrade. Validator misbehaviour on the PoA public chain is handled by the operator-run validator set off-chain. Nothing in this document is an offer, a sale or a promise of any token or other asset.
 
 ---
 

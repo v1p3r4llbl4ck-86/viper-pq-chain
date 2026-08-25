@@ -5,7 +5,7 @@
 **Last updated:** 2026-05-06 (token-economics sections re-labelled Reserved at the public release).
 **Authority:** TASK-225 (essay items 21-25 consolidated), referenced from ROADMAP.md "Deferred" section.
 
-> **Public-chain note.** `viper-testnet-1` has no native token: the
+> **Public-chain note.** `viper-testnet-2` has no native token: the
 > `token_economics` feature is compiled out and its specs are
 > `Reserved`. §4 below (fee-primacy crossover) and every stake-weighted
 > measure in §5 apply only if token economics are ever activated by a
@@ -257,7 +257,7 @@ standard* (the gate Viper waits for) lags by 12-18 months.
 
 ## 4. Fee-primacy crossover (Reserved)
 
-> Applies only if token economics are activated; dormant on `viper-testnet-1`.
+> Applies only if token economics are activated; dormant on `viper-testnet-2`.
 
 ### Why
 

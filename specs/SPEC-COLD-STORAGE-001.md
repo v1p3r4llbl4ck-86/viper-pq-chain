@@ -88,7 +88,7 @@ The manifest is written as `manifest.json` in the export output directory and se
 | Field | Type | Notes |
 |-------|------|-------|
 | `schema_version` | string | MUST equal `"viper-cold-storage-v1"` (§3). |
-| `chain_id_hex` | string | UTF-8 byte hex of the chain id (per SPEC-GENESIS-001 §0). For the retired `viper-pq-1` chain this was `76697065722d70712d31`; the `viper-testnet-1` value is assigned at genesis. Operator-supplied at export time; the binary does not re-derive it. |
+| `chain_id_hex` | string | UTF-8 byte hex of the chain id (per SPEC-GENESIS-001 §0). For the retired `viper-pq-1` chain this was `76697065722d70712d31`; the `viper-testnet-2` value is assigned at genesis. Operator-supplied at export time; the binary does not re-derive it. |
 | `exported_at_unix` | uint64 | Wall-clock seconds since the Unix epoch at export start. Derived from `SystemTime::now()`; falls back to `0` on clock-error (the operator MUST notice a `0` value). Authoritative time is the §9 TSA anchor when v2 lands; v1 carries the host-clock value as informational only. |
 | `low_height` | uint64 | Smallest height included in the export. v1 emits `1` (genesis at height 0 stays in the live store; the v1 path never archives genesis). |
 | `high_height` | uint64 | Largest height included in the export. Equals the operator-supplied `cutoff` (§6). |

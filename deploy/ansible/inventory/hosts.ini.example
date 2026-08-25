@@ -14,7 +14,7 @@ ansible_port=22
 ansible_ssh_private_key_file=~/.ssh/your-deploy-key
 ansible_ssh_common_args=-o StrictHostKeyChecking=accept-new -o IdentitiesOnly=yes -o PasswordAuthentication=no
 
-viper_chain_id=viper-testnet-1
+viper_chain_id=viper-testnet-2
 viper_repo_url=https://github.com/v1p3r4llbl4ck-86/viper-pq-chain.git
 viper_repo_branch=main
 

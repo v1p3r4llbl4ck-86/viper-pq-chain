@@ -20,7 +20,7 @@
 
 ## 0. Status banner
 
-There is no live network at the time of the public release. This specification was written for `viper-pq-1`, launched on 2026-04-25 from commit `879ce62` and since retired (archived at height 33,976); its `chain_id_hex` = `76697065722d70712d31` (the ASCII bytes of `"viper-pq-1"`, no separator) and the `genesis-viper-pq-1.json` artefact referenced throughout are kept as the historical worked example. The tokenless successors `viper-research-1` and `viper-lab-1` are retired as well. The public chain **`viper-testnet-1`** is created after the public release with `pqcd ceremony` (SPEC-CEREMONY-001); its `chain_id_hex`, `genesis_validators_root`, `genesis_hash` and validator roster are assigned at genesis and published with the genesis file. `viper-testnet-1` has no native token: the genesis account balances, founder / treasury / reserved tranches and the storage fund described below belong to the `token_economics` Cargo feature (see SPEC-TOKEN-002, status Reserved) and are compiled out of the public chain build. The previous chain id `viper-mainnet-1` from the v1.0 ceremony plan was never launched; its design context survives in Appendix A and in `DECISIONS.md` ADR-025 / ADR-053. Per Policy P-COMPAT-001, every breaking change on a running chain rides an activation height (ADR-053 §T2.3, code path: `crates/pqc-state/src/store.rs::pending_upgrades`), never a reset.
+There is no live network at the time of the public release. This specification was written for `viper-pq-1`, launched on 2026-04-25 from commit `879ce62` and since retired (archived at height 33,976); its `chain_id_hex` = `76697065722d70712d31` (the ASCII bytes of `"viper-pq-1"`, no separator) and the `genesis-viper-pq-1.json` artefact referenced throughout are kept as the historical worked example. The tokenless successors `viper-research-1` and `viper-lab-1` are retired as well. The public chain **`viper-testnet-2`** is created after the public release with `pqcd ceremony` (SPEC-CEREMONY-001); its `chain_id_hex`, `genesis_validators_root`, `genesis_hash` and validator roster are assigned at genesis and published with the genesis file. `viper-testnet-2` has no native token: the genesis account balances, founder / treasury / reserved tranches and the storage fund described below belong to the `token_economics` Cargo feature (see SPEC-TOKEN-002, status Reserved) and are compiled out of the public chain build. The previous chain id `viper-mainnet-1` from the v1.0 ceremony plan was never launched; its design context survives in Appendix A and in `DECISIONS.md` ADR-025 / ADR-053. Per Policy P-COMPAT-001, every breaking change on a running chain rides an activation height (ADR-053 §T2.3, code path: `crates/pqc-state/src/store.rs::pending_upgrades`), never a reset.
 
 ---
 
@@ -271,7 +271,7 @@ Response includes `chain_id`, `state_root`, `tip_hash`, `height`, `base_fee`, `e
 
 For full independent verification:
 
-1. Obtain the published genesis config from the official source (for `viper-testnet-1`: the genesis file published at genesis; historical example: `deploy/ansible/files/genesis-viper-pq-1.json`).
+1. Obtain the published genesis config from the official source (for `viper-testnet-2`: the genesis file published at genesis; historical example: `deploy/ansible/files/genesis-viper-pq-1.json`).
 2. Run `pqcd genesis-verify deploy/ansible/files/genesis-viper-pq-1.json`.
 3. Confirm the computed hash matches the published `genesis_hash`.
 4. If starting a new node: the node will refuse to sync from peers whose genesis hash does not match (parent hash mismatch at height 1 — detected by `ChainStore::validate_stored_block`).
@@ -335,7 +335,7 @@ The Phase-5 v1.0 of this spec described a `viper-mainnet-1` ceremony with a sing
 genesis_hash = SHAKE-256("VIPER-GENESIS-V1" || chain_id_bytes || state_root || timestamp_be64, 32)
 ```
 
-That ceremony was superseded by ADR-053 before ever being executed. The `viper-mainnet-1` chain id is reserved for a future public mainnet ceremony and was never used. Every Tier-1 / Tier-2 / Tier-3 commitment in ADR-053 (BIP340 double-tagged hashing, chain-id-bound addresses, header_version + extension_root, hash_id registry, multi-dim fee market, storage fund, smart-account templates, light-client sync committee) is a launch invariant of every chain from `viper-pq-1` forward, including `viper-testnet-1`. The historical TASK-106 air-gapped ML-DSA-65 key ceremony procedure remains the template for future launches.
+That ceremony was superseded by ADR-053 before ever being executed. The `viper-mainnet-1` chain id is reserved for a future public mainnet ceremony and was never used. Every Tier-1 / Tier-2 / Tier-3 commitment in ADR-053 (BIP340 double-tagged hashing, chain-id-bound addresses, header_version + extension_root, hash_id registry, multi-dim fee market, storage fund, smart-account templates, light-client sync committee) is a launch invariant of every chain from `viper-pq-1` forward, including `viper-testnet-2`. The historical TASK-106 air-gapped ML-DSA-65 key ceremony procedure remains the template for future launches.
 
 ### A.2 `viper-devnet-2` (deprecated, archived 2026-04-25)
 
