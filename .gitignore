@@ -6,7 +6,6 @@
 # the exact dependency versions the code was written against).
 
 # Agent tooling (local only, not tracked)
-.claude/
 
 # Editor and OS artifacts
 .vscode/
@@ -90,3 +89,4 @@ fuzz/artifacts/
 fuzz/target/
 
 .cargo/
+release/genesis/
