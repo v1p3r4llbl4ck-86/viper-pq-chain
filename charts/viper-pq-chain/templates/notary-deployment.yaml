@@ -20,10 +20,15 @@ spec:
     matchLabels:
       {{- include "viper-pq-chain.notarySelectorLabels" . | nindent 6 }}
   strategy:
+    {{- if .Values.notary.persistence.enabled }}
+    # The evidence index claim is ReadWriteOnce: the old pod must release it first.
+    type: Recreate
+    {{- else }}
     type: RollingUpdate
     rollingUpdate:
       maxSurge: 1
       maxUnavailable: 0
+    {{- end }}
   template:
     metadata:
       labels:
@@ -79,6 +84,10 @@ spec:
               value: {{ .Values.notary.config.corsOrigin | quote }}
             - name: NOTARY_PUBLIC_BASE_URL
               value: {{ .Values.notary.config.publicBaseUrl | quote }}
+            {{- if .Values.notary.persistence.enabled }}
+            - name: NOTARY_EVIDENCE_DB_PATH
+              value: {{ printf "%s/notary-evidence.json" .Values.notary.persistence.path | quote }}
+            {{- end }}
             {{- if .Values.notary.config.evidenceDisabled }}
             - name: NOTARY_EVIDENCE_DISABLED
               value: "1"
@@ -227,7 +236,16 @@ spec:
               mountPath: /tmp
             - name: home
               mountPath: /home/viper-notary
+            {{- if .Values.notary.persistence.enabled }}
+            - name: data
+              mountPath: {{ .Values.notary.persistence.path }}
+            {{- end }}
       volumes:
+        {{- if .Values.notary.persistence.enabled }}
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "viper-pq-chain.notaryName" . }}-data
+        {{- end }}
         # The runtime needs writable /tmp and /home — readOnlyRootFilesystem.
         - name: tmp
           emptyDir:

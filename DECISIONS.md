@@ -3325,3 +3325,45 @@ The private repository holds everything: the chain, the notary product, the depl
 - Public history is linear and starts at the first public release; later changes are exported on top of the public `main`, never force-pushed.
 - Anything the verifier flags is a real leak candidate; the exclusion list grows, the source is corrected, the export is re-run.
 - The GitLab pipeline keeps serving the private repository; the two CIs run the same gates (`make ci`).
+
+## ADR-072 - Operator Services Are Funded At Genesis; Fees Stay On A Tokenless Network
+
+**Date:** 2026-08-25 · **Status:** Accepted · **Closes:** TASK-249
+
+### Context
+
+`viper-testnet-1` was retired on its first day: the notary's service account could not
+exist. Every transaction settles its fee from the sender's balance (`pqc-tx` validation step
+14, `pqc-state::settle_sender`) even when the `token_economics` feature is off, while after
+genesis nothing can fund an account — `TokenTransfer` is compiled out of the release binaries
+and `vault_create` opens accounts with a zero balance. The only funded accounts are those in
+`genesis_accounts`, which the ceremony filled with validators alone.
+
+Two ways out were on the table: change the protocol (a fee-free lane, or fee settlement
+skipped, when token economics are off), or fund operator services at genesis.
+
+### Decision
+
+1. **Fees stay as they are.** Charging every sender from a balance is the anti-spam floor
+   of the network and part of the consensus rules; removing it for the "tokenless" case would
+   change state-transition semantics for every node and re-open the flood surface with no
+   replacement. The tokenless posture means *no public token* (no transfers, no market), not
+   *no fees*.
+2. **Operator services are genesis accounts.** `pqcd ceremony --service-account <label>:<pk>`
+   (repeatable) funds them at height 0 with `--genesis-balance` and the key rights
+   VAULT | ATTESTATION | KEY_MGMT — never GOVERNANCE. `viper-testnet-2` was born with the
+   notary and an operator account; the values file records label → address under
+   `_service_accounts`, and the notary takes its address through `NOTARY_ADDRESS_HEX`.
+3. **Adding a service later means a new network.** Until a funded creation path exists, an
+   operator who needs another funded account after genesis re-runs the ceremony. The operator
+   account created on `viper-testnet-2` is the reserve for that case: it can open vaults
+   (`vault_create`) for future services, which then need no balance only if their transactions
+   are fee-exempt — which today none are.
+
+### Consequences
+
+- `docs/operators/GENESIS.md` tells operators to pass `--service-account` at the ceremony.
+- A fee-free lane (or a funded `vault_create`) stays an open protocol question; if it is ever
+  wanted it gets its own ADR and a hard fork, not a patch.
+- The public networks keep the fee parameters of genesis; `base_fee` is not a knob to reach
+  zero.

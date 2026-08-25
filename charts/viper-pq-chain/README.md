@@ -266,6 +266,11 @@ notary:
     nodeUrl: http://my-external-rpc:26657
 ```
 
+The evidence-chain index (`POST /api/evidence` stream heads) is a file: with
+`notary.persistence.enabled: true` it lives on a PersistentVolumeClaim mounted at
+`notary.persistence.path` (Deployment strategy `Recreate`, `replicas: 1`); off, it sits on the
+pod's emptyDir and a restart loses the heads.
+
 API surface (when notary is enabled):
 
 | Endpoint | Purpose |

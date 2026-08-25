@@ -218,8 +218,11 @@ spec:
   volumeClaimTemplates:
     - metadata:
         name: data
+        # Selector labels only: volumeClaimTemplates are immutable, and the
+        # full label set carries the chart version — a chart bump would make
+        # every `helm upgrade` fail on the StatefulSet (0.3.1, 2026-08-25).
         labels:
-          {{- include "viper-pq-chain.roleLabels" (dict "ctx" $ "role" $role) | nindent 10 }}
+          {{- include "viper-pq-chain.roleSelectorLabels" (dict "ctx" $ "role" $role) | nindent 10 }}
       spec:
         accessModes:
           {{- toYaml $merged.persistence.accessModes | nindent 10 }}
