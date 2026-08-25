@@ -898,4 +898,4 @@ Every command that opens the store needs the node stopped. Passphrases come from
 Related: `docs/validator-onboarding.md` (joining as a validator),
 `docs/observability.md` (logs, metrics, audit log), `configs/README.md`,
 `charts/viper-pq-chain/README.md`, `deploy/ansible/README.md`, `docker/README.md`,
-`API.md`, `SECURITY.md` (`security@viper-chain.eu`).
+`API.md`, `SECURITY.md` (`security@agwswebconsulting.it`).
