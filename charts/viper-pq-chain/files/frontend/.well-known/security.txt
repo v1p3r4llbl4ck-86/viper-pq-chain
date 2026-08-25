@@ -1,0 +1,8 @@
+# RFC 9116 — https://www.rfc-editor.org/rfc/rfc9116
+
+Contact: mailto:security@agwswebconsulting.it
+Contact: https://github.com/v1p3r4llbl4ck-86/viper-pq-chain/security/policy
+Expires: 2027-04-22T00:00:00.000Z
+Encryption: https://pqchain.agwswebconsulting.it/.well-known/pgp.asc
+Preferred-Languages: it, en
+Canonical: https://pqchain.agwswebconsulting.it/.well-known/security.txt
