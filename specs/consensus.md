@@ -3,7 +3,7 @@
 **Spec ID**: SPEC-CONSENSUS-001  
 **Version**: 0.3  
 **Status**: Accepted  
-**History**: v0.3 revised for the `viper-pq-1` launch (2026-04-25); that chain and its successor `viper-research-1` are retired, the protocol is unchanged on `viper-testnet-1`.  
+**History**: v0.3 revised for the `viper-pq-1` launch (2026-04-25); that chain and its successor `viper-research-1` are retired, the protocol is unchanged on `viper-testnet-2`.  
 **Date**: 2026-04-25  
 **Revised by**: ADR-042 (dynamic validator set, epoch model, RANDAO+VDF proposer); ADR-051 (distributed precommit signing); ADR-053 (`viper-pq-1` genesis architecture)  
 **Depends on**: ADR-007, ADR-027, ADR-042, ADR-051, ADR-053, SPEC-VAL-001, SPEC-TX-001, SPEC-ACCOUNT-001, SPEC-ADDRESS-001, SPEC-LIGHT-CLIENT-001
@@ -24,7 +24,7 @@ This document specifies the BFT consensus protocol for Viper PQ Chain. It define
 
 The protocol is Tendermint-like with three voting phases (Prevote → Precommit → Commit) and proposer rotation. It is adapted for post-quantum signatures, with ML-DSA-65 as the default consensus key algorithm. The validator set is **dynamic**: membership transitions occur at epoch boundaries, not mid-epoch.
 
-This spec at v0.3 was first active on the `viper-pq-1` chain (chain_id_hex `0x76697065722d70712d31`, launched 2026-04-25, since retired) and then on `viper-research-1` (retired). The public chain `viper-testnet-1` is created at genesis with the same protocol after the public release. Breaking consensus changes on a running chain MUST travel via Policy P-COMPAT-001 (ADR-052).
+This spec at v0.3 was first active on the `viper-pq-1` chain (chain_id_hex `0x76697065722d70712d31`, launched 2026-04-25, since retired) and then on `viper-research-1` (retired). The public chain `viper-testnet-2` is created at genesis with the same protocol after the public release. Breaking consensus changes on a running chain MUST travel via Policy P-COMPAT-001 (ADR-052).
 
 This specification does not cover:
 

@@ -3,7 +3,7 @@
 **Spec ID**: SPEC-TX-001  
 **Version**: 0.3  
 **Status**: Accepted  
-**History**: v0.3 revised for the `viper-pq-1` launch (2026-04-25); that chain is retired, the envelope format is unchanged on `viper-testnet-1`.  
+**History**: v0.3 revised for the `viper-pq-1` launch (2026-04-25); that chain is retired, the envelope format is unchanged on `viper-testnet-2`.  
 **Date**: 2026-04-25  
 **Depends on**: ADR-004 (deterministic CBOR), ADR-005 (fee model), ADR-006 (algorithm baseline), ADR-044 (crypto agility), ADR-053 (`viper-pq-1` genesis architecture)
 
@@ -316,7 +316,7 @@ A cross-chain replay must defeat both layers simultaneously; defeating either al
 
 ### 6.4 Pre-genesis placeholder (test/dev only)
 
-Test harnesses and pre-genesis devnet code paths use `ForkDigest::viper_pq_1_placeholder()` (`crates/pqc-types/src/fork.rs:66`), which computes the digest from `(VIPER_FORK_VERSION_V1, [0u8; 32])`. This placeholder is NOT the production digest — each chain's real digest is sealed when its genesis block is produced and is pinned in the genesis JSON (`viper-testnet-1`: assigned at genesis). Production nodes MUST configure the real digest (via `CommitQuorumPolicy::with_fork_digest` and the equivalent tx-validation-context wiring). The placeholder is retained only so internal test fixtures sign and verify bytes with the same shape as production.
+Test harnesses and pre-genesis devnet code paths use `ForkDigest::viper_pq_1_placeholder()` (`crates/pqc-types/src/fork.rs:66`), which computes the digest from `(VIPER_FORK_VERSION_V1, [0u8; 32])`. This placeholder is NOT the production digest — each chain's real digest is sealed when its genesis block is produced and is pinned in the genesis JSON (`viper-testnet-2`: assigned at genesis). Production nodes MUST configure the real digest (via `CommitQuorumPolicy::with_fork_digest` and the equivalent tx-validation-context wiring). The placeholder is retained only so internal test fixtures sign and verify bytes with the same shape as production.
 
 ---
 
@@ -481,7 +481,7 @@ The following are non-exhaustive conditions that MUST result in rejection:
 
 The TLV envelope format introduced in v0.2 (ADR-044) changed the wire representation of `signature` (key 12) from a raw byte string to a versioned TLV-prefixed byte string. The v0.3 revision (ADR-053) layered the `ForkDigest` signing-domain prefix (§6.1, ADR-053 §T1.2) and the BIP340 double-tagged outer hash (§8.1, ADR-053 §T2.4) on top of the v0.2 format.
 
-These were breaking changes that ran on the `viper-devnet-2` → `viper-pq-1` cutover. v0.1 envelopes are not accepted on `viper-pq-1`, and v0.3 envelopes are not accepted on the retired `viper-devnet-2` chain. The v0.3 envelope format has been canonical since the `viper-pq-1` genesis (chain_id_hex `0x76697065722d70712d31`; chain since retired) and is the format used by `viper-testnet-1`.
+These were breaking changes that ran on the `viper-devnet-2` → `viper-pq-1` cutover. v0.1 envelopes are not accepted on `viper-pq-1`, and v0.3 envelopes are not accepted on the retired `viper-devnet-2` chain. The v0.3 envelope format has been canonical since the `viper-pq-1` genesis (chain_id_hex `0x76697065722d70712d31`; chain since retired) and is the format used by `viper-testnet-2`.
 
 ---
 

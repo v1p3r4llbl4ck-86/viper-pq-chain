@@ -3279,7 +3279,7 @@ The Helm chart has modelled six roles since 0.2.0 (`validator`, `sentry`, `full`
 
 ### Consequences
 - One vocabulary end to end: `node.json`, `pqcd ceremony`, the chart, the docs. The chart's `VIPER_ROLE` becomes informational.
-- Old configs keep working (aliases); the alias names are deprecated and will be removed at the first public minor release after `viper-testnet-1` genesis.
+- Old configs keep working (aliases); the alias names are deprecated and will be removed at the first public minor release after `viper-testnet-2` genesis.
 - Rendering `node.json` inside the chart from structured values (so the release name is never baked in) is the natural next step and is tracked as TASK-242; this ADR only makes the mismatch impossible to miss.
 - The validator on `viper-lab-1` is OOM-killed periodically (1 GiB limit, RSS growing with height): unrelated to roles, tracked as TASK-241.
 - The Ansible path (`viper_role` in inventories, `when: viper_role == 'producer'` in playbooks) still speaks the old vocabulary; its `node.json` keeps loading through the aliases. Moving it to the new names is TASK-243, together with the scripts and docs that describe the local devnet as producer/followers (Phase 6 rewrite).
@@ -3319,7 +3319,7 @@ The private repository holds everything: the chain, the notary product, the depl
 2. **The export refuses to produce a tree that carries** a real IP address, one of the author's host names, the private repository's URLs or names, a private path, or any attribution to development tooling (`release/verify-public.py`), and it re-runs the licence and link guards, `cargo metadata`, `helm lint` and gitleaks on the exported tree. A failure is fixed at the source, never in the export.
 3. **CI on GitHub Actions**, on GitHub-hosted runners by default (free for a public repository): fmt, clippy `-D warnings`, licence and link guards, `cargo deny`, the full test suite with all features and one test thread, `pqc-hsm` against SoftHSM, chart lint plus the render guard. A self-hosted runner on the author's host is an opt-in through the `CI_RUNS_ON` repository variable, installed with `CARGO_BUILD_JOBS=3` and one job at a time (the host went down under an 8-job build).
 4. **Releases are tags.** `vX.Y.Z` builds the public-chain binaries (`--no-default-features --features hybrid-kem-tls`: no token economics, hybrid post-quantum TLS on) for Linux x86_64, pushes `pqcd` and `viper-archival-sidecar` images to `ghcr.io` signed with cosign (keyless), attaches a CycloneDX SBOM and checksums, and opens the GitHub Release.
-5. The chart ships with the notary **off**; the genesis artefact of `viper-testnet-1` is published under `genesis/` at the ceremony.
+5. The chart ships with the notary **off**; the genesis artefact of `viper-testnet-2` is published under `genesis/` at the ceremony.
 
 ### Consequences
 - Public history is linear and starts at the first public release; later changes are exported on top of the public `main`, never force-pushed.

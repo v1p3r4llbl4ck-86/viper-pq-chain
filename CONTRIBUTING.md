@@ -13,7 +13,7 @@ Thank you for looking at Viper PQ Chain closely enough to want to change it.
   [CONVENTIONS.md](CONVENTIONS.md), and the mandatory updates listed in [AGENTS.md](AGENTS.md)
   (CHANGELOG, TASKS, the affected spec).
 - **No resets, no forks of history.** Compatibility rules (Policy P-COMPAT-001, ADR-052)
-  apply to every change that lands after `viper-testnet-1` genesis: activation heights,
+  apply to every change that lands after `viper-testnet-2` genesis: activation heights,
   dual-path decoders, explicit migrations.
 - **Licences follow the file.** Contributions to Apache-2.0 files are accepted under
   Apache-2.0; contributions to BUSL-1.1 files under BUSL-1.1 with the parameters in

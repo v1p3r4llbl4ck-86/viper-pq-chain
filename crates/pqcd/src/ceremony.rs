@@ -110,6 +110,66 @@ pub struct CeremonyConfig {
     /// `image.pullSecrets[]` entry so the chart can pull from a
     /// private registry without manual `kubectl create secret`.
     pub deploy_token: Option<DeployToken>,
+    /// 2026-08-25 — operator services (the notary, an operator wallet) that
+    /// need a funded genesis account with their own ML-DSA-65 key. After
+    /// genesis nothing can create a funded account on a tokenless network:
+    /// `vault_create` starts at balance 0 and transfers are compiled out.
+    pub service_accounts: Vec<ServiceAccount>,
+}
+
+/// An extra genesis account: label for the operator's records and the
+/// ML-DSA-65 public key (hex). The address is derived like a validator's
+/// (`derive_address(chain_id, alg_id, pk)`); balance = `genesis_balance`;
+/// key permissions VAULT | ATTESTATION | KEY_MGMT (no governance).
+#[derive(Debug, Clone)]
+pub struct ServiceAccount {
+    pub label: String,
+    pub public_key_hex: String,
+}
+
+/// A service account resolved against the chain id.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ServiceAccountEntry {
+    pub label: String,
+    pub address_hex: String,
+    pub public_key_hex: String,
+    pub alg_id: u16,
+}
+
+/// FIPS 204 ML-DSA-65 public key size — the only algorithm the ceremony
+/// issues keys for.
+const ML_DSA_65_PK_LEN: usize = 1952;
+
+/// Resolve the operator's service accounts: validate the key and derive
+/// the chain-bound address.
+pub fn derive_service_accounts(
+    cfg: &CeremonyConfig,
+    chain_id_bytes: &[u8],
+    alg_id: AlgId,
+) -> Result<Vec<ServiceAccountEntry>> {
+    cfg.service_accounts
+        .iter()
+        .map(|sa| {
+            let pk = hex::decode(sa.public_key_hex.trim()).map_err(|e| {
+                anyhow!("service account '{}': public key is not hex: {e}", sa.label)
+            })?;
+            if pk.len() != ML_DSA_65_PK_LEN {
+                anyhow::bail!(
+                    "service account '{}': public key is {} bytes, {:?} expects {}",
+                    sa.label,
+                    pk.len(),
+                    alg_id,
+                    ML_DSA_65_PK_LEN
+                );
+            }
+            Ok(ServiceAccountEntry {
+                label: sa.label.clone(),
+                address_hex: hex::encode(derive_address(chain_id_bytes, alg_id, &pk)),
+                public_key_hex: hex::encode(&pk),
+                alg_id: alg_id.as_u16(),
+            })
+        })
+        .collect()
 }
 
 /// GitLab deploy-token credentials embedded in a Kubernetes
@@ -271,6 +331,7 @@ fn build_node_json(
     // the "unused" warning explicitly.
     _p2p_bind_addr: &str,
     libp2p: &Libp2pSection,
+    service_accounts: &[ServiceAccountEntry],
 ) -> serde_json::Value {
     let mut libp2p_obj = serde_json::Map::new();
     libp2p_obj.insert("enable".into(), serde_json::Value::Bool(true));
@@ -365,7 +426,20 @@ fn build_node_json(
                 // `pqc_types::keyset::allowed_tx::ALL` for ML-DSA keys.
                 "allowed_tx_types": 0xFu32,
             }],
-        })).collect::<Vec<_>>(),
+        })).chain(service_accounts.iter().map(|a| serde_json::json!({
+            "address_hex": a.address_hex,
+            "balance":     cfg.genesis_balance,
+            "nonce":       0,
+            "keys": [{
+                "alg_id":           a.alg_id,
+                "pk_hex":           a.public_key_hex,
+                "key_version":      1,
+                "valid_from_height": 0,
+                "status":           "active",
+                // VAULT | ATTESTATION | KEY_MGMT — a service key never votes.
+                "allowed_tx_types": 0x7u32,
+            }],
+        }))).collect::<Vec<_>>(),
         "rate_limit": {
             "max_requests_per_window": 100,
             "window_secs": 60,
@@ -548,6 +622,7 @@ pub fn generate_ceremony_values(
         .collect::<Result<Vec<_>>>()?;
 
     let proposer_address_hex = validators[0].address_hex.clone();
+    let service_accounts = derive_service_accounts(cfg, chain_id_bytes, alg_id)?;
 
     // 2. Topology (ADR-069 §4). Every pod takes its node_id from its own
     // name (`VIPER_NODE_ID`, set by the chart), so the libp2p PeerId of a
@@ -647,6 +722,7 @@ pub fn generate_ceremony_values(
             "0.0.0.0:26657",
             "0.0.0.0:26656",
             &libp2p_for(role),
+            &service_accounts,
         )
     };
     let validator_node_json = node_json_for(NodeRole::Validator);
@@ -710,6 +786,9 @@ pub fn generate_ceremony_values(
         // in the per-role node.json embed them.
         "_release_name": cfg.release_name,
         "_namespace": cfg.namespace,
+        // Operator services with a funded genesis account (label → address);
+        // the notary reads its own through NOTARY_ADDRESS_HEX.
+        "_service_accounts": service_accounts,
         "image": {
             "registry": cfg.image_repository.split('/').next().unwrap_or("registry.example.com"),
             "repository": cfg.image_repository

@@ -4,7 +4,7 @@ info:
   version: "0.2.0"
   description: >
     API for interacting with Viper PQ Chain — a post-quantum digital trust
-    L1. The public chain is `viper-testnet-1` (`chain_id_hex` is the hex of
+    L1. The public chain is `viper-testnet-2` (`chain_id_hex` is the hex of
     the ASCII chain id, e.g. `76697065722d746573746e65742d31`); it is
     created after the public release, so there is no live network to
     query at publication time. Routes marked "specified, not implemented"
@@ -13,11 +13,11 @@ info:
     attestations / proofs / governance receipts, manage verifiable
     credentials, and anchor proofs.
     Spec version aligns with the Viper SDK 0.2.0 release (TS + Python),
-    which predates `viper-testnet-1` and is re-aligned before republishing.
+    which predates `viper-testnet-2` and is re-aligned before republishing.
 
 servers:
   - url: https://rpc.pqchain.agwswebconsulting.it
-    description: Planned public read API of viper-testnet-1 (DNS published at genesis; not live at publication time)
+    description: Planned public read API of viper-testnet-2 (DNS published at genesis; not live at publication time)
   - url: http://localhost:26657
     description: Local devnet node (default API port)
 
@@ -90,7 +90,7 @@ paths:
                 $ref: "#/components/schemas/StatusResponse"
               example:
                 node_id: "validator-1"
-                chain_id: "viper-testnet-1"
+                chain_id: "viper-testnet-2"
                 height: 3462
                 tip_hash: "1c730e583768424c66b1312c70a062fadc41bf83670f94ca3f5604c236861a67"
                 state_root: "c69dce3dd8023da4a761e9cb1c5585910abbe906217e20ff070b0be62d2f80ea"
@@ -1069,7 +1069,7 @@ components:
       type: object
       description: >
         Returned by GET /v1/network. `chain_id` is the hex-encoded chain id
-        bytes (e.g. `viper-testnet-1` is `76697065722d746573746e65742d31`).
+        bytes (e.g. `viper-testnet-2` is `76697065722d746573746e65742d31`).
       properties:
         chain_id:
           type: string
@@ -1093,7 +1093,7 @@ components:
           type: string
         chain_id:
           type: string
-          description: Plain chain id string (e.g. `viper-testnet-1`)
+          description: Plain chain id string (e.g. `viper-testnet-2`)
         height:
           type: integer
           format: int64
@@ -1264,7 +1264,7 @@ components:
           enum: [candidate, active, jailed, unbonding, exited]
         self_bond:
           type: string
-          description: Reserved (token economics, not active on the public chain); always "0" on viper-testnet-1
+          description: Reserved (token economics, not active on the public chain); always "0" on viper-testnet-2
         registered_height:
           type: integer
           format: int64

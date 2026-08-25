@@ -33,6 +33,7 @@ use anyhow::{bail, Context, Result};
 pub fn cmd_ceremony(args: &[String]) -> Result<()> {
     use pqcd::ceremony::{
         build_secrets_manifest, generate_ceremony_values, CeremonyConfig, DeployToken,
+        ServiceAccount,
     };
 
     let mut chain_id = "viper-pq-kind-test".to_string();
@@ -46,6 +47,7 @@ pub fn cmd_ceremony(args: &[String]) -> Result<()> {
     let mut namespace = "viper".to_string();
     let mut release_name = "viper-test".to_string();
     let mut deploy_token: Option<DeployToken> = None;
+    let mut service_accounts: Vec<ServiceAccount> = Vec::new();
 
     let mut i = 2;
     while i < args.len() {
@@ -151,6 +153,25 @@ pub fn cmd_ceremony(args: &[String]) -> Result<()> {
                 });
                 i += 2;
             }
+            "--service-account" => {
+                // <label>:<ml-dsa-65 public key hex> — a funded genesis account
+                // for an operator service (repeatable). Get the key with
+                // `pqcd wallet public-key <keystore>`.
+                let raw = args
+                    .get(i + 1)
+                    .context("--service-account requires <label>:<public-key-hex>")?;
+                let (label, pk) = raw.split_once(':').context(
+                    "--service-account must be <label>:<public-key-hex> (e.g. notary:abcd…)",
+                )?;
+                if label.is_empty() || pk.is_empty() {
+                    bail!("--service-account: label and public key must both be non-empty");
+                }
+                service_accounts.push(ServiceAccount {
+                    label: label.to_string(),
+                    public_key_hex: pk.to_string(),
+                });
+                i += 2;
+            }
             other => bail!(
                 "unknown flag '{other}'. Run `pqcd ceremony --help` (or read the \
                  module doc at crates/pqcd/src/ceremony.rs) for the full flag list."
@@ -168,6 +189,7 @@ pub fn cmd_ceremony(args: &[String]) -> Result<()> {
         release_name: release_name.clone(),
         namespace: namespace.clone(),
         deploy_token,
+        service_accounts,
     };
     let (values, validator_entries, identity_salts) =
         generate_ceremony_values(&cfg).context("ceremony generation failed")?;
@@ -191,6 +213,19 @@ pub fn cmd_ceremony(args: &[String]) -> Result<()> {
             v.address_hex,
             &v.public_key_hex[..32.min(v.public_key_hex.len())],
         );
+    }
+
+    if let Some(accounts) = values.get("_service_accounts").and_then(|v| v.as_array()) {
+        if !accounts.is_empty() {
+            eprintln!("# Service accounts (funded at genesis, no governance rights):");
+            for a in accounts {
+                eprintln!(
+                    "#   {}  address={}",
+                    a["label"].as_str().unwrap_or("?"),
+                    a["address_hex"].as_str().unwrap_or("?")
+                );
+            }
+        }
     }
 
     let values_file = output_path.as_deref().unwrap_or("values-ceremony.json");

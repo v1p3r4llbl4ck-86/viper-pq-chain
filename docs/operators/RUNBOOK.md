@@ -7,7 +7,7 @@ BUSL-1.1; the verification-path crates are Apache-2.0. Host names in examples ar
 placeholders (`<host>`, `203.0.113.x`).
 
 There is no live public network at the time of writing. The public chain
-`viper-testnet-1` is created with `pqcd ceremony` after the public release; the
+`viper-testnet-2` is created with `pqcd ceremony` after the public release; the
 endpoints named in §11 exist at genesis, not before. Everything else in this
 runbook works today on a laptop.
 
@@ -118,7 +118,7 @@ Top level:
 | Key | Meaning |
 |---|---|
 | `node_id` | Unique name of this node. Feeds the deterministic libp2p PeerId (`pqcd peer-id <node_id>`). `$VIPER_NODE_ID` overrides it at start-up (the chart sets it from the pod name). |
-| `chain_id_hex` | Hex of the chain id string, e.g. `python3 -c "print('viper-testnet-1'.encode().hex())"`. Identical on every node; every transaction must carry it. |
+| `chain_id_hex` | Hex of the chain id string, e.g. `python3 -c "print('viper-testnet-2'.encode().hex())"`. Identical on every node; every transaction must carry it. |
 | `anchor_prev_hash_hex` | 32-byte genesis anchor. `0000…0000` for a fresh genesis; identical on every node. |
 | `data_dir` | Absolute path; the RocksDB store lives in `<data_dir>/rocksdb`. Distinct per node on a shared host. |
 | `fee_params` | `base_fee`, `byte_fee`, `sigverify_fee_v_a/_b/_c`, `exec_fee_per_gas`. Byte-for-byte identical on every node or `state_root` diverges at the first block. |
@@ -403,7 +403,7 @@ new chain is created with `pqcd ceremony`, which generates genesis, validator
 secrets and one `node.json` per role into a values file:
 
 ```sh
-pqcd ceremony --chain-id viper-testnet-1 --validators 3 --block-time-ms 500 \
+pqcd ceremony --chain-id viper-testnet-2 --validators 3 --block-time-ms 500 \
   --namespace viper --release-name viper \
   --image-repository <your-registry>/pqcd --image-tag <tag> \
   --output values-ceremony.json --secrets-output secrets-ceremony.yaml
@@ -430,7 +430,7 @@ mounted (`docker/README.md`).
 
 ## 11. Joining a network as an external operator
 
-This section describes joining `viper-testnet-1`, the public network to be created
+This section describes joining `viper-testnet-2`, the public network to be created
 at genesis after the public release. Until then the endpoints below do not
 resolve; the procedure is the same for any chain started per §12.
 

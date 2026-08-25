@@ -5,7 +5,7 @@
 **Version**: 0.2
 **Date**: 2026-04-12 (updated from 2026-04-09)
 
-> **Reserved — `token_economics`.** The public chain `viper-testnet-1` has no native token. The token model and mechanisms in this document are implemented behind the `token_economics` Cargo feature, compiled out of the public chain build, and kept as a design reserve; they are not active on any network at the time of the public release. Nothing in this document is an offer, a sale or a promise of any token or other asset.
+> **Reserved — `token_economics`.** The public chain `viper-testnet-2` has no native token. The token model and mechanisms in this document are implemented behind the `token_economics` Cargo feature, compiled out of the public chain build, and kept as a design reserve; they are not active on any network at the time of the public release. Nothing in this document is an offer, a sale or a promise of any token or other asset.
 
 ---
 

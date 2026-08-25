@@ -1,9 +1,11 @@
-# Deploys a released tag to viper-testnet-1 on the operator's k3s cluster.
+# Deploys a released tag to viper-testnet-2 on the operator's k3s cluster.
 #
-# Manual only (workflow_dispatch), from a `v*` tag, behind the "testnet"
+# Manual only (workflow_dispatch, from `main` with the `tag` input or from a `v*` tag that
+# carries this file), behind the "testnet"
 # environment (required reviewer) and on the "viper-k3s-deploy" runner scale set,
-# whose ServiceAccount is confined to the viper-testnet-1 namespace. The release
-# values live in the cluster (Secret testnet1-deploy-values), not in this repo.
+# whose ServiceAccount is confined to the viper-testnet-2 namespace. The release
+# values live in the cluster (Secret testnet2-deploy-values), not in this repo —
+# including whether the notary is on and which image it runs.
 # Default is a server-side dry run; untick it to roll the release.
 name: deploy-testnet
 on:
@@ -32,15 +34,15 @@ jobs:
           ref: ${{ inputs.tag }}
       - name: Release values from the cluster
         run: |
-          kubectl -n viper-testnet-1 get secret testnet1-deploy-values \
+          kubectl -n viper-testnet-2 get secret testnet2-deploy-values \
             -o jsonpath='{.data.values\.json}' | base64 -d > "$RUNNER_TEMP/values.json"
-          helm -n viper-testnet-1 history testnet1 --max 3
+          helm -n viper-testnet-2 history testnet2 --max 3
       - name: helm upgrade (${{ inputs.dry_run && 'dry run' || 'LIVE' }})
         run: |
           set -euo pipefail
           extra=""
           if [ "${{ inputs.dry_run }}" = "true" ]; then extra="--dry-run=server"; fi
-          helm upgrade --install testnet1 charts/viper-pq-chain -n viper-testnet-1 \
+          helm upgrade --install testnet2 charts/viper-pq-chain -n viper-testnet-2 \
             -f "$RUNNER_TEMP/values.json" \
             --set image.tags.pqcd="${{ inputs.tag }}" \
             --set image.tags.archivalSidecar="${{ inputs.tag }}" \
@@ -52,11 +54,10 @@ jobs:
             --set chainNode.sentry.publicService.enabled=true \
             --set chainNode.sentry.publicService.type=LoadBalancer \
             --set frontend.enabled=true \
-            --set notary.enabled=false \
             $extra
       - name: Rollout status
         if: ${{ !inputs.dry_run }}
         run: |
-          kubectl -n viper-testnet-1 rollout status statefulset/testnet1-viper-pq-chain-pqcd-validator --timeout=10m
-          kubectl -n viper-testnet-1 get pods
+          kubectl -n viper-testnet-2 rollout status statefulset/testnet2-viper-pq-chain-pqcd-validator --timeout=10m
+          kubectl -n viper-testnet-2 get pods
           curl -fsS https://pqchain.agwswebconsulting.it/v1/status

@@ -18,7 +18,7 @@ chain can retire an algorithm without retiring its accounts.
 
 ## Status
 
-**`viper-testnet-1` is live since 2026-08-25** (genesis digest in [genesis/](genesis/README.md)).
+**`viper-testnet-2` is live since 2026-08-25** (genesis digest in [genesis/](genesis/README.md)).
 Before it the code ran three private chains — `viper-pq-1` (2026-04 → 2026-05), `viper-research-1`
 (2026-05 → 2026-08) and an internal single-validator lab — all retired; what they taught is
 in [KNOWN-ISSUES.md](KNOWN-ISSUES.md) and [ROADMAP.md](ROADMAP.md).
@@ -50,7 +50,7 @@ Anyone can run a full, rpc or archive node; validators are admitted by the exist
 | `specs/` | the normative protocol contract (28 specifications) | CC BY 4.0 |
 | `charts/viper-pq-chain`, `deploy/ansible`, `docker/` | Kubernetes chart (one StatefulSet per role), systemd path, images | BUSL-1.1 |
 | `configs/` | reference `node.json` per role and the local devnet set | BUSL-1.1 |
-| `sdk/typescript`, `sdk/python` | client SDKs (0.2.0 published on npm / PyPI; the tree is at 0.3.0, to be re-aligned to `viper-testnet-1` before republishing) | Apache-2.0 |
+| `sdk/typescript`, `sdk/python` | client SDKs (0.2.0 published on npm / PyPI; the tree is at 0.3.0, to be re-aligned to `viper-testnet-2` before republishing) | Apache-2.0 |
 | `tests/acvp`, `fuzz/` | ACVP conformance vectors; cargo-fuzz targets | Apache-2.0 / BUSL-1.1 |
 | `vendor/` | patched `libp2p-tls`, `libp2p-quic` (post-quantum handshake), `slh-dsa` | upstream |
 

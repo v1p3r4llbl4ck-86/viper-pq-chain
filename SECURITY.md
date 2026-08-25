@@ -19,7 +19,7 @@ author only.
 
 **Encryption**: a PGP key will be published at
 `https://pqchain.agwswebconsulting.it/.well-known/pgp.asc` before the P-COMPAT-001
-binding window opens (before `viper-testnet-1` accepts external state from
+binding window opens (before `viper-testnet-2` accepts external state from
 operators outside the author's control — see `AGENTS.md` §"Repository Status").
 
 **What to include**:
@@ -85,7 +85,7 @@ we intend to adopt the SEAL / Immunefi **Safe Harbor framework**
 (<https://frameworks.securityalliance.org/safe-harbor>) once the
 P-COMPAT-001 binding window opens (see `AGENTS.md`). Until then, contact
 us first — we will coordinate rapidly. Reminder: there is no live public network yet;
-`viper-testnet-1` is created at genesis after the first public release, and from that
+`viper-testnet-2` is created at genesis after the first public release, and from that
 moment it carries real cryptographic state and public-facing services. Findings against the
 node, the P2P layer, the cryptographic envelope or the public API are in scope and should be
 reported privately, not exercised on the network.

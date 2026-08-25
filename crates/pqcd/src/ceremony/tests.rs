@@ -75,6 +75,7 @@ fn ceremony_values_have_expected_top_level_keys() {
         release_name: "viper-test".into(),
         namespace: "viper".into(),
         deploy_token: None,
+        service_accounts: vec![],
     };
     let (values, validators, _) = generate_ceremony_values(&cfg).unwrap();
     assert_eq!(validators.len(), 3);
@@ -128,6 +129,7 @@ fn build_secrets_manifest_emits_validator_consensus_secret() {
         release_name: "viper-test".into(),
         namespace: "viper".into(),
         deploy_token: None,
+        service_accounts: vec![],
     };
     let (_values, validators, salts) = generate_ceremony_values(&cfg).unwrap();
     let yaml = build_secrets_manifest(&cfg, "viper", &validators, &salts).unwrap();
@@ -155,6 +157,7 @@ fn build_secrets_manifest_appends_dockerconfigjson_for_deploy_token() {
             username: "gitlab+deploy-token-k8s".into(),
             password: "abc123token".into(),
         }),
+        service_accounts: vec![],
     };
     let (_values, validators, salts) = generate_ceremony_values(&cfg).unwrap();
     let yaml = build_secrets_manifest(&cfg, "viper", &validators, &salts).unwrap();
@@ -191,6 +194,7 @@ fn libp2p_wires_validator_multiaddr_into_sentry_and_full_bootstrap_peers() {
         release_name: "alfa".into(),
         namespace: "beta".into(),
         deploy_token: None,
+        service_accounts: vec![],
     };
     let (values, _, identity_salts) = generate_ceremony_values(&cfg).unwrap();
     // G-01: every role's node.json carries its own libp2p / KEM salts and the
@@ -339,6 +343,7 @@ fn deploy_token_emits_pull_secret_block() {
             username: "gitlab+deploy-token-k8s".into(),
             password: "abc123token".into(),
         }),
+        service_accounts: vec![],
     };
     let (values, _, _identity_salts) = generate_ceremony_values(&cfg).unwrap();
     let pull_secrets = values["image"]["pullSecrets"].as_array().unwrap();
@@ -366,6 +371,7 @@ fn build_secrets_manifest_emits_one_identity_secret_per_role() {
         release_name: "alfa".into(),
         namespace: "beta".into(),
         deploy_token: None,
+        service_accounts: vec![],
     };
     let (_values, validators, salts) = generate_ceremony_values(&cfg).unwrap();
     assert_eq!(salts.len(), 6);
@@ -390,4 +396,86 @@ fn build_secrets_manifest_emits_one_identity_secret_per_role() {
     all.sort_unstable();
     all.dedup();
     assert_eq!(all.len(), 12, "every salt is distinct");
+}
+
+#[test]
+fn service_accounts_land_in_every_node_json_with_the_chain_derived_address() {
+    // 2026-08-25: the notary (and any other operator service) needs a funded
+    // genesis account with its own key — after genesis nothing can create one
+    // with a balance on a tokenless network.
+    let seed = [0x51u8; 32];
+    let pk = ml_dsa_public_key_from_seed(AlgId::MlDsa65, &seed).unwrap();
+    let cfg = CeremonyConfig {
+        chain_id: "viper-pq-ceremony-test".into(),
+        validators: 1,
+        block_time_ms: 500,
+        genesis_balance: 1_000_000_000,
+        image_repository: "ghcr.io/v1p3r4llbl4ck-86".into(),
+        image_tag: "main".into(),
+        release_name: "viper-test".into(),
+        namespace: "viper".into(),
+        deploy_token: None,
+        service_accounts: vec![ServiceAccount {
+            label: "notary".into(),
+            public_key_hex: hex::encode(&pk),
+        }],
+    };
+    let (values, validators, _) = generate_ceremony_values(&cfg).unwrap();
+    let expected = hex::encode(derive_address(
+        b"viper-pq-ceremony-test",
+        AlgId::MlDsa65,
+        &pk,
+    ));
+    assert_ne!(expected, validators[0].address_hex);
+    for role in ["validator", "sentry", "full", "rpc", "archive", "bootnode"] {
+        let parsed: serde_json::Value = serde_json::from_str(
+            values["chainNode"][role]["config"]["nodeJson"]
+                .as_str()
+                .unwrap(),
+        )
+        .unwrap();
+        let accounts = parsed["genesis_accounts"].as_array().unwrap();
+        assert_eq!(accounts.len(), 2, "{role}: validator + service account");
+        let acc = accounts
+            .iter()
+            .find(|a| a["address_hex"] == expected)
+            .unwrap_or_else(|| panic!("{role}: service account missing"));
+        assert_eq!(
+            acc["balance"],
+            serde_json::json!(1_000_000_000u128),
+            "{role}"
+        );
+        assert_eq!(acc["nonce"], 0, "{role}");
+        let key = &acc["keys"][0];
+        assert_eq!(key["pk_hex"].as_str().unwrap(), hex::encode(&pk), "{role}");
+        assert_eq!(key["alg_id"], 2, "{role}");
+        assert_eq!(key["status"], "active", "{role}");
+        // VAULT | ATTESTATION | KEY_MGMT — no governance for a service key.
+        assert_eq!(key["allowed_tx_types"], 7, "{role}");
+    }
+    let summary = values["_service_accounts"].as_array().unwrap();
+    assert_eq!(summary.len(), 1);
+    assert_eq!(summary[0]["label"], "notary");
+    assert_eq!(summary[0]["address_hex"], expected);
+}
+
+#[test]
+fn a_service_account_with_a_malformed_public_key_is_rejected() {
+    let cfg = CeremonyConfig {
+        chain_id: "viper-pq-ceremony-test".into(),
+        validators: 1,
+        block_time_ms: 500,
+        genesis_balance: 1_000_000_000,
+        image_repository: "ghcr.io/v1p3r4llbl4ck-86".into(),
+        image_tag: "main".into(),
+        release_name: "viper-test".into(),
+        namespace: "viper".into(),
+        deploy_token: None,
+        service_accounts: vec![ServiceAccount {
+            label: "broken".into(),
+            public_key_hex: "abcd".into(),
+        }],
+    };
+    let err = generate_ceremony_values(&cfg).unwrap_err().to_string();
+    assert!(err.contains("broken"), "{err}");
 }

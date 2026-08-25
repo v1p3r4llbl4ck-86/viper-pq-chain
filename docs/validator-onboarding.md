@@ -1,8 +1,8 @@
-# Node and Validator Onboarding — `viper-testnet-1`
+# Node and Validator Onboarding — `viper-testnet-2`
 
 **Audience.** Operators who want to run a node of the public chain
-`viper-testnet-1`, and operators who want to be admitted as validators.
-**Status.** Accepted for the public release. `viper-testnet-1` is created
+`viper-testnet-2`, and operators who want to be admitted as validators.
+**Status.** Accepted for the public release. `viper-testnet-2` is created
 after the release with `pqcd ceremony`; the endpoints named below are
 published with the genesis and are not live until then.
 **Companion documents.** `docs/operators/RUNBOOK.md` (day-two
@@ -15,7 +15,7 @@ operations), `docs/observability.md` (logs, metrics, audit log),
 
 ## 1. Who can run what
 
-`viper-testnet-1` is a proof-of-authority network with **no native
+`viper-testnet-2` is a proof-of-authority network with **no native
 token**: nothing is staked, nothing is earned, nothing is bought. The
 `token_economics` feature is compiled out of the public binary and its
 specifications are `Reserved`.
@@ -78,7 +78,7 @@ pqcd version
    `crates/pqcd/src/node/tests.rs::configs_roles_examples_match_their_role`
    keeps them consistent with the binary.
 2. **Fill the chain constants from the published genesis.** The genesis
-   publication for `viper-testnet-1` gives you `chain_id_hex`
+   publication for `viper-testnet-2` gives you `chain_id_hex`
    (`76697065722d746573746e65742d31`, the hex of the ASCII chain id),
    `anchor_prev_hash_hex`, `fee_params`, `devnet.block_time_ms`,
    `devnet.epoch_duration`, `devnet.unbonding_period` and the
@@ -189,8 +189,8 @@ controlled deployments.
 You can also seed the store by hand from a snapshot you trust:
 
 ```bash
-pqcd snapshot-export /etc/pqchain/node.json /var/tmp/viper-testnet-1.snap   # on a synced node
-pqcd snapshot-import /etc/pqchain/node.json /var/tmp/viper-testnet-1.snap   # on the new node, stopped
+pqcd snapshot-export /etc/pqchain/node.json /var/tmp/viper-testnet-2.snap   # on a synced node
+pqcd snapshot-import /etc/pqchain/node.json /var/tmp/viper-testnet-2.snap   # on the new node, stopped
 ```
 
 Importing means trusting the snapshot source. Before recovery the node

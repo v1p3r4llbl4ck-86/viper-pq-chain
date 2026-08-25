@@ -1,7 +1,7 @@
 # Genesis of a Viper PQ Chain network
 
 How a network is born, from the ceremony to the first external node. Written for
-`viper-testnet-1`; every other network follows the same steps with its own names.
+`viper-testnet-2`; every other network follows the same steps with its own names.
 
 ## 0. What genesis fixes forever
 
@@ -26,20 +26,29 @@ only ([AGENTS.md](../../AGENTS.md)). Everything before that is rehearsal.
 
 ```sh
 pqcd ceremony \
-  --chain-id viper-testnet-1 \
+  --chain-id viper-testnet-2 \
   --validators 1 \
   --block-time-ms 500 \
   --image-repository ghcr.io/v1p3r4llbl4ck-86 --image-tag v0.1.1 \
   --release-name pqchain --namespace pqchain \
-  --output values-viper-testnet-1.json --secrets-output secrets-viper-testnet-1.yaml
+  --service-account notary:<ml-dsa-65 public key hex> \
+  --output values-viper-testnet-2.json --secrets-output secrets-viper-testnet-2.yaml
 ```
+
+`--service-account <label>:<pk>` (repeatable) funds an operator service at genesis — the
+notary, an operator wallet. Do it now or never: on a tokenless network every transaction still
+settles its fee from the sender's balance, `vault_create` opens accounts at balance 0 and
+transfers are not compiled in, so nothing can be funded after height 0 (that is why
+`viper-testnet-1` was retired on its first day). Get the key with `pqcd wallet import-seed …`
+then `pqcd wallet public-key <keystore>`; the derived address is listed under
+`_service_accounts` in the values file and is what the notary takes as `NOTARY_ADDRESS_HEX`.
 
 It produces:
 
-- `values-viper-testnet-1.json` — Helm values: genesis inline, one `node.json` per role
+- `values-viper-testnet-2.json` — Helm values: genesis inline, one `node.json` per role
   (validator, sentry ×2, full, rpc, archive, bootnode; the last three disabled), image
   coordinates, `_release_name` / `_namespace` (the chart refuses other names);
-- `secrets-viper-testnet-1.yaml` — the validator consensus seed and one identity Secret per
+- `secrets-viper-testnet-2.yaml` — the validator consensus seed and one identity Secret per
   role (libp2p + ML-KEM salts); **keep it offline, `chmod 600`, back it up before install**.
 
 The number of validators at genesis is the number of consensus seeds generated: with `1`
@@ -50,8 +59,8 @@ it, everything else dials the sentries).
 
 ```sh
 kubectl create namespace pqchain
-kubectl apply -n pqchain -f secrets-viper-testnet-1.yaml
-helm install pqchain charts/viper-pq-chain -n pqchain -f values-viper-testnet-1.json
+kubectl apply -n pqchain -f secrets-viper-testnet-2.yaml
+helm install pqchain charts/viper-pq-chain -n pqchain -f values-viper-testnet-2.json
 kubectl -n pqchain get pods -w          # validator-0, sentry-0/1, full-0, frontend
 ```
 
@@ -71,7 +80,7 @@ multiaddrs do not resolve: check the release name and namespace against the valu
 
 ## 4. Publish
 
-1. Copy the genesis from the values file to `genesis/viper-testnet-1.json`, compute
+1. Copy the genesis from the values file to `genesis/viper-testnet-2.json`, compute
    `sha256sum`, commit both, and attach them to the GitHub Release of the launch tag.
 2. DNS (Cloudflare):
    - `pqchain.<domain>` → the ingress (proxied): explorer at `/`, read API under `/v1/`;

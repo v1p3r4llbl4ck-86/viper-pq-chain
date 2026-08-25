@@ -12,7 +12,7 @@ Commit messages carry the author's name only; no `Co-Authored-By:` trailers.
 
 ## Repository Status
 
-**No live public network.** The public chain `viper-testnet-1` is created at a genesis ceremony
+**No live public network.** The public chain `viper-testnet-2` is created at a genesis ceremony
 after the first public release of this repository; until then every claim in the documents is
 about the design and the code, not about a running network. Three private chains preceded it —
 `viper-pq-1` (2026-04-25 → 2026-05-12, archived at height 33,976), `viper-research-1`
@@ -26,7 +26,7 @@ state tree, sync-committee light client) with the node roles of ADR-069 and the 
 ADR-070. Token economics are a reserve behind the dormant `token_economics` feature; the public
 chain is built without it.
 
-**Compatibility discipline — Policy P-COMPAT-001 (ADR-052).** From `viper-testnet-1` genesis on,
+**Compatibility discipline — Policy P-COMPAT-001 (ADR-052).** From `viper-testnet-2` genesis on,
 committed state is a promise to the operators and users who hold it:
 
 - **No chain reset.** Fixing an "invalid" state is done by an explicit, versioned migration with

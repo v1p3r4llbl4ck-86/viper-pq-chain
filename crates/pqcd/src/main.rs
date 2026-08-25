@@ -12,7 +12,7 @@
 //! - `pqcd snapshot-prune <node-config.json> [--keep-tail-blocks N] [--force]` — TASK-187a follower disk reclamation
 //! - `pqcd cold-storage-export <node-config.json> --cutoff-height N --output-dir DIR [--batch-size 10000] [--sign-with-operator <addr>] [--anchor-tsa <url>] [--tsa-best-effort] [--upload-to s3://...]` — TASK-188 / TASK-188b cold-storage rotation export
 //! - `pqcd cold-storage-import <node-config.json> <input-dir> [--insecure-no-verify] [--require-tsa]` — TASK-188b §3 cold-storage rotation import (replay + verify)
-//! - `pqcd ceremony [--chain-id S] [--validators N] [--block-time-ms M] [--output FILE] [--deploy-token user:pass@registry]` — TASK-233 chart ceremony tooling
+//! - `pqcd ceremony [--chain-id S] [--validators N] [--block-time-ms M] [--output FILE] [--deploy-token user:pass@registry] [--service-account label:pk_hex]…` — TASK-233 chart ceremony tooling
 //! - `pqcd migrate-store <node-config.json>` — migrate legacy DiskChainStore to RocksDB
 //! - `pqcd validate-tx <hex>`           — validate a CBOR-encoded transaction (local testing)
 //! - `pqcd peer-id <node_id>`           — print deterministic libp2p PeerId for a given node_id

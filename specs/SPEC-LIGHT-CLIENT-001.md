@@ -248,7 +248,7 @@ A sync committee member is slashable for two distinct offenses:
 
 ### 7.1 Genesis Activation
 
-This spec activates at the **genesis block** of every chain that ships it (it was active from the genesis of the retired `viper-pq-1` chain and is active from the genesis of `viper-testnet-1`). The first sync committee is computed from:
+This spec activates at the **genesis block** of every chain that ships it (it was active from the genesis of the retired `viper-pq-1` chain and is active from the genesis of `viper-testnet-2`). The first sync committee is computed from:
 
 ```
 seed = tagged_hash(
