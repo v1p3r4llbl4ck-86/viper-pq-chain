@@ -12,15 +12,10 @@
  *   npx serve . -p 3000
  * and open index.html that imports this file, or use Vite/CRA.
  *
- * baseUrl defaults to http://localhost:9000. Override via ?node=<url> query param.
+ * baseUrl defaults to the page origin (the ingress serves /v1 next to the explorer). Override via ?node=<url>.
  */
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
 
-import React, {
-  useState,
-  useEffect,
-  useCallback,
-  useRef,
-} from "react";
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -93,9 +88,9 @@ function timeAgo(ms) {
 function getBaseUrl() {
   try {
     const url = new URL(window.location.href);
-    return url.searchParams.get("node") ?? "http://localhost:9000";
+    return url.searchParams.get("node") ?? window.location.origin;
   } catch {
-    return "http://localhost:9000";
+    return window.location.origin;
   }
 }
 
@@ -957,7 +952,7 @@ function NavBar({ view, setView }) {
 // Root App
 // ---------------------------------------------------------------------------
 
-export default function App() {
+function App() {
   const [baseUrl, setBaseUrl] = useState(getBaseUrl);
   const [status, setStatus] = useState(null);
   const [validators, setValidators] = useState([]);
@@ -1099,3 +1094,5 @@ export default function App() {
     </div>
   );
 }
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App />);
