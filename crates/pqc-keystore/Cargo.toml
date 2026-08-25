@@ -28,7 +28,7 @@ pbkdf2 = { version = "0.12", default-features = false, features = ["hmac"] }
 bip39 = { version = "2", default-features = false }
 rand = "0.9"
 argon2 = "0.5"
-chacha20poly1305 = "0.10"
+chacha20poly1305 = "0.11"
 
 [lints]
 workspace = true
