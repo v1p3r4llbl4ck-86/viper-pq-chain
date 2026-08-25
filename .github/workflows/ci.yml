@@ -54,7 +54,8 @@ jobs:
   test:
     name: tests (all features)
     runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
-    timeout-minutes: 90
+    # 65 min on a 4-vCPU hosted runner; the k3s runner (2.5 CPU, 2 build jobs, cold cache) needs more.
+    timeout-minutes: 150
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
@@ -72,8 +73,9 @@ jobs:
 
   softhsm:
     name: pqc-hsm against SoftHSM
-    # Always GitHub-hosted: the job installs softhsm2 with apt-get.
-    runs-on: ubuntu-latest
+    # softhsm2/opensc are baked into the k3s runner image; on GitHub-hosted runners
+    # (pull requests, or no CI_RUNS_ON) the job installs them with apt-get.
+    runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
     env:
       VIPER_HSM_TEST_MODULE: /usr/lib/softhsm/libsofthsm2.so
       VIPER_HSM_TEST_SLOT: "0"
@@ -87,6 +89,7 @@ jobs:
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
         if: runner.environment == 'github-hosted'
       - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends softhsm2 opensc
+        if: runner.environment == 'github-hosted'
       - run: cargo test -p pqc-hsm --features softhsm --no-fail-fast
 
   chart:
