@@ -437,7 +437,7 @@ resolve; the procedure is the same for any chain started per §12.
 | Purpose | Address (at genesis) |
 |---|---|
 | Explorer / status | `https://pqchain.agwswebconsulting.it` |
-| Read API | `rpc.pqchain.agwswebconsulting.it` (port 26657, `/v1/*`) |
+| Read API | `pqchain.agwswebconsulting.it/v1/…` (port 26657, `/v1/*`) |
 | P2P seed (bootnode) | `boot1.pqchain.agwswebconsulting.it:26656` |
 
 ### 11.1 Choose a role

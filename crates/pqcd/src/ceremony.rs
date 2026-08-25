@@ -783,7 +783,8 @@ pub fn generate_ceremony_values(
             },
         },
         "notary": {
-            "enabled": true,
+            // The notary is a separate, private product: off unless the operator turns it on.
+            "enabled": false,
             "replicas": 2,
         },
         "kubernetes": {

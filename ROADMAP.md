@@ -102,7 +102,7 @@ non-validating nodes first and can be admitted as validators.
   for the read API, deployed from `charts/viper-pq-chain`.
 - Public endpoints at the planned names, live only from genesis: the
   explorer and status page at `pqchain.agwswebconsulting.it`, the read
-  API at `rpc.pqchain.agwswebconsulting.it`, the P2P seed at
+  API at `pqchain.agwswebconsulting.it/v1/…`, the P2P seed at
   `boot1.pqchain.agwswebconsulting.it:26656`.
 
 **External operators**
