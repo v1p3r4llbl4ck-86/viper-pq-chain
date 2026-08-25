@@ -550,7 +550,9 @@ mod tests {
     /// without updating the JSON) surfaces here.
     #[test]
     fn viper_research_1_root_pin() {
-        let validators = viper_research_1_genesis_validators();
+        let Some(validators) = viper_research_1_genesis_validators() else {
+            return;
+        };
         assert_eq!(
             validators.len(),
             3,
@@ -571,11 +573,22 @@ mod tests {
     /// `deploy/ansible/files/genesis-viper-research-1.json` at the Fase 5
     /// cutover ceremony (2026-05-12). Reads the JSON at test runtime so
     /// the test fails on any drift between the JSON and the pinned root.
-    fn viper_research_1_genesis_validators() -> Vec<(Address, AlgId, Vec<u8>)> {
+    ///
+    /// The artefact belongs to a retired private chain and is not part of
+    /// the public tree: when it is absent the callers skip (`None`) instead
+    /// of failing, so the pin still guards the private repository.
+    fn viper_research_1_genesis_validators() -> Option<Vec<(Address, AlgId, Vec<u8>)>> {
         // env!("CARGO_MANIFEST_DIR") = crates/pqc-types — go up two levels
         // to repo root, then down into deploy/ansible/files/.
         let json_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../deploy/ansible/files/genesis-viper-research-1.json");
+        if !json_path.exists() {
+            eprintln!(
+                "skipped: {} is not in this tree (private artefact of a retired chain)",
+                json_path.display()
+            );
+            return None;
+        }
         let raw = std::fs::read_to_string(&json_path)
             .unwrap_or_else(|e| panic!("read {}: {e}", json_path.display()));
         let parsed: serde_json::Value = serde_json::from_str(&raw)
@@ -616,7 +629,8 @@ mod tests {
                     ),
                 )
             })
-            .collect()
+            .collect::<Vec<_>>()
+            .into()
     }
 
     #[test]
