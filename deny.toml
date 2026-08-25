@@ -53,21 +53,21 @@ ignore = [
     # (2026-05-05, 2026-05-06, 2026-05-08). The dep tree no longer pulls a
     # vulnerable `lru` version (libp2p 0.55 transitive resolved away from it,
     # likely via a sibling dep bump). Re-add if a future advisory matches.
-    # RUSTSEC-2026-0118 — `hickory-proto` 0.25.0-alpha.5 NSEC3 unbounded loop.
-    #   Transitive dep through libp2p-mdns → libp2p 0.55. Upstream advisory
-    #   2026-05-01 explicitly says "no fixed upgrade is available". We are
-    #   not exposed in practice: pqcd doesn't run an authoritative DNS
-    #   responder; libp2p uses mDNS for local peer discovery only. Re-evaluate
-    #   on every libp2p release until hickory-proto ships a 0.25.x patch or
-    #   libp2p drops to a fixed branch.
+    # RUSTSEC-2026-0118 — `hickory-proto` 0.25.2 NSEC3 unbounded loop.
+    #   Transitive through libp2p-dns 0.44 (hickory-resolver ^0.25.2) and
+    #   libp2p-mdns 0.48 (hickory-proto ^0.25.2); libp2p 0.56.0 — the latest
+    #   release — pins that line and the advisory has no fix on 0.25. Not
+    #   exposed in practice: pqcd runs no DNS responder and never enables
+    #   DNSSEC validation; the resolver only maps the /dns*/ multiaddrs of
+    #   configured peers. KNOWN-ISSUES.md R-15. Re-evaluate on every libp2p
+    #   release: drop when libp2p depends on hickory-* 0.26.
     "RUSTSEC-2026-0118",
-    # RUSTSEC-2026-0119 — `hickory-proto` 0.25.0-alpha.5 O(n²) name compression
-    #   CPU exhaustion under crafted message floods. Same transitive path as
-    #   above (libp2p-mdns). Fix lands in hickory-proto 0.26.1, but libp2p
-    #   0.55 pins 0.25.0-alpha.5 and a workspace-wide bump requires a libp2p
-    #   minor upgrade — tracked separately. Same exposure analysis: mDNS
-    #   only, no public DNS surface; CPU-DoS via mDNS is bounded by the LAN
-    #   broadcast domain.
+    # RUSTSEC-2026-0119 — `hickory-proto` 0.25.2 O(n²) name compression
+    #   CPU exhaustion while encoding. Same transitive path as above; the fix
+    #   is hickory-proto 0.26.1, which libp2p 0.56.0 cannot take. Same
+    #   exposure analysis: the encoder only sees names bounded by the 255-byte
+    #   wire limit, so the quadratic path is capped at a few dozen labels.
+    #   KNOWN-ISSUES.md R-15.
     "RUSTSEC-2026-0119",
     # RUSTSEC-2026-0098 / -0099 / -0104 (`rustls-webpki` 0.101.7) — REMOVED
     #   2026-08-24: the closure plan landed. `pqcd`'s `s3-upload` feature now
