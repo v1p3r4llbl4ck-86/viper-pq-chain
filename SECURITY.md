@@ -12,13 +12,13 @@ author of that branch directly before escalating here.
 
 ## Reporting a vulnerability
 
-**Primary contact**: `security@viper-chain.eu` (see `.well-known/security.txt`).
+**Primary contact**: `security@agwswebconsulting.it` (see `.well-known/security.txt`).
 Alternatively, use GitHub's private vulnerability reporting on the public
 repository ("Report a vulnerability" under the Security tab): it reaches the
 author only.
 
 **Encryption**: a PGP key will be published at
-`https://viper-chain.eu/.well-known/pgp.asc` before the P-COMPAT-001
+`https://pqchain.agwswebconsulting.it/.well-known/pgp.asc` before the P-COMPAT-001
 binding window opens (before `viper-testnet-1` accepts external state from
 operators outside the author's control — see `AGENTS.md` §"Repository Status").
 
