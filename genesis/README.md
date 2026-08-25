@@ -9,7 +9,6 @@ Bootstrap peers (the author's sentries, behind `boot1.pqchain.agwswebconsulting.
 ```
 /dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWBzaTFqtoBrd8gtwP2sdumxd5pTPh3kzMrngv3uJ68VW8
 /dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWJfoEZUGfk75dyvgUUpJnATtoeWsiA1vVDYRHgR6LE7ck
-/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWJSSmZNzJE7ikxCfLzhnsHQbMVioSWemngABDwduq9A3D
 ```
 
 Read API and explorer: `https://pqchain.agwswebconsulting.it` (`/v1/status`, `/v1/blocks/latest`, `/docs`).
