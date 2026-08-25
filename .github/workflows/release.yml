@@ -15,7 +15,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_BUILD_JOBS: ${{ vars.CARGO_BUILD_JOBS || 3 }}
   RELEASE_FEATURES: --no-default-features --features hybrid-kem-tls
 
 jobs:
@@ -23,11 +22,12 @@ jobs:
     name: linux x86_64 binaries
     runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: 1.92.0
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        if: runner.environment == 'github-hosted'
       - name: build
         run: cargo build --release $RELEASE_FEATURES -p pqcd -p viper-archival-sidecar
       - name: package
@@ -41,12 +41,12 @@ jobs:
           cp LICENSE.md NOTICE dist/
           (cd dist && sha256sum *.tar.gz > SHA256SUMS)
       - name: SBOM (CycloneDX) of the workspace
-        uses: anchore/sbom-action@v0
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
         with:
           path: .
           format: cyclonedx-json
           output-file: dist/viper-pq-chain-${{ github.ref_name }}.cdx.json
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: dist
           path: dist
@@ -58,15 +58,15 @@ jobs:
       matrix:
         image: [pqcd, viper-archival-sidecar]
     steps:
-      - uses: actions/checkout@v4
-      - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
       - id: build
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
           context: .
           file: docker/${{ matrix.image }}.Dockerfile
@@ -78,7 +78,7 @@ jobs:
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.revision=${{ github.sha }}
             org.opencontainers.image.version=${{ github.ref_name }}
-      - uses: sigstore/cosign-installer@v3
+      - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
       - name: sign (keyless, Sigstore)
         run: cosign sign --yes ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}@${{ steps.build.outputs.digest }}
 
@@ -87,11 +87,11 @@ jobs:
     needs: [binaries, images]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
         with:
           name: dist
           path: dist
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
           files: dist/*
           generate_release_notes: true

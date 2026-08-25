@@ -10,27 +10,32 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+permissions:
+  contents: read
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  # Keep the build inside the memory of a small runner; raise on a big one.
-  CARGO_BUILD_JOBS: ${{ vars.CARGO_BUILD_JOBS || 3 }}
+  # Build parallelism is the runner's business: the hosted runners use every
+  # core, the self-hosted ones carry CARGO_BUILD_JOBS in their environment.
 
-# Runs on GitHub-hosted runners (free for a public repository). To use the
-# self-hosted runner instead (release/RUNNER.md in the private repository),
-# set the repository variable CI_RUNS_ON to a JSON label list such as
-# ["self-hosted","linux","viper"].
+# Pull requests always run on GitHub-hosted runners (free for a public
+# repository, disposable): code from a fork never executes on the project's
+# machines. Pushes to main and manual runs can be routed to the self-hosted
+# runners (release/RUNNER.md in the private repository) by setting the
+# repository variable CI_RUNS_ON to a JSON label list such as ["viper-k3s"].
 jobs:
   lint:
     name: fmt, clippy, licences, links
-    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: 1.92.0
           components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        if: runner.environment == 'github-hosted'
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: scripts/check-licenses.sh
@@ -38,24 +43,25 @@ jobs:
 
   deny:
     name: cargo deny (advisories, licences, bans, sources)
-    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: EmbarkStudios/cargo-deny-action@v2
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
         with:
           command: check
           arguments: --all-features
 
   test:
     name: tests (all features)
-    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: 1.92.0
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        if: runner.environment == 'github-hosted'
       - name: unit and integration tests
         # The multi-node integration tests are timing-sensitive: one test thread,
         # and every deadline stretched ×3 on the 2-core hosted runners (TASK-239).
@@ -74,20 +80,21 @@ jobs:
       VIPER_HSM_TEST_PIN: "1234"
       VIPER_HSM_TEST_LABEL: viper-dev-probe-key
     steps:
-      - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@master
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
         with:
           toolchain: 1.92.0
-      - uses: Swatinem/rust-cache@v2
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
+        if: runner.environment == 'github-hosted'
       - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends softhsm2 opensc
       - run: cargo test -p pqc-hsm --features softhsm --no-fail-fast
 
   chart:
     name: helm lint and render
-    runs-on: ${{ vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
     steps:
-      - uses: actions/checkout@v4
-      - uses: azure/setup-helm@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4
       - run: helm lint charts/viper-pq-chain
       - run: helm template ci charts/viper-pq-chain > /dev/null
       - name: the chart refuses ceremony values made for another release

@@ -3,10 +3,11 @@ updates:
   - package-ecosystem: cargo
     directory: /
     schedule: { interval: weekly }
-    open-pull-requests-limit: 5
-    groups:
-      rust-minor-and-patch:
-        update-types: [minor, patch]
+    # Version-update PRs are off: this repository is a mirror of the private
+    # tree (release/sync-public.sh), so nothing can be merged here — upgrades
+    # land upstream and arrive with the next sync. Security alerts stay on.
+    open-pull-requests-limit: 0
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
+    open-pull-requests-limit: 0
