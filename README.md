@@ -18,22 +18,20 @@ chain can retire an algorithm without retiring its accounts.
 
 ## Status
 
-**There is no live public network yet.** The public chain **`viper-testnet-1`** is created
-at a genesis ceremony after this repository's first public release. Until then the code has
-run three private chains — `viper-pq-1` (2026-04 → 2026-05), `viper-research-1`
+**`viper-testnet-1` is live since 2026-08-25** (genesis digest in [genesis/](genesis/README.md)).
+Before it the code ran three private chains — `viper-pq-1` (2026-04 → 2026-05), `viper-research-1`
 (2026-05 → 2026-08) and an internal single-validator lab — all retired; what they taught is
 in [KNOWN-ISSUES.md](KNOWN-ISSUES.md) and [ROADMAP.md](ROADMAP.md).
 
-At genesis the author runs the first validator, two sentries and a bootnode, and publishes:
+The author runs the first validator, two sentries and a full node, and publishes:
 
 | What | Where |
 |---|---|
 | explorer and chain status | `https://pqchain.agwswebconsulting.it` |
-| public read API | `https://rpc.pqchain.agwswebconsulting.it/v1/status` |
+| public read API | `https://pqchain.agwswebconsulting.it/v1/status` |
 | P2P seed for your node | `boot1.pqchain.agwswebconsulting.it:26656` |
 
-None of these answers before genesis: the names are reserved, the services come up with the
-chain. Genesis is announced in [ROADMAP.md](ROADMAP.md) and on the repository's Releases page.
+Bootstrap multiaddrs (with PeerIds) are in [genesis/README.md](genesis/README.md).
 
 Anyone can run a full, rpc or archive node; validators are admitted by the existing set.
 [docs/validator-onboarding.md](docs/validator-onboarding.md) is the join guide.

@@ -209,7 +209,7 @@ curl -s http://127.0.0.1:26657/v1/status | jq
 returns `height`, `chain_id`, `state_root`, `tip_hash`, `node_id`,
 `base_fee`, `epoch_number` and `epoch_length_blocks`. Compare `height`
 and `tip_hash` with the public read API
-(`https://rpc.pqchain.agwswebconsulting.it/v1/status`, published at
+(`https://pqchain.agwswebconsulting.it/v1/status`, published at
 genesis) or with any other operator's `rpc` node: you are in sync when
 your height stays within a block or two of theirs and the `tip_hash`
 at a common height matches. Note that the `syncing` field is a
