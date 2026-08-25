@@ -61,7 +61,8 @@ jobs:
         # and every deadline stretched ×3 on the 2-core hosted runners (TASK-239).
         env:
           PQCD_TEST_TIME_SCALE: "3"
-        run: cargo test --workspace --all-features --no-fail-fast -- --test-threads=1
+        # pqc-hsm's softhsm feature needs libsofthsm2 on the host: it has its own job below.
+        run: cargo test --workspace --exclude pqc-hsm --all-features --no-fail-fast -- --test-threads=1
 
   softhsm:
     name: pqc-hsm against SoftHSM
