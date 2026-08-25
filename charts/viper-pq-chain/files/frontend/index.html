@@ -16,11 +16,13 @@
 <body>
   <div id="root"></div>
   <!-- The explorer is a single JSX file compiled in the browser: no bundler,
-       no build step. It reads the node's public API (/v1/...) served on the
+       no build step. Versions are pinned: Babel 8 switched preset-react to the
+       automatic runtime, which injects an `import` and breaks a classic script.
+       It reads the node's public API (/v1/...) served on the
        same origin by the chart's ingress. -->
-  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react@18.3.1/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone@7.29.8/babel.min.js"></script>
   <script type="text/babel" data-presets="react" src="/viper-explorer.jsx"></script>
 </body>
 </html>
