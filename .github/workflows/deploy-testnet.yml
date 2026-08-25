@@ -1,0 +1,62 @@
+# Deploys a released tag to viper-testnet-1 on the operator's k3s cluster.
+#
+# Manual only (workflow_dispatch), from a `v*` tag, behind the "testnet"
+# environment (required reviewer) and on the "viper-k3s-deploy" runner scale set,
+# whose ServiceAccount is confined to the viper-testnet-1 namespace. The release
+# values live in the cluster (Secret testnet1-deploy-values), not in this repo.
+# Default is a server-side dry run; untick it to roll the release.
+name: deploy-testnet
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to deploy (images ghcr.io/v1p3r4llbl4ck-86/{pqcd,viper-archival-sidecar}:<tag>)"
+        required: true
+      dry_run:
+        description: "Dry run only (helm upgrade --dry-run=server)"
+        type: boolean
+        default: true
+concurrency:
+  group: deploy-testnet
+  cancel-in-progress: false
+permissions:
+  contents: read
+jobs:
+  deploy:
+    runs-on: viper-k3s-deploy
+    environment: testnet
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          ref: ${{ inputs.tag }}
+      - name: Release values from the cluster
+        run: |
+          kubectl -n viper-testnet-1 get secret testnet1-deploy-values \
+            -o jsonpath='{.data.values\.json}' | base64 -d > "$RUNNER_TEMP/values.json"
+          helm -n viper-testnet-1 history testnet1 --max 3
+      - name: helm upgrade (${{ inputs.dry_run && 'dry run' || 'LIVE' }})
+        run: |
+          set -euo pipefail
+          extra=""
+          if [ "${{ inputs.dry_run }}" = "true" ]; then extra="--dry-run=server"; fi
+          helm upgrade --install testnet1 charts/viper-pq-chain -n viper-testnet-1 \
+            -f "$RUNNER_TEMP/values.json" \
+            --set image.tags.pqcd="${{ inputs.tag }}" \
+            --set image.tags.archivalSidecar="${{ inputs.tag }}" \
+            --set chainNode.common.resources.requests.cpu=100m \
+            --set chainNode.common.resources.requests.memory=256Mi \
+            --set chainNode.common.resources.limits.cpu=1500m \
+            --set chainNode.common.resources.limits.memory=1Gi \
+            --set chainNode.common.storage.size=20Gi \
+            --set chainNode.sentry.publicService.enabled=true \
+            --set chainNode.sentry.publicService.type=LoadBalancer \
+            --set frontend.enabled=true \
+            --set notary.enabled=false \
+            $extra
+      - name: Rollout status
+        if: ${{ !inputs.dry_run }}
+        run: |
+          kubectl -n viper-testnet-1 rollout status statefulset/testnet1-viper-pq-chain-pqcd-validator --timeout=10m
+          kubectl -n viper-testnet-1 get pods
+          curl -fsS https://pqchain.agwswebconsulting.it/v1/status
