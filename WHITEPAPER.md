@@ -4,8 +4,8 @@
 cryptographic architecture, account model, transaction format, consensus and fee model below are
 the design as built. Two sections are framed differently from the original: §12 — the validator set
 is operator-run proof of authority with no stake; §13 — the token utility is a **reserve** design
-behind the dormant `token_economics` feature, not a live mechanism and not an offer. There is no
-public network yet; `viper-testnet-2` is created at genesis after the first public release.
+behind the dormant `token_economics` feature, not a live mechanism and not an offer. `viper-testnet-2`
+is live since 2026-08-25 as a single-validator public testnet with no guarantee of persistence.
 
 **Version**: 0.3 framing / 0.2 text
 
@@ -225,7 +225,7 @@ HotStuff-like linear communication complexity (`O(n)` vs. `O(n²)` for Tendermin
 
 | Topology | Validator count | Quorum (2/3+1) | ML-DSA-65 commit | SLH-DSA-SHAKE-192s commit |
 |-------|----------------|----------------|-----------------|---------------|
-| `viper-testnet-2` at genesis | 3 | 3 | ~10 KB | ~49 KB |
+| `viper-testnet-2` at genesis (2026-08-25) | 1 | 1 | ~3.3 KB | ~16 KB |
 | Forward: controlled growth (ADR-013) | 24 | ~17 | ~56 KB | ~276 KB |
 | Forward: stress ceiling | 50 | ~34 | ~110 KB | ~552 KB |
 
@@ -354,7 +354,7 @@ Explicitly excluded from Phase 1: native RWA tokenization (issuance, transfer re
   - liveness failure (extended downtime): **0.5%** of stake
   - invalid vote: **2%** of stake
 - reward structure: proposer priority share + validator-pool split of fee revenue (SPEC-FEE-001)
-- launch validator set size: **3** on `viper-testnet-2` (the author's validator plus admitted operators); growth path to 24 → 50 without redesign
+- launch validator set size: **1** on `viper-testnet-2` (the author's validator; operators are admitted afterwards, target 3 then 24 → 50 without redesign)
 
 ### 12.3 Operator API
 
@@ -466,4 +466,4 @@ Phase 9+ (post-launch soak): final `block_time_ms` decision, follower prune scri
 
 ---
 
-*This document is the vision-and-overview reference for the design as built; `viper-testnet-2` is created at genesis after the first public release. Section-level normative detail lives in the `specs/` corpus referenced inline. Forward-looking items are tagged "Forward:" or marked with a referenced ADR; sections with no such tag describe the as-built protocol.*
+*This document is the vision-and-overview reference for the design as built; `viper-testnet-2` is live since 2026-08-25 (single validator). Section-level normative detail lives in the `specs/` corpus referenced inline. Forward-looking items are tagged "Forward:" or marked with a referenced ADR; sections with no such tag describe the as-built protocol.*

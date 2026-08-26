@@ -12,9 +12,9 @@ Commit messages carry the author's name only; no `Co-Authored-By:` trailers.
 
 ## Repository Status
 
-**No live public network.** The public chain `viper-testnet-2` is created at a genesis ceremony
-after the first public release of this repository; until then every claim in the documents is
-about the design and the code, not about a running network. Three private chains preceded it —
+**One live public network.** `viper-testnet-2` was born at a genesis ceremony on 2026-08-25
+(single validator run by the author; no guarantee of persistence); claims about behaviour under a
+multi-operator validator set are still about the design and the code, not about a running network. Three private chains preceded it —
 `viper-pq-1` (2026-04-25 → 2026-05-12, archived at height 33,976), `viper-research-1`
 (2026-05-12 → 2026-08, tokenless) and an internal single-validator lab — all retired. Their
 records stay in the private repository; what they taught is in `KNOWN-ISSUES.md` and `ROADMAP.md`.

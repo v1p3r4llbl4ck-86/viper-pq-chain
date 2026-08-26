@@ -143,7 +143,7 @@ Validator set sizing — the launch posture of `viper-testnet-2` and the forward
 
 | Topology | Validator count | Quorum (2/3+1) | ML-DSA-65 commit | SLH-DSA-SHAKE-192s commit |
 |-------|----------------|----------------|-----------------|---------------|
-| `viper-testnet-2` at genesis (author's validator + admitted operators) | 3 | 3 | ~10 KB | ~49 KB |
+| `viper-testnet-2` at genesis, 2026-08-25 (author's validator; operators admitted afterwards) | 1 | 1 | ~3.3 KB | ~16 KB |
 | private chains 2026-04 → 2026-08 (retired) | 3 | 3 | ~10 KB | ~49 KB |
 | Forward: controlled growth | 24 | ~17 | ~56 KB | ~276 KB |
 | Forward: stress ceiling | 50 | ~34 | ~110 KB | ~552 KB |

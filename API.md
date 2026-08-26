@@ -14,10 +14,9 @@ serves two HTTP routers on port 26657:
   data directory. It overlaps with the runtime router but is not
   identical.
 
-There is no live public network at the time of writing: the endpoints
-below are what a node built from this tree serves. Planned public names
-for `viper-testnet-2` (read API at `rpc.pqchain.agwswebconsulting.it`)
-go live at genesis.
+`viper-testnet-2` is live since 2026-08-25: the endpoints below are served at
+`https://pqchain.agwswebconsulting.it` (read API under `/v1/`, notary under `/api/`,
+alias `rpc.pqchain.agwswebconsulting.it`).
 
 Three configuration flags in the `api` section of `node.json` gate parts
 of the runtime surface (`crates/pqcd/src/node.rs`, `ApiConfig`):
