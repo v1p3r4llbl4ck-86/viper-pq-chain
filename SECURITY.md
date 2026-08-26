@@ -84,9 +84,9 @@ For on-chain whitehat rescue operations during an exploit in progress,
 we intend to adopt the SEAL / Immunefi **Safe Harbor framework**
 (<https://frameworks.securityalliance.org/safe-harbor>) once the
 P-COMPAT-001 binding window opens (see `AGENTS.md`). Until then, contact
-us first — we will coordinate rapidly. Reminder: there is no live public network yet;
-`viper-testnet-2` is created at genesis after the first public release, and from that
-moment it carries real cryptographic state and public-facing services. Findings against the
+us first — we will coordinate rapidly. `viper-testnet-2` is live since 2026-08-25
+(single validator, public notary in anonymous mode): it carries real cryptographic state and
+public-facing services, with no guarantee of persistence. Findings against the
 node, the P2P layer, the cryptographic envelope or the public API are in scope and should be
 reported privately, not exercised on the network.
 

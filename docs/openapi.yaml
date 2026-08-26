@@ -17,7 +17,7 @@ info:
 
 servers:
   - url: https://rpc.pqchain.agwswebconsulting.it
-    description: Planned public read API of viper-testnet-2 (DNS published at genesis; not live at publication time)
+    description: Public read API of viper-testnet-2 (live since 2026-08-25)
   - url: http://localhost:26657
     description: Local devnet node (default API port)
 

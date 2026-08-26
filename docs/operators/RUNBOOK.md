@@ -6,8 +6,7 @@ Licensed CC BY 4.0 (see `LICENSE.md`). The node binary is source-available under
 BUSL-1.1; the verification-path crates are Apache-2.0. Host names in examples are
 placeholders (`<host>`, `203.0.113.x`).
 
-There is no live public network at the time of writing. The public chain
-`viper-testnet-2` is created with `pqcd ceremony` after the public release; the
+`viper-testnet-2` is live since 2026-08-25 (single validator, public notary); it was created with `pqcd ceremony` — the
 endpoints named in §11 exist at genesis, not before. Everything else in this
 runbook works today on a laptop.
 

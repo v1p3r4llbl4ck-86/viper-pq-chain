@@ -5,10 +5,10 @@ author knows to be **incomplete**, **deferred**, or **accepted as risk**
 in this repository at the time of the public release. It is written for
 an external reviewer: if a limitation is not here, it is not known.
 
-Status of the network: **there is no live public chain.** The public
-chain `viper-testnet-2` is created after this release with
-`pqcd ceremony`; §2 lists what must be closed before its genesis. The
-chains that preceded it (`viper-pq-1`, `viper-research-1` and a
+Status of the network: **`viper-testnet-2` is live since 2026-08-25** — a single
+validator run by the author, two sentries and a full node on one cluster, with the
+public notary in anonymous mode (`genesis/README.md` has the digest). §2 lists what
+was closed before its genesis and what stays open. The chains that preceded it (`viper-pq-1`, `viper-research-1` and a
 single-validator lab) are retired; §5 records what they taught.
 
 Conventions: `R-nn` accepted risk, `G-nn` gap to close before genesis,
