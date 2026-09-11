@@ -47,6 +47,20 @@ use pqcd::{
 };
 use tokio::time::{self, Duration};
 
+/// TASK-239: progress windows here are multiplied by `PQCD_TEST_TIME_SCALE`
+/// (default 1.0), as in `product_workflows.rs`. Three in-process nodes on a
+/// loaded machine finalise far fewer blocks per second: on 2026-09-11 the k3s
+/// runner saw height 2 where the test wants ≥ 10, while the whole file passed
+/// in 276 s on an idle host. Halt assertions stay unscaled — see below.
+fn scaled(d: Duration) -> Duration {
+    let factor = std::env::var("PQCD_TEST_TIME_SCALE")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|f| *f > 0.0)
+        .unwrap_or(1.0);
+    d.mul_f64(factor)
+}
+
 // Inline tempdir helper — same pattern as product_workflows.rs:135.
 struct TempDir(PathBuf);
 impl TempDir {
@@ -226,6 +240,10 @@ async fn withhold_precommit_halts_three_node_chain() -> Result<()> {
     // we conservatively expect height NOT to exceed 1 in the observation
     // window (the genesis block at height 0 plus at most one in-flight
     // proposal by validator-2 or -3 that gets dropped at threshold check).
+    //
+    // Deliberately NOT scaled by `PQCD_TEST_TIME_SCALE`: this window asserts the
+    // chain is halted (height ≤ 1), so stretching it only makes the assertion
+    // stricter. Scaling belongs to the two windows below, which assert progress.
     let observation_deadline = Instant::now() + Duration::from_secs(10);
     let mut peak_height: u64 = 0;
     while Instant::now() < observation_deadline {
@@ -274,7 +292,7 @@ async fn double_propose_drives_equivocation_evidence() -> Result<()> {
     let dir = TempDir::new("malicious-node-double-propose");
     let handles = spin_three_node_fixture_with_attack(&dir, "DoubleProposeAtHeight").await?;
 
-    let observation_deadline = Instant::now() + Duration::from_secs(30);
+    let observation_deadline = Instant::now() + scaled(Duration::from_secs(30));
     let mut peak_height: u64 = 0;
     while Instant::now() < observation_deadline {
         for h in &handles {
@@ -321,7 +339,7 @@ async fn replay_finalized_block_does_not_double_apply() -> Result<()> {
     let dir = TempDir::new("malicious-node-replay-finalized");
     let handles = spin_three_node_fixture_with_attack(&dir, "ReplayFinalizedBlock").await?;
 
-    let observation_deadline = Instant::now() + Duration::from_secs(30);
+    let observation_deadline = Instant::now() + scaled(Duration::from_secs(30));
     let mut peak_height: u64 = 0;
     while Instant::now() < observation_deadline {
         for h in &handles {
