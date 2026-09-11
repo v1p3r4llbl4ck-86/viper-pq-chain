@@ -672,6 +672,11 @@ Refused with `INVALID_PRUNE_CUTOFF` unless cutoff > 0, cutoff ≤ tip and a trus
 checkpoint exists at or above the cutoff (catch up first otherwise). The Ansible
 role installs `pqcd-prune.timer` (Sunday 03:00 UTC, stop → prune → start, log in
 `/var/log/pqchain/prune.log`; off-schedule: `systemctl start pqcd-prune.service`).
+On Kubernetes the chart does the same per role: `chainNode.<role>.prune.enabled`
+adds a `snapshot-prune` initContainer (a failed prune is logged and pqcd starts
+anyway) and a CronJob `<release>-pqcd-<role>-prune` that restarts the StatefulSet
+on `prune.schedule` (default Sunday 03:00 UTC). Log: `kubectl logs <pod> -c
+snapshot-prune`; off-schedule: `kubectl create job --from=cronjob/<name> <name>-now`.
 If the disk is too full for RocksDB compaction, fall back to `snapshot-export` →
 wipe `rocksdb/` → `snapshot-import` (§14).
 
