@@ -139,8 +139,22 @@ fn consensus_producer_config(data_dir: &Path, validators: &[TestValidator]) -> N
     }
 }
 
+/// TASK-239: deadlines here are multiplied by `PQCD_TEST_TIME_SCALE` (default
+/// 1.0), as in `product_workflows.rs`. The in-process nodes miss fixed deadlines
+/// on a loaded machine: on 2026-09-11 the k3s runner reached height 8 of 9
+/// within 15 s while the same test passed in 6.7 s on an idle host.
+fn scaled(d: Duration) -> Duration {
+    let factor = env::var("PQCD_TEST_TIME_SCALE")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|f| *f > 0.0)
+        .unwrap_or(1.0);
+    d.mul_f64(factor)
+}
+
 /// Poll until the node reaches at least `target_height`, with a timeout.
 async fn wait_for_height(handle: &DevnetNodeHandle, target: u64, timeout: Duration) {
+    let timeout = scaled(timeout);
     let deadline = Instant::now() + timeout;
     loop {
         let snap: DevnetNodeSnapshot = handle.snapshot().await;

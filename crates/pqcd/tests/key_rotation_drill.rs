@@ -393,6 +393,20 @@ fn proof_anchor_tx(sender: &Address, nonce: u64, key_version: u32) -> Vec<u8> {
 
 // ── Shared drill logic ────────────────────────────────────────────────────────
 
+/// TASK-239: deadlines here are multiplied by `PQCD_TEST_TIME_SCALE` (default
+/// 1.0), as in `product_workflows.rs`. The drill runs a live in-process node,
+/// so a loaded machine misses fixed deadlines: on 2026-09-11 the k3s runner
+/// timed out waiting for the committed nonce while the same drill passed in
+/// 54.8 s on an idle host.
+fn scaled(d: Duration) -> Duration {
+    let factor = std::env::var("PQCD_TEST_TIME_SCALE")
+        .ok()
+        .and_then(|v| v.parse::<f64>().ok())
+        .filter(|f| *f > 0.0)
+        .unwrap_or(1.0);
+    d.mul_f64(factor)
+}
+
 /// Poll the live state until the sender's committed nonce reaches `expected`.
 ///
 /// `wait_for_height_advance` is insufficient here because it returns as soon
@@ -405,7 +419,7 @@ async fn wait_for_committed_nonce(
     expected: u64,
     timeout: Duration,
 ) -> Result<()> {
-    let deadline = Instant::now() + timeout;
+    let deadline = Instant::now() + scaled(timeout);
     loop {
         if let Some(account) = node.get_account(sender).await {
             if account.nonce >= expected {
@@ -453,7 +467,7 @@ async fn run_key_rotation_drill(
         .await
         .context("failed to start key-drill node")?;
 
-    node.wait_for_height(1, Duration::from_secs(15))
+    node.wait_for_height(1, scaled(Duration::from_secs(15)))
         .await
         .context("node did not reach height 1")?;
 
