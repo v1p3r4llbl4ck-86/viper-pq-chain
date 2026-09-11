@@ -1,0 +1,105 @@
+{{- /*
+TASK-187a on Kubernetes — the weekly prune tick. snapshot-prune needs the
+store closed, so the tick only restarts the role's StatefulSet; the
+snapshot-prune initContainer (chain-statefulset.yaml) does the work while
+pqcd is down. One CronJob per enabled role with prune.enabled; the
+ServiceAccount may restart those StatefulSets and nothing else.
+*/ -}}
+{{- $fullname := include "viper-pq-chain.fullname" $ -}}
+{{- $pruned := list -}}
+{{- range $role := list "validator" "sentry" "full" "rpc" "archive" "bootnode" }}
+{{- $cfg := index $.Values.chainNode $role | default dict -}}
+{{- if $cfg.enabled }}
+{{- $merged := include "viper-pq-chain.roleConfig" (dict "ctx" $ "role" $role) | fromYaml -}}
+{{- if and $merged.prune $merged.prune.enabled }}
+{{- $pruned = append $pruned $role -}}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- if $pruned }}
+{{- $sa := printf "%s-prune" $fullname | trunc 63 | trimSuffix "-" }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $sa }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.labels" $ | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $sa }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.labels" $ | nindent 4 }}
+rules:
+  - apiGroups: ["apps"]
+    resources: ["statefulsets"]
+    resourceNames:
+      {{- range $role := $pruned }}
+      - {{ printf "%s-pqcd-%s" $fullname $role | trunc 63 | trimSuffix "-" }}
+      {{- end }}
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $sa }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.labels" $ | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $sa }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $sa }}
+    namespace: {{ $.Release.Namespace }}
+{{- range $role := $pruned }}
+{{- $merged := include "viper-pq-chain.roleConfig" (dict "ctx" $ "role" $role) | fromYaml -}}
+{{- $name := printf "%s-pqcd-%s" $fullname $role | trunc 63 | trimSuffix "-" }}
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  # CronJob names are capped at 52 characters (the Job suffix needs the rest).
+  name: {{ printf "%s-prune" $name | trunc 52 | trimSuffix "-" }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.roleLabels" (dict "ctx" $ "role" $role) | nindent 4 }}
+spec:
+  schedule: {{ $merged.prune.schedule | quote }}
+  timeZone: {{ default "Etc/UTC" $merged.prune.timeZone | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    spec:
+      backoffLimit: 2
+      template:
+        spec:
+          serviceAccountName: {{ $sa }}
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            runAsGroup: 65534
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: restart
+              image: {{ $merged.prune.kubectlImage }}
+              args: ["-n", {{ $.Release.Namespace | quote }}, "rollout", "restart", "statefulset/{{ $name }}"]
+              resources:
+                requests: { cpu: "10m", memory: "32Mi" }
+                limits:   { cpu: "200m", memory: "128Mi" }
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+{{- end }}
+{{- end }}

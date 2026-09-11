@@ -114,6 +114,18 @@ chainNode:
     podAnnotations: {}
     podLabels: {}
     extraEnv: []
+    # TASK-187a on Kubernetes — follower prune (RUNBOOK §15). When enabled,
+    # an initContainer runs `pqcd snapshot-prune` before pqcd opens the
+    # store, and a CronJob restarts the role's StatefulSet on `schedule` so
+    # the prune repeats. Refused on validator and archive (full history).
+    # keepTailBlocks is a block count: 1209600 ≈ 7 days at 500 ms blocks,
+    # 28 days at 2 s — roughly the same disk either way.
+    prune:
+      enabled: false
+      keepTailBlocks: 1209600
+      schedule: "0 3 * * 0"
+      timeZone: "Etc/UTC"
+      kubectlImage: "docker.io/rancher/kubectl:v1.36.2"
     # G-01 (ADR-069): Secret with keys `libp2p_seed_salt_hex` and
     # `kem_seed_salt_hex` (32 bytes hex each). pqcd mixes them into the
     # libp2p and ML-KEM identity derivations so neither identity can be

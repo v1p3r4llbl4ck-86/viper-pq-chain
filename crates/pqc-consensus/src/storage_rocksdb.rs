@@ -1451,11 +1451,20 @@ impl RocksDbChainStore {
 
 // ── Free functions ────────────────────────────────────────────────────────────
 
+/// Ceiling on the write-ahead logs a store may keep. A WAL file is deleted
+/// only once every column family that wrote into it has flushed, and the
+/// quiet CFs (`meta`, `checkpoints`) fill their memtables so slowly that,
+/// uncapped, each viper-testnet-2 follower sat on 104 WAL files (6.5 GB,
+/// a quarter of its disk) after 16 days. Past the cap RocksDB flushes the
+/// CFs pinning the oldest WAL, so the logs stay a few hundred MB.
+const MAX_TOTAL_WAL_SIZE_BYTES: u64 = 256 * 1024 * 1024;
+
 /// Open (or create) the RocksDB at `path` with all required column families.
 fn open_rocksdb(path: &Path) -> Result<DB, StorageError> {
     let mut db_opts = Options::default();
     db_opts.create_if_missing(true);
     db_opts.create_missing_column_families(true);
+    db_opts.set_max_total_wal_size(MAX_TOTAL_WAL_SIZE_BYTES);
 
     let mut cf_opts = Options::default();
     cf_opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
@@ -1721,6 +1730,45 @@ fn read_meta_hash_by_name(db: &DB, key: &[u8]) -> Result<Option<BlockHash>, Stor
 fn write_meta_raw(db: &DB, key: &[u8], value: &[u8]) -> Result<(), StorageError> {
     let meta_cf = db.cf_handle(CF_META).expect("meta CF");
     db.put_cf(&meta_cf, key, value).map_err(rocksdb_err)
+}
+
+#[cfg(test)]
+mod wal_cap_tests {
+    //! The WAL cap is part of the options every production store opens
+    //! with. RocksDB persists the effective options as `OPTIONS-*` next to
+    //! the data — the same file an operator would inspect.
+
+    use std::{
+        env, fs,
+        time::{SystemTime, UNIX_EPOCH},
+    };
+
+    use super::{open_rocksdb, MAX_TOTAL_WAL_SIZE_BYTES};
+
+    #[test]
+    fn production_store_caps_total_wal_size() {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .expect("clock after epoch")
+            .as_nanos();
+        let dir = env::temp_dir().join(format!("pqc-wal-cap-{}-{nanos}", std::process::id()));
+        drop(open_rocksdb(&dir).expect("open rocksdb"));
+
+        let options: Vec<String> = fs::read_dir(&dir)
+            .expect("read store dir")
+            .filter_map(Result::ok)
+            .filter(|e| e.file_name().to_string_lossy().starts_with("OPTIONS-"))
+            .map(|e| fs::read_to_string(e.path()).expect("read OPTIONS file"))
+            .collect();
+        fs::remove_dir_all(&dir).ok();
+
+        let want = format!("max_total_wal_size={MAX_TOTAL_WAL_SIZE_BYTES}");
+        assert!(!options.is_empty(), "RocksDB wrote no OPTIONS file");
+        assert!(
+            options.iter().all(|o| o.contains(&want)),
+            "every OPTIONS file must carry `{want}`"
+        );
+    }
 }
 
 #[cfg(test)]

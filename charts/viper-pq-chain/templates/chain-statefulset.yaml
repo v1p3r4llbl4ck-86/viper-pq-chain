@@ -12,6 +12,7 @@ Volumes:
 {{- $cfg := index $.Values.chainNode $role | default dict -}}
 {{- if $cfg.enabled }}
 {{- $merged := include "viper-pq-chain.roleConfig" (dict "ctx" $ "role" $role) | fromYaml -}}
+{{- include "viper-pq-chain.guardPrune" (dict "role" $role "merged" $merged) -}}
 {{- $name := printf "%s-pqcd-%s" (include "viper-pq-chain.fullname" $) $role | trunc 63 | trimSuffix "-" -}}
 {{- $configMapName := default (printf "%s-config" $name) (and $merged.config $merged.config.configMapRef) -}}
 {{- $genesisCmName := default (printf "%s-genesis" (include "viper-pq-chain.fullname" $)) $.Values.chain.genesis.configMapRef }}
@@ -82,6 +83,37 @@ spec:
                   matchLabels:
                     {{- include "viper-pq-chain.roleSelectorLabels" (dict "ctx" $ "role" $role) | nindent 20 }}
         {{- end }}
+      {{- if and $merged.prune $merged.prune.enabled }}
+      # TASK-187a on Kubernetes (RUNBOOK §15): prune the follower's store
+      # before pqcd opens it — snapshot-prune needs it exclusively. A failed
+      # prune never keeps the node down: pqcd starts on the unpruned store,
+      # like the trap in the Ansible pqcd-prune.sh.
+      initContainers:
+        - name: snapshot-prune
+          image: {{ include "viper-pq-chain.image" (dict "ctx" $ "binary" "pqcd") }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          command: ["sh", "-c"]
+          args:
+            - pqcd snapshot-prune /etc/pqchain/node.json --keep-tail-blocks {{ $merged.prune.keepTailBlocks | int64 }} || echo "snapshot-prune failed (exit $?); pqcd starts on the unpruned store"
+          env:
+            - name: RUST_LOG
+              value: {{ default "pqcd=info,tower_http=warn" $merged.rustLog | quote }}
+          resources:
+            {{- toYaml $merged.resources | nindent 12 }}
+          securityContext:
+            {{- toYaml $merged.securityContext | nindent 12 }}
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/pqchain
+            - name: config
+              mountPath: /etc/pqchain/node.json
+              subPath: node.json
+              readOnly: true
+            - name: genesis
+              mountPath: /etc/pqchain/genesis.json
+              subPath: genesis.json
+              readOnly: true
+      {{- end }}
       containers:
         - name: pqcd
           image: {{ include "viper-pq-chain.image" (dict "ctx" $ "binary" "pqcd") }}
