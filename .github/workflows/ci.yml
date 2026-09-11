@@ -54,8 +54,9 @@ jobs:
   test:
     name: tests (all features)
     runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
-    # 65 min on a 4-vCPU hosted runner; the k3s runner (2.5 CPU, 2 build jobs, cold cache) needs more.
-    timeout-minutes: 150
+    # 65 min on a 4-vCPU hosted runner; the k3s runner (2.5 CPU, 2 build jobs, cold cache) needs more:
+    # 102-106 min when the node is quiet, past 150 when it is busy (2026-09-11, twice).
+    timeout-minutes: 240
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
