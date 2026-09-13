@@ -845,11 +845,19 @@ impl RocksDbChainStore {
         self.db.write(batch).map_err(rocksdb_err)?;
 
         // ── 4. Trigger compaction so SST files actually shrink ───────────
-        // `compact_range_cf` with None bounds compacts the entire CF.
-        // Synchronous in the calling thread; for a 7-day-tail prune this is
-        // typically a few seconds of I/O on a modern NVMe.
-        self.db
-            .compact_range_cf(&blocks_cf, None::<&[u8]>, None::<&[u8]>);
+        // `CF_BLOCKS` is bounded to the span the batch just deleted: its keys
+        // are big-endian heights, so [0, cutoff) is exactly the dead range.
+        // Unbounded, this call rewrites the whole store even when the prune
+        // drops a single day — on viper-testnet-2 (2026-09-12) a 40k-block
+        // prune took 25-35 min and inflated an 8.9 GB store to 14 GB while
+        // the node was down. The other CFs are keyed by hash, so a height
+        // window cannot be mapped onto them; they stay full-CF compactions
+        // and are far smaller than the block bodies.
+        self.db.compact_range_cf(
+            &blocks_cf,
+            Some(height_to_key(0)),
+            Some(height_to_key(cutoff_height)),
+        );
         self.db
             .compact_range_cf(&hash_cf, None::<&[u8]>, None::<&[u8]>);
         self.db
