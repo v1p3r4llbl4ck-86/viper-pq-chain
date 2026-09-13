@@ -35,8 +35,13 @@ jobs:
           set -e
           v=${GITHUB_REF_NAME}
           mkdir -p dist
+          # The self-hosted runner redirects CARGO_TARGET_DIR to its hostPath
+          # cache, so `target/release` does not exist there: v0.1.3's packaging
+          # step died on exactly this line (2026-09-12) while the images, built
+          # by the other job, were fine.
+          out="${CARGO_TARGET_DIR:-target}/release"
           for b in pqcd viper-archival-sidecar; do
-            tar -C target/release -czf "dist/${b}-${v}-linux-x86_64.tar.gz" "$b"
+            tar -C "$out" -czf "dist/${b}-${v}-linux-x86_64.tar.gz" "$b"
           done
           cp LICENSE.md NOTICE dist/
           (cd dist && sha256sum *.tar.gz > SHA256SUMS)
