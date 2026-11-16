@@ -55,6 +55,10 @@ die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
 [ "$(uname -s)" = "Linux" ] || die "Linux only (got $(uname -s)); build from source elsewhere"
 [ "$(uname -m)" = "x86_64" ] || die "release binaries are x86_64 only (got $(uname -m)); build from source: cargo build --release -p pqcd --no-default-features --features hybrid-kem-tls"
 for t in curl tar sha256sum python3; do command -v "$t" >/dev/null || die "missing tool: $t"; done
+glibc=$(ldd --version 2>/dev/null | head -1 | grep -o '[0-9]\+\.[0-9]\+$' || true)
+if [ -n "$glibc" ] && [ "$(printf '%s\n2.35\n' "$glibc" | sort -V | head -1)" != "2.35" ]; then
+  die "glibc $glibc is too old: the release binaries need glibc >= 2.35 (Ubuntu 22.04+, Debian 12+). Use the container image or build from source."
+fi
 if [ "$SYSTEMD" = 1 ] && [ "$(id -u)" != 0 ]; then die "--systemd needs root"; fi
 if [ "$SKIP_SIG" = 0 ] && ! command -v cosign >/dev/null; then
   die "cosign not found. Install it (https://docs.sigstore.dev/cosign/system_config/installation/)

@@ -21,7 +21,7 @@ chain can retire an algorithm without retiring its accounts.
 > **`viper-testnet-3` is a test network.** No token, nothing of value, no guarantees: it can be
 > reset at any time (a reset is a new chain id and a new genesis). Run a node, break it, open issues.
 
-**Try it — one command, Linux x86_64:**
+**Try it — one command, Linux x86_64 with glibc ≥ 2.35 (Ubuntu 22.04+, Debian 12+):**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/main/scripts/join-testnet.sh | bash

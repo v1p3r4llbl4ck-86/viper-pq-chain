@@ -8,6 +8,10 @@ KNOWN-ISSUES.md.
 
 ## [Unreleased] — public release preparation (opened 2026-08-24)
 
+### 0.2.2 — release binaries that run on Ubuntu 22.04 / Debian 12 (2026-11-16)
+
+- The 0.2.1 binaries were built on the current `ubuntu-latest` image and required glibc 2.38 and a GCC 13+ libstdc++: they did not start on Ubuntu 22.04 or Debian 12. The binary job now builds on `ubuntu-22.04` and refuses a binary that needs more than glibc 2.35; `join-testnet.sh` says so upfront on an older system. Container images were not affected.
+
 ### 0.2.1 — dependency security updates (2026-11-16)
 
 - **Dependencies:** `quinn-proto` 0.11.19 / `quinn-udp` 0.5.16 (six advisories on the QUIC transport, among them remote panics), `rustls` 0.23.46 (among others RUSTSEC-2026-0349, an unauthenticated ServerHello could downgrade later connections to classical key exchange), `rustls-webpki`, `webpki-roots`, `libp2p-gossipsub` 0.49.5, `tokio` 1.54.1, `zstd`, `cryptoki`, `ctutils`, `aws-lc-rs`. `cargo deny check` is green; the advisories with no fix on the libp2p 0.56 line are listed with their reachability in `deny.toml` and KNOWN-ISSUES R-17.

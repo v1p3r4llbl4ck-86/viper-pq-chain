@@ -21,7 +21,11 @@ env:
 jobs:
   binaries:
     name: linux x86_64 binaries
-    runs-on: ubuntu-latest
+    # The oldest supported hosted image, on purpose: the binaries link the
+    # glibc and libstdc++ of the build host, and ubuntu-latest's (glibc 2.38+)
+    # would not start on Ubuntu 22.04 or Debian 12. Built here they need
+    # glibc >= 2.35 (Ubuntu 22.04+, Debian 12+).
+    runs-on: ubuntu-22.04
     permissions:
       contents: read
       id-token: write   # keyless signing of the tarballs and SHA256SUMS
@@ -43,6 +47,12 @@ jobs:
             tar -C "$out" -czf "dist/${b}-${v}-linux-x86_64.tar.gz" "$b"
           done
           cp LICENSE.md NOTICE dist/
+          for b in pqcd viper-archival-sidecar; do
+            need=$(objdump -T "$out/$b" | grep -o 'GLIBC_[0-9.]*' | sort -uV | tail -1)
+            echo "$b needs $need"
+            # refuse a binary that the documented baseline cannot run
+            [ "$(printf '%s\nGLIBC_2.35\n' "$need" | sort -V | tail -1)" = "GLIBC_2.35" ] || { echo "$b requires $need > GLIBC_2.35" >&2; exit 1; }
+          done
           (cd dist && sha256sum *.tar.gz > SHA256SUMS)
       - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
       - name: sign SHA256SUMS and the tarballs (keyless, Sigstore)

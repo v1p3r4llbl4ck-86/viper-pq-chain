@@ -6,7 +6,7 @@
 nothing of value, and it may be reset (new chain id, new genesis) at any
 time — the join script handles a reset by moving the old data aside.
 
-**Fastest path (a `full` node on Linux x86_64, with [`cosign`](https://docs.sigstore.dev/cosign/system_config/installation/) installed — the script verifies the release signature before trusting any checksum):**
+**Fastest path (a `full` node on Linux x86_64 with glibc ≥ 2.35 — Ubuntu 22.04+, Debian 12+ — with [`cosign`](https://docs.sigstore.dev/cosign/system_config/installation/) installed — the script verifies the release signature before trusting any checksum):**
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/main/scripts/join-testnet.sh | bash
