@@ -10,6 +10,8 @@ KNOWN-ISSUES.md.
 
 ### Docs
 
+- Security: `libz-sys` 1.1.28 → 1.1.33 (RUSTSEC-2026-0418, build script leaked environment variables into the build directory; build time only) and `event-listener` 5.4.1 → 5.4.2 (RUSTSEC-2026-0221, unsound).
+
 - Docs: full consistency pass against viper-testnet-4 (GENESIS, RUNBOOK, openapi, SDK READMEs, docker/deploy READMEs, chart notes); `/v1/peers` documented; retired standalone status page `site/` removed; internal task ids dropped from newcomer docs.
 
 ### 0.2.5 — Docker recipe that works, fast catch-up (2026-11-16)
