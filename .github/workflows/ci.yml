@@ -16,18 +16,13 @@ permissions:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  # Build parallelism is the runner's business: the hosted runners use every
-  # core, the self-hosted ones carry CARGO_BUILD_JOBS in their environment.
 
-# Pull requests always run on GitHub-hosted runners (free for a public
-# repository, disposable): code from a fork never executes on the project's
-# machines. Pushes to main and manual runs can be routed to the self-hosted
-# runners (release/RUNNER.md in the private repository) by setting the
-# repository variable CI_RUNS_ON to a JSON label list such as ["viper-k3s"].
+# Every job runs on GitHub-hosted runners, fixed: no self-hosted runner is
+# reachable from this repository.
 jobs:
   lint:
     name: fmt, clippy, licences, links
-    runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master
@@ -35,7 +30,6 @@ jobs:
           toolchain: 1.92.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-        if: runner.environment == 'github-hosted'
       - run: cargo fmt --all -- --check
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
       - run: scripts/check-licenses.sh
@@ -43,7 +37,7 @@ jobs:
 
   deny:
     name: cargo deny (advisories, licences, bans, sources)
-    runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25 # v2
@@ -53,9 +47,8 @@ jobs:
 
   test:
     name: tests (all features)
-    runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
-    # 65 min on a 4-vCPU hosted runner; the k3s runner (2.5 CPU, 2 build jobs, cold cache) needs more:
-    # 102-106 min when the node is quiet, past 150 when it is busy (2026-09-11, twice).
+    runs-on: ubuntu-latest
+    # about 65 min on a 4-vCPU hosted runner.
     timeout-minutes: 240
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
@@ -63,7 +56,6 @@ jobs:
         with:
           toolchain: 1.92.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-        if: runner.environment == 'github-hosted'
       - name: unit and integration tests
         # The multi-node integration tests are timing-sensitive: one test thread,
         # and every deadline stretched ×3 on the 2-core hosted runners (TASK-239).
@@ -74,9 +66,8 @@ jobs:
 
   softhsm:
     name: pqc-hsm against SoftHSM
-    # softhsm2/opensc are baked into the k3s runner image; on GitHub-hosted runners
-    # (pull requests, or no CI_RUNS_ON) the job installs them with apt-get.
-    runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    # softhsm2/opensc are installed with apt-get.
+    runs-on: ubuntu-latest
     env:
       VIPER_HSM_TEST_MODULE: /usr/lib/softhsm/libsofthsm2.so
       VIPER_HSM_TEST_SLOT: "0"
@@ -88,14 +79,12 @@ jobs:
         with:
           toolchain: 1.92.0
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2
-        if: runner.environment == 'github-hosted'
       - run: sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends softhsm2 opensc
-        if: runner.environment == 'github-hosted'
       - run: cargo test -p pqc-hsm --features softhsm --no-fail-fast
 
   chart:
     name: helm lint and render
-    runs-on: ${{ github.event_name != 'pull_request' && vars.CI_RUNS_ON && fromJSON(vars.CI_RUNS_ON) || 'ubuntu-latest' }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: azure/setup-helm@1a275c3b69536ee54be43f2070a358922e12c8d4 # v4

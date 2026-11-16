@@ -2040,6 +2040,7 @@ async fn three_node_distributed_signing_converges() -> Result<()> {
             gossip_mesh_n_low: Some(1),
             gossip_mesh_n_high: Some(2),
             // TCP-only on loopback (QUIC + loopback is temperamental).
+            external_addrs: vec![],
             quic_enabled: Some(false),
             tcp_tls_fallback: Some(true),
             max_peers_per_asn: Some(8),
@@ -2290,6 +2291,7 @@ async fn three_node_distributed_signing_20x_determinism() -> Result<()> {
                 gossip_mesh_n: Some(2),
                 gossip_mesh_n_low: Some(1),
                 gossip_mesh_n_high: Some(2),
+                external_addrs: vec![],
                 quic_enabled: Some(false),
                 tcp_tls_fallback: Some(true),
                 max_peers_per_asn: Some(8),
@@ -2689,6 +2691,7 @@ async fn external_validator_registers_and_participates_in_quorum() -> Result<()>
             gossip_mesh_n: Some(3),
             gossip_mesh_n_low: Some(2),
             gossip_mesh_n_high: Some(3),
+            external_addrs: vec![],
             quic_enabled: Some(false),
             tcp_tls_fallback: Some(true),
             max_peers_per_asn: Some(8),

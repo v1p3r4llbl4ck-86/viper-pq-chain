@@ -288,7 +288,7 @@ The following are explicitly not success criteria for any testnet phase:
 | [SPEC-TX-001](transaction-envelope.md) | canonical encoding and validation pipeline tested in §3.1 and §3.4 |
 | [SPEC-ACCOUNT-001](account-keyset-registry.md) | key lifecycle criteria in §3.5 |
 | [SPEC-FEE-001](fee-model.md) | fee model criteria in §3.6 and §5.2 |
-| [SPEC-VAL-001](validator-staking.md) | consensus and partition criteria in §4.4; commit overhead data in §3.3 |
+| SPEC-VAL-001 | consensus and partition criteria in §4.4; commit overhead data in §3.3 |
 | [SPEC-OPS-001](operations.md) | trust workflow coverage in §5.4 |
 | [SPEC-GOV-001](governance-module.md) | crypto agility drill in §4.2 |
 | [TESTING.md](../TESTING.md) | benchmark reference data; update after Phase 2 actuals |

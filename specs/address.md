@@ -174,7 +174,7 @@ Transactions with `sender = TREASURY_ADDRESS` MUST be rejected at mempool admiss
 
 ### 4.3 Genesis Accounts
 
-Genesis accounts (founder, treasury, genesis validators, reserved pool per SPEC-TOKEN-002) use addresses derived by the standard procedure in §2 with `chain_id` set to the chain's own identifier (`b"viper-pq-1"` on the retired chain; the `viper-testnet-2` identifier is assigned at genesis). Their public keys, algorithm identifiers, and resulting addresses are pinned in the chain's genesis configuration file (historical example: `deploy/ansible/files/genesis-viper-pq-1.json`).
+Genesis accounts (genesis validators and operator service accounts, ADR-072) use addresses derived by the standard procedure in §2 with `chain_id` set to the chain's own identifier (`b"viper-pq-1"` on the retired chain; the `viper-testnet-2` identifier is assigned at genesis). Their public keys, algorithm identifiers, and resulting addresses are pinned in the chain's genesis configuration file (historical example: `deploy/ansible/files/genesis-viper-pq-1.json`).
 
 ---
 

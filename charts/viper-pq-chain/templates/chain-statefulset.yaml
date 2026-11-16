@@ -162,6 +162,9 @@ spec:
             - name: p2p
               containerPort: {{ default 26656 (and $merged.p2p $merged.p2p.port) | int }}
               protocol: TCP
+            - name: p2p-quic
+              containerPort: {{ default 26656 (and $merged.p2p $merged.p2p.port) | int }}
+              protocol: UDP
             - name: api
               containerPort: {{ default 26657 (and $merged.api $merged.api.port) | int }}
               protocol: TCP
@@ -224,11 +227,20 @@ spec:
         {{- end }}
       volumes:
         - name: config
+          {{- if and $merged.config $merged.config.secretRef }}
+          # node.json from a Secret: a validator's carries its signing seed.
+          secret:
+            secretName: {{ $merged.config.secretRef }}
+            items:
+              - key: node.json
+                path: node.json
+          {{- else }}
           configMap:
             name: {{ $configMapName }}
             items:
               - key: node.json
                 path: node.json
+          {{- end }}
         - name: genesis
           configMap:
             name: {{ $genesisCmName }}

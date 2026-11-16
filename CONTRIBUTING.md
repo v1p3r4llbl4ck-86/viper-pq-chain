@@ -2,6 +2,11 @@
 
 Thank you for looking at Viper PQ Chain closely enough to want to change it.
 
+> **This repository is a read-only mirror** of the author's development repository: pull
+> requests are not merged here. Please open an **issue** for a bug, a specification question,
+> a documentation error or a problem joining the test network; report vulnerabilities
+> privately ([SECURITY.md](SECURITY.md)). What follows is how changes are made upstream.
+
 ## Ground rules
 
 - **The specifications are the contract.** `specs/` is normative; code conforms to it. If code
@@ -10,8 +15,7 @@ Thank you for looking at Viper PQ Chain closely enough to want to change it.
 - **Decisions are written down.** Anything that changes consensus material, `state_root`,
   block encoding, the fee model, an algorithm's status or a public interface needs an entry
   in [DECISIONS.md](DECISIONS.md) (ADR) with the status vocabulary from
-  [CONVENTIONS.md](CONVENTIONS.md), and the mandatory updates listed in [AGENTS.md](AGENTS.md)
-  (CHANGELOG, TASKS, the affected spec).
+  [CONVENTIONS.md](CONVENTIONS.md), plus a CHANGELOG entry and an update of the affected spec.
 - **No resets, no forks of history.** Compatibility rules (Policy P-COMPAT-001, ADR-052)
   apply to every change that lands after `viper-testnet-2` genesis: activation heights,
   dual-path decoders, explicit migrations.
@@ -21,8 +25,7 @@ Thank you for looking at Viper PQ Chain closely enough to want to change it.
   a pull request you state that you have the right to contribute the change under that
   licence. Every new Rust file starts with the `// SPDX-License-Identifier:` line of its crate
   (`scripts/check-licenses.sh` checks it).
-- **Attribution.** Commits carry the name and e-mail of the person who wrote them; no
-  `Co-Authored-By` trailers. Public-facing prose is in English and free of hype.
+- Public-facing prose is in English and free of hype.
 
 ## Before you open a pull request
 
@@ -44,7 +47,7 @@ lints are the rule, not a suggestion.
 1. A short problem statement in the pull request: what is wrong or missing, how you noticed.
 2. The spec or ADR change, if the behaviour is specified.
 3. The code change, small enough to review in one sitting, with tests that fail without it.
-4. `CHANGELOG.md` entry under *Unreleased*; `TASKS.md` if the work was tracked.
+4. `CHANGELOG.md` entry under *Unreleased*.
 
 Pull requests that only touch documentation are welcome and follow the same path minus the
 cargo gates.

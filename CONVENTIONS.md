@@ -84,5 +84,5 @@ This is the locked stack (ADR-053), carried unchanged through the private chains
 
 - use conventional commit prefixes such as `docs:`, `feat:`, `fix:`, `refactor:`, and `chore:`
 - update [CHANGELOG.md](./CHANGELOG.md) for meaningful repository-level changes
-- update [TASKS.md](./TASKS.md) when a foundation item is completed or newly opened
+- update TASKS.md when a foundation item is completed or newly opened
 - do not collapse working assumptions into accepted facts without recording the change in [DECISIONS.md](./DECISIONS.md)

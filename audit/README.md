@@ -10,7 +10,7 @@ directory is the entry point for one.
 - Cryptographic conformance evidence: `tests/acvp/` (ACVP vectors) exercised by
   `crates/pqc-crypto/tests/acvp_conformance.rs`.
 - Accepted risks and known gaps: [KNOWN-ISSUES.md](../KNOWN-ISSUES.md).
-- Internal reports available on request: [reports/README.md](../reports/README.md).
+- Internal reports available on request: reports/README.md.
 - Disclosure and contact: [SECURITY.md](../SECURITY.md).
 
 The verification path (`pqc-crypto`, `pqc-types`, `pqc-tx`, `pqc-light-client`,

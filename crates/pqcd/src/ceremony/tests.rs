@@ -253,13 +253,23 @@ fn libp2p_wires_validator_multiaddr_into_sentry_and_full_bootstrap_peers() {
         "/dns4/alfa-viper-pq-chain-pqcd-validator-headless.beta.svc.cluster.local/tcp/26656/p2p/{expected_validator_peer_id}"
     );
 
+    let expected_quic_multiaddr =
+        expected_multiaddr.replacen("/tcp/26656/", "/udp/26656/quic-v1/", 1);
+
     // ADR-069 §4: sentries dial the validator; full / rpc / archive /
-    // bootnode dial the sentries (one multiaddr per sentry replica).
+    // bootnode dial the sentries. ADR-041: every peer appears twice, QUIC
+    // (primary) first, then its TCP/TLS fallback.
     let expected_sentry_multiaddrs: Vec<String> = (0..2)
-        .map(|i| {
+        .flat_map(|i| {
             let pod = format!("alfa-viper-pq-chain-pqcd-sentry-{i}");
             let pid = crate::p2p::deterministic_peer_id(&pod, Some(&salt_of("sentry")));
-            format!("/dns4/{pod}.alfa-viper-pq-chain-pqcd-sentry-headless.beta.svc.cluster.local/tcp/26656/p2p/{pid}")
+            let host = format!(
+                "/dns4/{pod}.alfa-viper-pq-chain-pqcd-sentry-headless.beta.svc.cluster.local"
+            );
+            [
+                format!("{host}/udp/26656/quic-v1/p2p/{pid}"),
+                format!("{host}/tcp/26656/p2p/{pid}"),
+            ]
         })
         .collect();
     for role in ["full", "rpc", "archive", "bootnode"] {
@@ -299,13 +309,23 @@ fn libp2p_wires_validator_multiaddr_into_sentry_and_full_bootstrap_peers() {
             .unwrap_or_else(|| panic!("{role}: bootstrap_peers must be array"));
         assert_eq!(
             bootstrap.len(),
-            1,
-            "{role}: exactly one bootstrap peer (the validator)"
+            2,
+            "{role}: the validator, over QUIC and over TCP"
         );
         assert_eq!(
             bootstrap[0].as_str(),
+            Some(expected_quic_multiaddr.as_str()),
+            "{role}: QUIC first; binds release-name + namespace + PeerId"
+        );
+        assert_eq!(
+            bootstrap[1].as_str(),
             Some(expected_multiaddr.as_str()),
-            "{role}: bootstrap multiaddr binds release-name + namespace + PeerId"
+            "{role}: TCP/TLS fallback second"
+        );
+        assert_eq!(
+            parsed["libp2p"]["quic_enabled"].as_bool(),
+            Some(true),
+            "{role}: QUIC on"
         );
     }
     // sentry uses vfn_listen, full uses public_listen, validator uses
@@ -478,4 +498,46 @@ fn a_service_account_with_a_malformed_public_key_is_rejected() {
     };
     let err = generate_ceremony_values(&cfg).unwrap_err().to_string();
     assert!(err.contains("broken"), "{err}");
+}
+
+/// A validator's signing seed reaches the validator role only. Every other
+/// role's node.json is a ConfigMap (or a config handed to the public) and
+/// verifies commits with the public keys alone.
+#[test]
+fn only_the_validator_node_json_carries_signing_seeds() {
+    let cfg = CeremonyConfig {
+        chain_id: "viper-seed-scope-test".into(),
+        validators: 2,
+        block_time_ms: 500,
+        genesis_balance: 1_000_000_000,
+        image_repository: "ghcr.io/v1p3r4llbl4ck-86".into(),
+        image_tag: "main".into(),
+        release_name: "alfa".into(),
+        namespace: "beta".into(),
+        deploy_token: None,
+        service_accounts: vec![],
+    };
+    let (values, _, _) = generate_ceremony_values(&cfg).unwrap();
+    for role in ["sentry", "full", "rpc", "archive", "bootnode"] {
+        let node_json = values["chainNode"][role]["config"]["nodeJson"]
+            .as_str()
+            .unwrap_or_else(|| panic!("{role}: nodeJson"));
+        assert!(
+            !node_json.contains("commit_seed_hex"),
+            "{role}: node.json must not carry a validator seed"
+        );
+        let parsed: serde_json::Value = serde_json::from_str(node_json).unwrap();
+        assert_eq!(
+            parsed["devnet"]["validators"].as_array().unwrap().len(),
+            2,
+            "{role}: still lists every validator (public keys)"
+        );
+    }
+    let validator = values["chainNode"]["validator"]["config"]["nodeJson"]
+        .as_str()
+        .unwrap();
+    assert!(
+        validator.contains("commit_seed_hex"),
+        "the validator keeps its seeds"
+    );
 }

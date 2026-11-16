@@ -1,10 +1,37 @@
-# Node and Validator Onboarding — `viper-testnet-2`
+# Node and Validator Onboarding — `viper-testnet-3`
 
 **Audience.** Operators who want to run a node of the public chain
-`viper-testnet-2`, and operators who want to be admitted as validators.
-**Status.** Accepted for the public release. `viper-testnet-2` is created
-after the release with `pqcd ceremony`; the endpoints named below are
-published with the genesis and are not live until then.
+`viper-testnet-3`, and operators who want to be admitted as validators.
+**Status.** Live. `viper-testnet-3` is a **test network**: no token,
+nothing of value, and it may be reset (new chain id, new genesis) at any
+time — the join script handles a reset by moving the old data aside.
+
+**Fastest path (a `full` node on Linux x86_64, with [`cosign`](https://docs.sigstore.dev/cosign/system_config/installation/) installed — the script verifies the release signature before trusting any checksum):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/main/scripts/join-testnet.sh | bash
+# or, as root, as a systemd service:
+curl -fsSL https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/main/scripts/join-testnet.sh | sudo bash -s -- --systemd
+```
+
+**Container** (the image's entrypoint is `pqcd`):
+
+```bash
+mkdir -p ~/viper && cd ~/viper
+curl -fsSLO https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/main/genesis/viper-testnet-3/full.json
+sed -i "s/\"node_id\": \"[^\"]*\"/\"node_id\": \"full-$(hostname -s)-$RANDOM\"/" full.json
+# per-node libp2p salt (what `pqcd wallet libp2p-init` does on a host install)
+sed -i "s/\"role\": \"full\",/\"role\": \"full\", \"libp2p_seed_salt_hex\": \"$(openssl rand -hex 32)\",/" full.json
+IMG=ghcr.io/v1p3r4llbl4ck-86/pqcd:latest
+docker run -d --name viper-testnet --restart unless-stopped \
+  -p 26656:26656/udp -p 26656:26656/tcp -p 127.0.0.1:26657:26657 \
+  -v "$PWD/full.json:/etc/pqchain/node.json:ro" -v viper-data:/var/lib/pqchain/data \
+  $IMG devnet-serve /etc/pqchain/node.json
+curl -s http://127.0.0.1:26657/v1/status
+```
+
+The rest of this guide is the manual path and the validator path.
+
 **Companion documents.** `docs/operators/RUNBOOK.md` (day-two
 operations), `docs/observability.md` (logs, metrics, audit log),
 `configs/README.md` (config field reference), `specs/consensus.md` and
@@ -15,7 +42,7 @@ operations), `docs/observability.md` (logs, metrics, audit log),
 
 ## 1. Who can run what
 
-`viper-testnet-2` is a proof-of-authority network with **no native
+`viper-testnet-3` is a proof-of-authority network with **no native
 token**: nothing is staked, nothing is earned, nothing is bought. The
 `token_economics` feature is compiled out of the public binary and its
 specifications are `Reserved`.
@@ -45,8 +72,9 @@ never written; do not use them in new configs.
   source; otherwise the published container image. The node crates are
   source-available under BUSL-1.1; running a node of a Viper PQ Chain
   network is within the Additional Use Grant (see `LICENSE.md`).
-- **Ports**: `26656/tcp` P2P (libp2p; QUIC is optional and off in the
-  reference configs) and `26657/tcp` HTTP API. Open `26656` to the
+- **Ports**: `26656/udp` P2P over **QUIC** (the primary transport, on
+  by default) and `26656/tcp` P2P over TCP/TLS 1.3 (the fallback), plus
+  `26657/tcp` HTTP API. Open `26656` udp+tcp to the
   internet on `full`, `rpc`, `archive`, `bootnode`; open `26657` only on
   nodes that are meant to serve the public API (`full`, `rpc`,
   `archive`). A validator binds its API to `127.0.0.1` and its P2P
@@ -78,8 +106,8 @@ pqcd version
    `crates/pqcd/src/node/tests.rs::configs_roles_examples_match_their_role`
    keeps them consistent with the binary.
 2. **Fill the chain constants from the published genesis.** The genesis
-   publication for `viper-testnet-2` gives you `chain_id_hex`
-   (`76697065722d746573746e65742d31`, the hex of the ASCII chain id),
+   publication for `viper-testnet-3` gives you `chain_id_hex`
+   (`76697065722d746573746e65742d33`, the hex of the ASCII chain id),
    `anchor_prev_hash_hex`, `fee_params`, `devnet.block_time_ms`,
    `devnet.epoch_duration`, `devnet.unbonding_period` and the
    `devnet.validators[]` list (the genesis validator set: `node_id`,
@@ -104,9 +132,16 @@ pqcd version
 
    ```json
    "bootstrap_peers": [
-     "/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/<bootnode PeerId>"
+     "/dns4/boot1.pqchain.agwswebconsulting.it/udp/26656/quic-v1/p2p/12D3KooWS2a6495jsyZ91izS5zbEgXv9oE52TUst4L3QhpVN9pxb",
+     "/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWS2a6495jsyZ91izS5zbEgXv9oE52TUst4L3QhpVN9pxb"
    ]
    ```
+
+   QUIC first, TCP second: libp2p tries them in order, so a network that
+   drops UDP still gets in over TCP. If your node is reachable from the
+   internet, also set `libp2p.external_addrs` to your public multiaddrs
+   (e.g. `/ip4/<your IP>/udp/26656/quic-v1`) so peers learn an address
+   they can dial back.
 
    The bootnode's PeerId is part of the genesis publication. Add other
    operators' `rpc`/`full` nodes as you learn them (the P2P layer wants
@@ -135,7 +170,7 @@ this key.
 mkdir -p /etc/pqchain && chmod 0750 /etc/pqchain
 VIPER_PASSPHRASE='<strong passphrase>' \
   pqcd wallet create --alg ml-dsa-65 \
-    --chain-id 76697065722d746573746e65742d31 \
+    --chain-id 76697065722d746573746e65742d33 \
     --output /etc/pqchain/operator-keystore.json
 pqcd wallet address    /etc/pqchain/operator-keystore.json   # hex + bech32m (vpt1… on testnets)
 pqcd wallet public-key /etc/pqchain/operator-keystore.json
@@ -189,8 +224,8 @@ controlled deployments.
 You can also seed the store by hand from a snapshot you trust:
 
 ```bash
-pqcd snapshot-export /etc/pqchain/node.json /var/tmp/viper-testnet-2.snap   # on a synced node
-pqcd snapshot-import /etc/pqchain/node.json /var/tmp/viper-testnet-2.snap   # on the new node, stopped
+pqcd snapshot-export /etc/pqchain/node.json /var/tmp/viper-testnet-3.snap   # on a synced node
+pqcd snapshot-import /etc/pqchain/node.json /var/tmp/viper-testnet-3.snap   # on the new node, stopped
 ```
 
 Importing means trusting the snapshot source. Before recovery the node

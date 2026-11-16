@@ -852,9 +852,9 @@ paths:
                 $ref: "#/components/schemas/CredentialIssueResponse"
               example:
                 status: "accepted"
-                credential_id: "e3b0c44298fc1c149afbf4c8996fb924..."
+                credential_id: "<credential id: 64 hex characters>"
                 msg_type: "attestation_create"
-                verify_url: "/api/credentials/e3b0c44298fc1c149afbf4c8996fb924..."
+                verify_url: "/api/credentials/<credential id>"
         "400":
           description: Invalid input
           content:

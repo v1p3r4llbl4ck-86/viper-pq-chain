@@ -15,11 +15,10 @@ image:
   repository: v1p3r4llbl4ck-86
   pullPolicy: IfNotPresent
   pullSecrets: []
-  # Tag for each binary (pqcd / viper-notary / viper-archival-sidecar).
+  # Tag for each binary (pqcd / viper-archival-sidecar).
   # Empty = use Chart.appVersion.
   tags:
     pqcd: ""
-    notary: ""
     archivalSidecar: ""
 
 # ============================================================================
@@ -134,7 +133,7 @@ chainNode:
     identitySalts:
       secretName: ""
     # Logging: tracing-subscriber RUST_LOG filter.
-    rustLog: "viper_notary=info,pqcd=info,tower_http=warn"
+    rustLog: "pqcd=info,tower_http=warn"
     # Storage class is applied to PersistentVolumeClaim.
     # leave empty to use cluster default.
     persistence:
@@ -177,6 +176,15 @@ chainNode:
     p2p:
       bindAddress: "0.0.0.0"
       port: 26656
+    # p2p.expose: put sentry-0 on the Internet as a public seed (QUIC/UDP +
+    # TCP/TLS on the same port). Pair it with `config.nodeJson` /
+    # `libp2p.external_addrs` so the node advertises its public address.
+    #   p2p:
+    #     expose:
+    #       enabled: true
+    #       type: LoadBalancer            # ServiceLB on k3s; NodePort works too
+    #       externalTrafficPolicy: Local
+    #       port: 26656
     validatorPeer:
       # If validator role is enabled in the same release, sentries auto-discover.
       # Override here for cross-release / external validators.
@@ -259,226 +267,6 @@ chainNode:
       secretName: ""
 
 # ============================================================================
-# Notary backend (viper-notary)
-# ----------------------------------------------------------------------------
-# Stateless Deployment that wraps the chain's attestation_create primitive
-# behind ADR-055 + QEAA HTTP services.
-# ============================================================================
-notary:
-  # The notary service is a separate, private product; the chart can deploy it
-  # when its image and Secrets are available. Off by default in the public chart.
-  enabled: false
-  # Sprint 5.1: tenant store is now Postgres-backed, so replicas can
-  # safely scale beyond 1. Default 2 for cheap HA; bump for traffic.
-  replicas: 2
-  config:
-    # nodeUrl: pqcd API endpoint. If empty, auto-resolves to the first enabled
-    #          chain role's headless service in this release.
-    nodeUrl: ""
-    # chainId: empty = inherit from chain.id at the top of values.
-    chainId: ""
-    listenAddr: "0.0.0.0:3000"
-    listenPort: 3000
-    finalizationTimeoutMs: 30000
-    publicBaseUrl: ""
-    corsOrigin: "*"
-    evidenceDisabled: false
-  serviceAccountKey:
-    # Secret with key `service_account_seed` (32 bytes hex).
-    secretName: ""
-  # Sprint 1: admin sub-router bearer token. Operator MUST pre-create
-  # the Secret (with key `admin_token`) before installing — otherwise
-  # the admin endpoints stay disabled (404). Generation idiom:
-  #   kubectl create secret generic notary-admin-token \
-  #       --from-literal=admin_token="$(openssl rand -hex 32)"
-  adminToken:
-    secretName: ""
-  # Sprint 4.2: Prometheus /metrics bearer token. Independent from the
-  # admin token so a Prometheus operator can hold metrics access
-  # without holding tenant CRUD. When unset, /metrics returns 404.
-  # Generation idiom:
-  #   kubectl create secret generic notary-metrics-token \
-  #       --from-literal=metrics_token="$(openssl rand -hex 32)"
-  metricsToken:
-    secretName: ""
-  # Sprint 5.1: Postgres connection. Operator pre-creates a Secret
-  # holding NOTARY_TENANT_DB_URL pointed at a Postgres cluster
-  # (managed RDS / Cloud SQL / sidecar StatefulSet — anything that
-  # speaks vanilla Postgres ≥ 14). Required: the chart fails the
-  # deployment validation if unset.
-  #   kubectl create secret generic notary-tenant-db \
-  #       --from-literal=url="postgres://notary:pw@pg:5432/notary"
-  tenantDb:
-    secretName: ""
-    # Key inside the Secret holding the connection URL.
-    secretKey: "url"
-  # Sprint 5.9: audit-log + webhook-deliveries retention pruning.
-  # `days: 0` (default) disables pruning entirely; flip to a positive
-  # number when you need automatic GDPR-style hygiene. The pruner
-  # task wakes every `intervalSecs`; one DELETE per table per pass.
-  retention:
-    days: 0
-    intervalSecs: 86400
-  # Sprint 5.3: Stripe billing — opt-in. When `secretName` is unset,
-  # every Stripe path returns 503 and the background reporter is a
-  # no-op. Same Secret can hold both keys (recommended) or you can
-  # split if you want different IAM scopes per key.
-  #   kubectl create secret generic notary-stripe \
-  #       --from-literal=secret_key=sk_test_… \
-  #       --from-literal=webhook_secret=whsec_…
-  stripe:
-    secretName: ""
-    secretKeyKey: "secret_key"     # → STRIPE_SECRET_KEY
-    webhookSecretKey: "webhook_secret"  # → STRIPE_WEBHOOK_SECRET
-    # Reporter cadence. 1 h is fine until you cross ~10 K customers
-    # (Stripe Usage Records API has a per-item monthly cap).
-    reportIntervalSecs: 3600
-  # Sprint 5.10: transactional emails (welcome / api-key minted /
-  # suspended). When `secretName` is unset the SMTP transport is
-  # disabled and every send_* helper is a no-op. Operator pre-creates
-  # the Secret carrying the SASL credentials (key names below):
-  #   kubectl create secret generic notary-smtp \
-  #       --from-literal=user="apikey" \
-  #       --from-literal=password="$SMTP_PASSWORD"
-  # Host / port / from are non-secret values (kept in this file).
-  smtp:
-    secretName: ""        # Unset → emails disabled (no-op send_* helpers)
-    userKey: "user"       # Key inside the Secret holding NOTARY_SMTP_USER
-    passwordKey: "password" # → NOTARY_SMTP_PASSWORD
-    host: ""              # → NOTARY_SMTP_HOST (empty also disables)
-    port: 587             # → NOTARY_SMTP_PORT (STARTTLS default)
-    from: "notary@localhost" # → NOTARY_SMTP_FROM (RFC 5322 mailbox)
-  # Sprint 5.11: OpenTelemetry OTLP gRPC export. When `endpoint` is
-  # empty the OTel layer is skipped — only the existing `tracing::fmt`
-  # subscriber runs (no extra cost). Operator points it at a collector
-  # (Tempo, Jaeger, OTel Collector daemon-set) and dashboards pick up
-  # the spans tagged service.name="viper-notary".
-  otel:
-    endpoint: ""          # → NOTARY_OTEL_ENDPOINT (e.g. http://otel-collector:4317)
-  podSecurityContext:
-    runAsNonRoot: true
-    runAsUser: 10002
-    runAsGroup: 10002
-    fsGroup: 10002
-    seccompProfile:
-      type: RuntimeDefault
-  securityContext:
-    allowPrivilegeEscalation: false
-    readOnlyRootFilesystem: true
-    capabilities:
-      drop: [ALL]
-  resources:
-    requests: { cpu: "100m", memory: "256Mi" }
-    limits:   { cpu: "1",    memory: "1Gi"   }
-  # Sprint 5.16 — extra env vars passed straight to the notary
-  # container. Useful for the gates that don't have a dedicated
-  # chart value:
-  #   NOTARY_SIGNUP_INVITE_CODE
-  #   NOTARY_ADMIN_IP_ALLOWLIST
-  #   NOTARY_ALERT_WEBHOOK_URL
-  #   NOTARY_AUDIT_RETENTION_DAYS / NOTARY_RETENTION_INTERVAL_SECS (alt
-  #     to the dedicated notary.retention block)
-  # Format mirrors the k8s container env array — `value:` for plain
-  # strings, `valueFrom:` for secretKeyRef / configMapKeyRef.
-  extraEnv: []
-  # Example:
-  # extraEnv:
-  #   - name: NOTARY_SIGNUP_INVITE_CODE
-  #     valueFrom:
-  #       secretKeyRef:
-  #         name: notary-signup
-  #         key: invite_code
-  #   - name: NOTARY_ADMIN_IP_ALLOWLIST
-  #     value: "10.0.0.0/24,192.168.1.5"
-  # Sprint 5.16 — readiness probe path override. Default `/readyz`
-  # gates traffic on tenant DB + chain reachability; override to
-  # `/health` when running notary-only against an external pqcd that
-  # may not be reachable at chart-install time (so `helm install
-  # --wait` doesn't time out before chain comes up).
-  readinessProbe:
-    path: /readyz
-    periodSeconds: 10
-    failureThreshold: 3
-    timeoutSeconds: 5
-  # 2026-08-25 — the evidence-chain index (`NOTARY_EVIDENCE_DB_PATH`, the
-  # stream heads that `POST /api/evidence` chains against) lives on disk.
-  # Off: it sits on the pod's emptyDir and a restart loses the heads (the
-  # chain receipts themselves survive). On: one PersistentVolumeClaim is
-  # mounted at `path`, the index is written under it, and the Deployment
-  # switches to the Recreate strategy (the claim is ReadWriteOnce). Meant
-  # for `replicas: 1` — the index is a per-process file, not a shared store.
-  persistence:
-    enabled: false
-    size: 1Gi
-    storageClass: ""     # empty = the cluster default
-    path: /var/lib/pqchain
-  service:
-    type: ClusterIP
-    port: 3000
-  ingress:
-    enabled: false
-    className: nginx
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
-    host: notary.example.com
-    # Each entry: { path, pathType, backend? }. `backend` is one of
-    # "notary" (default, axum API) or "frontend" (the static SPA).
-    # Default list below preserves the API surface AND lights up the
-    # SPA at "/" — without this, "/" returned 404 because the axum
-    # backend doesn't serve a landing page.
-    paths:
-      - { path: /api,         pathType: Prefix, backend: notary   }
-      - { path: /health,      pathType: Prefix, backend: notary   }
-      - { path: /v1,          pathType: Prefix, backend: notary   }
-      - { path: /timestamp,   pathType: Prefix, backend: notary   }
-      - { path: /evidence,    pathType: Prefix, backend: notary   }
-      - { path: /attestation, pathType: Prefix, backend: notary   }
-      - { path: /notary,      pathType: Prefix, backend: notary   }
-      - { path: /,            pathType: Prefix, backend: frontend }
-    tls:
-      enabled: true
-      secretName: notary-tls
-  podDisruptionBudget:
-    enabled: true
-    minAvailable: 1
-  autoscaling:
-    enabled: false
-    minReplicas: 2
-    maxReplicas: 6
-    targetCPUUtilizationPercentage: 70
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-
-# ============================================================================
-# Notary frontend (static SPA served by nginx)
-# ----------------------------------------------------------------------------
-# Renders the React/Babel-standalone bundle shipped under
-# `files/frontend/` as a ConfigMap mounted into an nginx:alpine
-# Deployment. Required for `https://<host>/` to return the landing
-# page — the notary axum backend itself does not serve a UI.
-# Disable only if you expose a different frontend (e.g. an external
-# CDN bucket); in that case set `frontend.enabled: false` AND drop
-# the `backend: frontend` entry from `notary.ingress.paths`.
-# ============================================================================
-frontend:
-  enabled: true
-  replicas: 2
-  image:
-    repository: nginx
-    tag: 1.27-alpine
-    pullPolicy: IfNotPresent
-  service:
-    type: ClusterIP
-    port: 80
-  resources:
-    requests: { cpu: "20m",  memory: "32Mi"  }
-    limits:   { cpu: "200m", memory: "128Mi" }
-  nodeSelector: {}
-  tolerations: []
-  affinity: {}
-
-# ============================================================================
 # NetworkPolicy — three-network segregation (validator / sentry / public)
 # ============================================================================
 networkPolicy:
@@ -528,3 +316,7 @@ tests:
   image:
     repository: curlimages/curl
     tag: 8.10.0
+
+# Extra Kubernetes objects rendered as-is (e.g. the ExternalSecret that
+# provides a validator's node.json for `chainNode.validator.config.secretRef`).
+extraObjects: []

@@ -90,12 +90,12 @@ ARG BUILD_DATE
 ARG VERSION
 LABEL org.opencontainers.image.title="pqcd" \
       org.opencontainers.image.description="Viper PQ Chain node binary — post-quantum L1, FIPS 203/204/205 baseline" \
-      org.opencontainers.image.url="https://pqchain.agwswebconsulting.it" \
+      org.opencontainers.image.url="https://github.com/v1p3r4llbl4ck-86/viper-pq-chain" \
       org.opencontainers.image.source="https://github.com/v1p3r4llbl4ck-86/viper-pq-chain" \
       org.opencontainers.image.documentation="https://github.com/v1p3r4llbl4ck-86/viper-pq-chain/blob/main/docs/operators/RUNBOOK.md" \
       org.opencontainers.image.licenses="Apache-2.0" \
       org.opencontainers.image.vendor="Alberto Galassi" \
-      org.opencontainers.image.authors="Alberto Galassi <agalassi@agwswebconsulting.it>" \
+      org.opencontainers.image.authors="Alberto Galassi <279985960+v1p3r4llbl4ck-86@users.noreply.github.com>" \
       org.opencontainers.image.revision="${VCS_REF}" \
       org.opencontainers.image.created="${BUILD_DATE}" \
       org.opencontainers.image.version="${VERSION}"

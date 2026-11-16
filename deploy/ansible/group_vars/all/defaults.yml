@@ -78,11 +78,10 @@ viper_libp2p_common:
   gossip_mesh_n:      2
   gossip_mesh_n_low:  1
   gossip_mesh_n_high: 3
-  # QUIC is the ADR-041 primary transport but the current
-  # `listen_addr_for_role` only emits a TCP multiaddr, so we flip QUIC
-  # off until M1b extends the listener to a UDP/quic-v1 address.
-  # Firewall role still opens UDP 26656/26666/26676 for a trivial flip.
-  quic_enabled:       false
+  # QUIC is the ADR-041 primary transport: the node listens on
+  # /udp/<port>/quic-v1 and, with tcp_tls_fallback, on /tcp/<port> too.
+  # The firewall role opens UDP and TCP on 26656/26666/26676.
+  quic_enabled:       true
   tcp_tls_fallback:   true
   max_peers_per_asn:  3
   # Empty allow-list: the ValidatorPeerId binding check stays OPT-IN

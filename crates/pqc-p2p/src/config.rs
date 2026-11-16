@@ -27,6 +27,12 @@ pub struct P2pConfig {
     pub public_listen: Option<SocketAddr>,
     /// Bootstrap peers (multiaddr format). Minimum 8, maximum 16, on diverse operators.
     pub bootstrap_peers: Vec<String>,
+    /// Publicly reachable addresses this node advertises to its peers
+    /// (multiaddr format, e.g. `/dns4/boot1.example.org/udp/26656/quic-v1`).
+    /// A node behind NAT or in a Kubernetes pod only knows its private
+    /// listen address; without this list Identify and Kademlia would gossip
+    /// an address nobody outside can dial. Empty = advertise nothing extra.
+    pub external_addrs: Vec<String>,
     /// GossipSub mesh size (D parameter). Default 6.
     pub gossip_mesh_n: usize,
     /// GossipSub D_low. Default 4.
@@ -59,6 +65,7 @@ impl P2pConfig {
             vfn_listen: Some("0.0.0.0:26666".parse().unwrap()),
             public_listen: Some("0.0.0.0:26676".parse().unwrap()),
             bootstrap_peers: vec![],
+            external_addrs: vec![],
             gossip_mesh_n: 6,
             gossip_mesh_n_low: 4,
             gossip_mesh_n_high: 12,

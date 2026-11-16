@@ -60,7 +60,7 @@ is no cross-chain replay surface.
 # 0. Cluster
 kind create cluster --name viper-test
 
-# 1. Install with chart defaults (sentry + full + notary, no validator)
+# 1. Install with chart defaults (sentry + full, no validator)
 helm install viper-test ./charts/viper-pq-chain \
     --namespace viper \
     --create-namespace
@@ -87,7 +87,6 @@ network policy, and storage profile.
 | `full` | ✅ | Validates everything, doesn't sign. | public P2P + read API | `full` / `public_listen` | the sentries |
 | `rpc` | ❌ | Read-only API server, HPA-friendly. | public read API only | `rpc` / `public_listen` | the sentries |
 | `archive` | ❌ | Full + `viper-archival-sidecar` (RFC 3161); keeps the whole history. | public + TSA outbound | `archive` / `public_listen` | the sentries |
-| `notary` | ❌ | `viper-notary` Deployment — a separate, private product; deployable when its image and Secrets are available. | public HTTP | — | — |
 | `bootnode` | ❌ | DNS-stable seed peer. | public P2P only | `bootnode` / `public_listen` | the sentries |
 
 Every role can carry an identity Secret (`chainNode.<role>.identitySalts.secretName`, keys
@@ -102,10 +101,10 @@ the ceremony carry `_release_name` / `_namespace`; the chart refuses to render t
 because the bootstrap multiaddrs embed both.
 
 The default install (no values override) gives you:
-**1 sentry × 2 replicas + 1 full + 1 notary × 2 replicas** — sufficient to
+**1 sentry × 2 replicas + 1 full** — sufficient to
 demonstrate end-to-end without touching consensus signing.
 
-## Production install (validator + 2 sentries + 1 full + notary)
+## Production install (validator + 2 sentries + 1 full)
 
 ```yaml
 # values-prod.yaml
@@ -130,201 +129,3 @@ chainNode:
       enabled: true
       type: ClusterIP
 
-notary:
-  enabled: true
-  replicas: 2
-  ingress:
-    enabled: true
-    host: notary.eidas-pilot.example.it
-    annotations:
-      cert-manager.io/cluster-issuer: letsencrypt-prod
-```
-
-```bash
-helm install viper ./charts/viper-pq-chain \
-    --namespace viper-pilot \
-    --create-namespace \
-    -f values-prod.yaml
-```
-
-## Secrets
-
-The chart **does NOT include secret material**. Three integration patterns
-are supported via `secrets.provider`:
-
-### `manual` (default)
-
-Pre-create Kubernetes Secrets and reference them:
-
-```bash
-kubectl create secret generic viper-validator-1-consensus \
-    --namespace viper-pilot \
-    --from-literal=consensus_seed=$(openssl rand -hex 32)
-```
-
-```yaml
-chainNode.validator.consensusKey.secretName: viper-validator-1-consensus
-```
-
-### `externalSecrets` (recommended for k8s-native setups)
-
-Use the [external-secrets.io](https://external-secrets.io/) operator with
-your secret backend (Vault / AWS Secrets Manager / Azure Key Vault):
-
-```yaml
-secrets:
-  provider: externalSecrets
-  externalSecrets:
-    storeRef:
-      kind: ClusterSecretStore
-      name: vault-backend
-```
-
-(External Secrets / Sealed Secrets templates land in chart **Phase D**.)
-
-### `sealedSecrets` (Bitnami sealed-secrets)
-
-For GitOps workflows where secrets are encrypted at rest in git:
-
-```yaml
-secrets:
-  provider: sealedSecrets
-  sealedSecrets:
-    cluster: production
-```
-
-## Genesis
-
-Provide ONE of:
-
-```yaml
-chain:
-  genesis:
-    inline: |
-      {
-        "chain_id": "viper-pq-eidas-pilot",
-        "validators": [...]
-      }
-```
-
-OR
-
-```yaml
-chain:
-  genesis:
-    configMapRef: viper-pilot-genesis
-```
-
-If neither is set, the chart renders a placeholder genesis suitable only for
-smoke testing. **A real network requires a properly-prepared genesis** —
-see `docs/operators/RUNBOOK.md` §12 and `specs/genesis-spec.md`.
-
-## Storage
-
-Each chain-node role mounts a `PersistentVolumeClaim` for `/var/lib/pqchain`
-(RocksDB store). Default 50 GiB; override per role:
-
-```yaml
-chainNode:
-  archive:
-    enabled: true
-    storage:
-      size: 1Ti
-      storageClass: cold-archive
-```
-
-**StatefulSet PVCs are NOT deleted on `helm uninstall`** by design (chain
-state survives release rollback). Manual cleanup:
-
-```bash
-kubectl delete pvc -n viper-pilot -l app.kubernetes.io/instance=viper
-```
-
-## Networking
-
-By default each role gets:
-- A **headless** Service (`<release>-pqcd-<role>-headless`) — stable DNS
-  for P2P (`<ordinal>.<role>-headless.<ns>.svc.cluster.local`).
-- A **ClusterIP** Service (`<release>-pqcd-<role>`) — only if
-  `<role>.publicService.enabled = true`. Validators NEVER expose this.
-
-NetworkPolicy enforcement (default `networkPolicy.enabled: true`) — lands
-in chart **Phase C**. For now the role separation is logical (labels +
-DNS); consortium production deploy MUST add NetworkPolicy before going
-live.
-
-## Notary backend
-
-The viper-notary backend wraps the chain's `attestation_create` primitive
-behind ADR-055 + QEAA HTTP services. It auto-discovers the chain RPC
-endpoint by selecting the first enabled chain-node role's headless service
-in the same release; override with:
-
-```yaml
-notary:
-  config:
-    nodeUrl: http://my-external-rpc:26657
-```
-
-The evidence-chain index (`POST /api/evidence` stream heads) is a file: with
-`notary.persistence.enabled: true` it lives on a PersistentVolumeClaim mounted at
-`notary.persistence.path` (Deployment strategy `Recreate`, `replicas: 1`); off, it sits on the
-pod's emptyDir and a restart loses the heads.
-
-API surface (when notary is enabled):
-
-| Endpoint | Purpose |
-|---|---|
-| `POST /api/notarize` | Generic document anchoring |
-| `POST /api/timestamp` | RFC 3161-style PQ timestamping (ADR-055) |
-| `POST /api/evidence` | Append-only evidence chain (ADR-055) |
-| `POST /api/release/sign` | Code-release attestation (ADR-055) |
-| `POST /api/qeaa/issue` | eIDAS 2.0 QEAA emission (W3C VC + SD-JWT VC) |
-| `GET /api/qeaa/verify/:id` | QEAA verification by anchor id |
-| `POST /api/qeaa/verify` | Full SD-JWT VC verification |
-| `GET /.well-known/openid-credential-issuer` | OpenID4VCI metadata |
-
-## Helm test
-
-```bash
-helm test <release> -n <namespace>
-```
-
-The test pod (curlimages/curl) hits:
-1. The chain's `/v1/status` (via the first enabled role's headless service)
-2. The notary's `/health`
-3. The notary's `/api/qeaa/issuers` (must return 3 demo issuers)
-
-## Values reference
-
-See [`values.yaml`](values.yaml) — every key has an inline comment.
-
-Key sections:
-- `image.*` — registry + tag overrides
-- `chain.*` — chain-id, genesis, block time
-- `chainNode.<role>.*` — per-role enablement, replicas, storage, resources
-- `chainNode.common.*` — defaults merged into every role
-- `notary.*` — notary deploy + ingress
-- `secrets.provider` — manual / externalSecrets / sealedSecrets
-- `monitoring.*` — Prometheus Operator integration (Phase C)
-- `networkPolicy.*` — three-network segregation (Phase C)
-
-## Roadmap (chart phases — see git history)
-
-| Phase | Status | Scope |
-|---|:-:|---|
-| **A** | ✅ | Multi-arch OCI images, GitLab CI build/sign/scan/SBOM |
-| **B** | ✅ | Chart skeleton, role-based StatefulSets, notary Deployment, helm test |
-| **C** | ⏳ | NetworkPolicy three-network, PSP, anti-affinity hard, ServiceMonitor, PrometheusRule |
-| **D** | ⏳ | externalSecrets / sealedSecrets templates, backup CronJob, validator key rotation procedure |
-| **E** | ⏳ | helm lint + chart-testing CI, package + push to GitLab Helm registry |
-
-## Project links
-
-- Live chain status: https://pqchain.agwswebconsulting.it
-- Source: https://github.com/v1p3r4llbl4ck-86/viper-pq-chain
-- Author: Alberto Galassi <agalassi@agwswebconsulting.it>
-
-## License
-
-Apache-2.0

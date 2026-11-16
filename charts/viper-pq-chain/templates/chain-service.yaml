@@ -30,11 +30,53 @@ spec:
       port: {{ default 26656 (and $merged.p2p $merged.p2p.port) | int }}
       protocol: TCP
       targetPort: p2p
+    # QUIC (ADR-041 primary transport) on the same port number, over UDP.
+    - name: p2p-quic
+      port: {{ default 26656 (and $merged.p2p $merged.p2p.port) | int }}
+      protocol: UDP
+      targetPort: p2p-quic
 {{- if not (eq $role "bootnode") }}
     - name: api
       port: {{ default 26657 (and $merged.api $merged.api.port) | int }}
       protocol: TCP
       targetPort: api
+{{- end }}
+
+{{- /* ── Public P2P service (only if p2p.expose.enabled) ──────────────
+     Puts ordinal 0 of the role on the Internet, QUIC (UDP) + TCP/TLS on
+     the same port, so nodes outside the cluster can use it as a seed.
+     On a single-node k3s the default LoadBalancer is ServiceLB: the port
+     opens on the node's public address. externalTrafficPolicy Local keeps
+     the peer's real IP (max_peers_per_asn needs it). */ -}}
+{{- if and $merged.p2p $merged.p2p.expose $merged.p2p.expose.enabled }}
+{{- $port := default 26656 $merged.p2p.port | int }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $name }}-p2p-public
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "viper-pq-chain.roleLabels" (dict "ctx" $ "role" $role) | nindent 4 }}
+  {{- with $merged.p2p.expose.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ default "LoadBalancer" $merged.p2p.expose.type }}
+  externalTrafficPolicy: {{ default "Local" $merged.p2p.expose.externalTrafficPolicy }}
+  selector:
+    {{- include "viper-pq-chain.roleSelectorLabels" (dict "ctx" $ "role" $role) | nindent 4 }}
+    statefulset.kubernetes.io/pod-name: {{ printf "%s-0" $name }}
+  ports:
+    - name: p2p-quic
+      port: {{ default $port $merged.p2p.expose.port | int }}
+      protocol: UDP
+      targetPort: p2p-quic
+    - name: p2p
+      port: {{ default $port $merged.p2p.expose.port | int }}
+      protocol: TCP
+      targetPort: p2p
 {{- end }}
 
 {{- /* ── Public ClusterIP API service (only if publicService.enabled) ─── */ -}}

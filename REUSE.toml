@@ -1,6 +1,6 @@
 version = 1
 SPDX-PackageName = "viper-pq-chain"
-SPDX-PackageSupplier = "Alberto Galassi <agalassi@agwswebconsulting.it>"
+SPDX-PackageSupplier = "Alberto Galassi <279985960+v1p3r4llbl4ck-86@users.noreply.github.com>"
 
 # Files without an SPDX header are covered here (REUSE 3.2). Rust sources carry
 # their own `// SPDX-License-Identifier:` line; scripts/check-licenses.sh checks both.

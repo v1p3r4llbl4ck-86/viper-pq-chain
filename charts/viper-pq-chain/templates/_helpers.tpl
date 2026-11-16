@@ -78,37 +78,6 @@ viper.pqchain.io/component: pqcd
 {{- end }}
 
 {{/*
-Notary full name + selector labels.
-*/}}
-{{- define "viper-pq-chain.notaryName" -}}
-{{- printf "%s-notary" (include "viper-pq-chain.fullname" .) | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{- define "viper-pq-chain.notarySelectorLabels" -}}
-{{ include "viper-pq-chain.selectorLabels" . }}
-viper.pqchain.io/component: notary
-{{- end }}
-
-{{- define "viper-pq-chain.notaryLabels" -}}
-{{ include "viper-pq-chain.labels" . }}
-viper.pqchain.io/component: notary
-{{- end }}
-
-{{- define "viper-pq-chain.frontendName" -}}
-{{- printf "%s-frontend" (include "viper-pq-chain.fullname" .) | trunc 63 | trimSuffix "-" }}
-{{- end }}
-
-{{- define "viper-pq-chain.frontendSelectorLabels" -}}
-{{ include "viper-pq-chain.selectorLabels" . }}
-viper.pqchain.io/component: frontend
-{{- end }}
-
-{{- define "viper-pq-chain.frontendLabels" -}}
-{{ include "viper-pq-chain.labels" . }}
-viper.pqchain.io/component: frontend
-{{- end }}
-
-{{/*
 ServiceAccount name to use.
 */}}
 {{- define "viper-pq-chain.serviceAccountName" -}}
@@ -123,13 +92,12 @@ ServiceAccount name to use.
 Image reference helper. Usage:
   image: {{ include "viper-pq-chain.image" (dict "ctx" $ "binary" "pqcd") }}
 
-`binary` ∈ { "pqcd", "notary", "archivalSidecar" }.
+`binary` ∈ { "pqcd", "archivalSidecar" }.
 */}}
 {{- define "viper-pq-chain.image" -}}
 {{- $img := .ctx.Values.image -}}
 {{- $tag := default .ctx.Chart.AppVersion (index $img.tags .binary) -}}
 {{- $bin := .binary -}}
-{{- if eq $bin "notary" }}{{ $bin = "viper-notary" }}{{ end -}}
 {{- if eq $bin "archivalSidecar" }}{{ $bin = "viper-archival-sidecar" }}{{ end -}}
 {{- printf "%s/%s/%s:%s" $img.registry $img.repository $bin $tag -}}
 {{- end }}
@@ -162,8 +130,7 @@ bootnode). Returns a comma-separated string for iteration.
 {{- end }}
 
 {{/*
-The first-enabled role's headless service hostname. Used by the notary
-backend's auto-discovery of a chain RPC endpoint.
+The first-enabled role's headless service hostname (chain RPC discovery).
 */}}
 {{- define "viper-pq-chain.firstChainNodeService" -}}
 {{- $found := "" -}}

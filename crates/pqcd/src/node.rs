@@ -96,6 +96,12 @@ pub struct Libp2pConfig {
     /// Bootstrap peer multiaddrs (with `/p2p/<peer_id>` suffix).
     #[serde(default)]
     pub bootstrap_peers: Vec<String>,
+    /// Public multiaddrs this node advertises (Identify/Kademlia), e.g.
+    /// `/dns4/boot1.example.org/udp/26656/quic-v1`. Needed when the node
+    /// listens on a private address (NAT, Kubernetes pod) but is reachable
+    /// from outside. Default: empty.
+    #[serde(default)]
+    pub external_addrs: Vec<String>,
     /// GossipSub mesh parameters (D, D_low, D_high). Default (2, 1, 3) is
     /// tuned for the 3-node devnet-2 cutover.
     #[serde(default)]

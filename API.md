@@ -14,9 +14,9 @@ serves two HTTP routers on port 26657:
   data directory. It overlaps with the runtime router but is not
   identical.
 
-`viper-testnet-2` is live since 2026-08-25: the endpoints below are served at
-`https://pqchain.agwswebconsulting.it` (read API under `/v1/`, notary under `/api/`,
-alias `rpc.pqchain.agwswebconsulting.it`).
+On the public test network `viper-testnet-3` the read API of the author's full node is
+served at `https://pqchain.agwswebconsulting.it/v1/` (GET only; rate-limited). To submit
+transactions, run your own node (`scripts/join-testnet.sh`).
 
 Three configuration flags in the `api` section of `node.json` gate parts
 of the runtime surface (`crates/pqcd/src/node.rs`, `ApiConfig`):

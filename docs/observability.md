@@ -400,7 +400,7 @@ significantly more code, and will land separately.
 
 | Item                                  | What it would give us                                   | Why deferred              |
 |---------------------------------------|---------------------------------------------------------|---------------------------|
-| **Free-text log search across hosts** | Ad-hoc ` block_hash=…` queries across all journald output, regardless of which host produced the line | Needs Loki/Promtail/ELK or paid SaaS — Zabbix covers metrics + alert rates but is not a log-search index |
+| **Free-text log search across hosts** | Ad-hoc ` block_hash=…` queries across all journald output, regardless of which host produced the line | Needs Loki/Promtail/ELK or a hosted log service — Zabbix covers metrics + alert rates but is not a log-search index |
 | **Audit-root anchoring**              | Daily Merkle root of audit JSONL committed to a different chain (or to the chain itself) for cross-system tamper-evidence | Needs design on which chain to anchor to and what the on-chain envelope looks like |
 | **Audit log verification CLI**        | `pqcd audit verify <file>` that re-walks the chain and reports the first break | Easy to write; deferred only because manual verification is enough at present volume |
 | **Alertmanager / Slack / e-mail dispatch** | Push notifications instead of pull-only counters       | The brief was explicitly "no external components" |

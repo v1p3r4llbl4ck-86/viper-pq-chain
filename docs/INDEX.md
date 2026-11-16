@@ -14,7 +14,7 @@ an integrator or an auditor needs beyond that.
 | auditing | [../audit/README.md](../audit/README.md) → [../specs/audit-scope.md](../specs/audit-scope.md), [../specs/threat-model.md](../specs/threat-model.md), [../KNOWN-ISSUES.md](../KNOWN-ISSUES.md) |
 | deploying on Kubernetes | [../charts/viper-pq-chain/README.md](../charts/viper-pq-chain/README.md) (`pqcd ceremony` + Helm) |
 | deploying on hosts | [../deploy/ansible/README.md](../deploy/ansible/README.md) |
-| reading the plan | [../ROADMAP.md](../ROADMAP.md) → [long-horizon-roadmap.md](long-horizon-roadmap.md) |
+| reading the plan | [../ROADMAP.md](../ROADMAP.md) → long-horizon-roadmap.md |
 
 ## Current documents
 
@@ -25,7 +25,7 @@ an integrator or an auditor needs beyond that.
 | [validator-onboarding.md](validator-onboarding.md) | joining `viper-testnet-2` as a full/rpc/archive node; how validators are admitted |
 | [observability.md](observability.md) | metrics, logs, tracing, alert expressions |
 | [use-cases.md](use-cases.md) | what the chain is for: attestations, anchors, key-rotation records |
-| [long-horizon-roadmap.md](long-horizon-roadmap.md) | the multi-year direction behind ROADMAP.md |
+| long-horizon-roadmap.md | the multi-year direction behind ROADMAP.md |
 | [multicodec-mapping.md](multicodec-mapping.md) | multicodec / multihash identifiers used on the wire |
 | [openapi.yaml](openapi.yaml) | OpenAPI 3.0 description of the HTTP API (served by the node at `/openapi.yaml`) |
 | [examples/three-network/](examples/three-network/) | worked example of the validator / VFN / public P2P networks |
@@ -43,7 +43,7 @@ Nothing in it is current; it is kept because ADRs and reports cite it.
 
 Business material and internal plans (decks, funding material, pivot plans,
 archived-chain snapshots, the token-economics reserve design) stay in the private repository.
-Internal deployment, soak and audit reports are summarised in [../reports/README.md](../reports/README.md).
+Internal deployment, soak and audit reports are summarised in ../reports/README.md.
 
 ## Conventions
 

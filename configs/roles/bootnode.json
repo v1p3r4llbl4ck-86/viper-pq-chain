@@ -35,7 +35,7 @@
     "bootstrap_peers": [
       "/dns4/<sentry-host>/tcp/26656/p2p/<sentry-peer-id>"
     ],
-    "quic_enabled": false,
+    "quic_enabled": true,
     "tcp_tls_fallback": true,
     "max_peers_per_asn": 3
   }

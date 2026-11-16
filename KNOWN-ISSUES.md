@@ -5,10 +5,11 @@ author knows to be **incomplete**, **deferred**, or **accepted as risk**
 in this repository at the time of the public release. It is written for
 an external reviewer: if a limitation is not here, it is not known.
 
-Status of the network: **`viper-testnet-2` is live since 2026-08-25** — a single
-validator run by the author, two sentries and a full node on one cluster, with the
-public notary in anonymous mode (`genesis/README.md` has the digest). §2 lists what
-was closed before its genesis and what stays open. The chains that preceded it (`viper-pq-1`, `viper-research-1` and a
+Status of the network: **`viper-testnet-3` is live since 2026-11-16 — a TEST network**
+(no token, may be reset): a single validator run by the author, one public seed
+(QUIC + TCP/TLS) and a full node serving the read API, on one cluster
+(`genesis/README.md` has the digest). §2 lists what was closed before genesis and what
+stays open. `viper-testnet-2` (2026-08-25 → 2026-09-23) and the chains that preceded it (`viper-pq-1`, `viper-research-1` and a
 single-validator lab) are retired; §5 records what they taught.
 
 Conventions: `R-nn` accepted risk, `G-nn` gap to close before genesis,

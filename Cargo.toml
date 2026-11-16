@@ -13,13 +13,14 @@ members = [
     "crates/pqc-keystore",
     "crates/pqcd",
     "crates/viper-archival-sidecar",
+    "tools/viper-ricordi",
 ]
 resolver = "2"
 
 [workspace.package]
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
-authors = ["Alberto Galassi <agalassi@agwswebconsulting.it>"]
+authors = ["Alberto Galassi <279985960+v1p3r4llbl4ck-86@users.noreply.github.com>"]
 license = "Apache-2.0"
 
 [workspace.dependencies]

@@ -76,7 +76,17 @@ release itself:
 
 ---
 
-## Next — `viper-testnet-2`
+## Now — `viper-testnet-3` (live since 2026-11-16, TEST network)
+
+One validator run by the author, one public seed reachable over **QUIC** (primary) and
+TCP/TLS 1.3, both with X25519MLKEM768; a full node serving the read API. Anyone can join
+as a `full` node with `scripts/join-testnet.sh`. Next: external `full`/`rpc` nodes, then
+the first externally operated validator.
+
+## Done — `viper-testnet-2` (2026-08-25 → 2026-09-23)
+
+The plan below is what `viper-testnet-2` was built against; kept as the record.
+
 
 The first public network. It is a tokenless proof-of-authority chain
 with an operator-run validator set; external participants join as

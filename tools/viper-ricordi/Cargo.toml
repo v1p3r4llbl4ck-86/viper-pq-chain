@@ -1,0 +1,19 @@
+[package]
+name = "viper-ricordi"
+version = "0.1.0"
+edition = "2021"
+description = "Ricordi Indelebili helper: ML-DSA-65 keys, certificate signatures and attestation_create txs for Viper PQ Chain"
+publish = false
+
+[[bin]]
+name = "viper-ricordi"
+path = "src/main.rs"
+
+[dependencies]
+pqc-crypto = { path = "../../crates/pqc-crypto", features = ["ml-dsa-backend"] }
+pqc-tx     = { path = "../../crates/pqc-tx", default-features = false }
+pqc-types  = { path = "../../crates/pqc-types", default-features = false }
+ciborium.workspace = true
+hex.workspace = true
+base64.workspace = true
+anyhow.workspace = true

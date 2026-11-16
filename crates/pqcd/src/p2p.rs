@@ -503,6 +503,7 @@ pub async fn start_libp2p(
         vfn_listen,
         public_listen,
         bootstrap_peers: cfg_section.bootstrap_peers.clone(),
+        external_addrs: cfg_section.external_addrs.clone(),
         gossip_mesh_n: cfg_section.gossip_mesh_n.unwrap_or(2),
         gossip_mesh_n_low: cfg_section.gossip_mesh_n_low.unwrap_or(1),
         gossip_mesh_n_high: cfg_section.gossip_mesh_n_high.unwrap_or(3),

@@ -36,6 +36,7 @@ fn n2_config(role: NodeRole, listen: SocketAddr) -> P2pConfig {
         vfn_listen: matches!(role, NodeRole::ValidatorFullnode).then_some(listen),
         public_listen: matches!(role, NodeRole::PublicFullnode).then_some(listen),
         bootstrap_peers: vec![],
+        external_addrs: vec![],
         gossip_mesh_n: 1,
         gossip_mesh_n_low: 1,
         gossip_mesh_n_high: 2,
@@ -762,6 +763,58 @@ async fn block_fetch_request_rejects_oversized_range() {
         "oversized request must NOT be forwarded to the peer — validation \
          is a local no-op, not a per-peer policy"
     );
+
+    handle_a.shutdown().await;
+    handle_b.shutdown().await;
+}
+
+/// ADR-041 primary transport: two swarms with TCP switched off must still
+/// connect and gossip over QUIC alone. With the `hybrid-kem-tls` feature the
+/// QUIC handshake also negotiates X25519MLKEM768 (the ~1.2 KB larger
+/// ClientHello is part of what this test exercises over real UDP).
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+async fn two_swarms_connect_and_gossip_over_quic_only() {
+    let _ = tracing_subscriber::fmt::try_init();
+
+    let quic_cfg = |port: u16| {
+        let mut c = n2_config(
+            NodeRole::Validator,
+            format!("127.0.0.1:{port}").parse().unwrap(),
+        );
+        c.quic_enabled = true;
+        c.tcp_tls_fallback = false;
+        c.hybrid_kem_enabled = cfg!(feature = "hybrid-kem-tls");
+        c
+    };
+    let free_udp = |start: u16| -> u16 {
+        (start..start + 200)
+            .find(|p| std::net::UdpSocket::bind(("127.0.0.1", *p)).is_ok())
+            .expect("free udp port")
+    };
+    let port_a = free_udp(37500);
+    let port_b = free_udp(37700);
+
+    let (handle_a, mut rx_a) =
+        pqc_p2p::spawn_swarm(quic_cfg(port_a), Keypair::generate_ed25519()).expect("spawn A");
+    let (handle_b, mut rx_b) =
+        pqc_p2p::spawn_swarm(quic_cfg(port_b), Keypair::generate_ed25519()).expect("spawn B");
+    sleep(Duration::from_millis(400)).await;
+    drain_briefly(&mut rx_a, Duration::from_millis(100)).await;
+    drain_briefly(&mut rx_b, Duration::from_millis(100)).await;
+
+    let dial_b: Multiaddr = format!("/ip4/127.0.0.1/udp/{port_b}/quic-v1")
+        .parse()
+        .unwrap();
+    handle_a.dial(dial_b).await.expect("A dial B over QUIC");
+
+    expect_peer_connected(&mut rx_a, "A/quic", Duration::from_secs(8)).await;
+    expect_peer_connected(&mut rx_b, "B/quic", Duration::from_secs(8)).await;
+    sleep(Duration::from_secs(3)).await;
+
+    let msg = GossipMessage::new(MessageType::Block, CHAIN_ID, b"block-over-quic".to_vec());
+    handle_a.publish(msg).await.expect("A publish");
+    let got = expect_msg(&mut rx_b, MessageType::Block, "B/quic").await;
+    assert_eq!(got.payload, b"block-over-quic");
 
     handle_a.shutdown().await;
     handle_b.shutdown().await;

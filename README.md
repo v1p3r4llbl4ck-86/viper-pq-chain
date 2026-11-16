@@ -16,25 +16,39 @@ chain can retire an algorithm without retiring its accounts.
   economics that exist in the design are compiled out (`token_economics` feature) and kept
   as a reserve; nothing here is offered for sale.
 
-## Status
+## Status — public TEST network
 
-**`viper-testnet-2` is live since 2026-08-25** (genesis digest in [genesis/](genesis/README.md)).
-Before it the code ran three private chains — `viper-pq-1` (2026-04 → 2026-05), `viper-research-1`
-(2026-05 → 2026-08) and an internal single-validator lab — all retired; what they taught is
-in [KNOWN-ISSUES.md](KNOWN-ISSUES.md) and [ROADMAP.md](ROADMAP.md).
+> **`viper-testnet-3` is a test network.** No token, nothing of value, no guarantees: it can be
+> reset at any time (a reset is a new chain id and a new genesis). Run a node, break it, open issues.
 
-The author runs the first validator, two sentries and a full node, and publishes:
+**Try it — one command, Linux x86_64:**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/main/scripts/join-testnet.sh | bash
+```
+
+It needs [`cosign`](https://docs.sigstore.dev/cosign/system_config/installation/): it downloads the latest release, verifies the Sigstore signature that this repository's release workflow put on `SHA256SUMS`, checks the tarball against it, fetches the genesis and a ready
+`full` node config from [`genesis/viper-testnet-3/`](genesis/README.md), checks the genesis digest
+and prints the start command (`--systemd` installs a unit instead). Read the script first — it is
+150 lines. Other ways in (container image, build from source, other roles) are in
+[docs/validator-onboarding.md](docs/validator-onboarding.md).
 
 | What | Where |
 |---|---|
-| explorer and chain status | `https://pqchain.agwswebconsulting.it` |
-| public read API | `https://pqchain.agwswebconsulting.it/v1/status` |
-| P2P seed for your node | `boot1.pqchain.agwswebconsulting.it:26656` |
+| chain status, read API | `https://pqchain.agwswebconsulting.it/v1/status` |
+| P2P seed — **QUIC** (primary) | `/dns4/boot1.pqchain.agwswebconsulting.it/udp/26656/quic-v1/p2p/12D3KooWS2a6495jsyZ91izS5zbEgXv9oE52TUst4L3QhpVN9pxb` |
+| P2P seed — TCP/TLS 1.3 (fallback) | `/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWS2a6495jsyZ91izS5zbEgXv9oE52TUst4L3QhpVN9pxb` |
 
-Bootstrap multiaddrs (with PeerIds) are in [genesis/README.md](genesis/README.md).
+The PeerId and the genesis digest are in [genesis/README.md](genesis/README.md). Both transports
+negotiate **X25519MLKEM768** (hybrid ML-KEM-768 + X25519, FIPS 203) on every handshake when the
+binary is built with `hybrid-kem-tls` — the release binaries and images are.
 
-Anyone can run a full, rpc or archive node; validators are admitted by the existing set.
-[docs/validator-onboarding.md](docs/validator-onboarding.md) is the join guide.
+The author runs the validator and the public seed. Anyone can run a `full`, `rpc` or `archive`
+node without asking; validators are admitted by the existing set (§7 of the onboarding guide).
+
+Earlier networks — `viper-pq-1`, `viper-research-1`, an internal lab, `viper-testnet-1` and
+`viper-testnet-2` (2026-08-25 → 2026-09-23) — are retired; what they taught is in
+[KNOWN-ISSUES.md](KNOWN-ISSUES.md) and [ROADMAP.md](ROADMAP.md).
 
 ## What is in the repository
 
@@ -50,7 +64,7 @@ Anyone can run a full, rpc or archive node; validators are admitted by the exist
 | `specs/` | the normative protocol contract (28 specifications) | CC BY 4.0 |
 | `charts/viper-pq-chain`, `deploy/ansible`, `docker/` | Kubernetes chart (one StatefulSet per role), systemd path, images | BUSL-1.1 |
 | `configs/` | reference `node.json` per role and the local devnet set | BUSL-1.1 |
-| `sdk/typescript`, `sdk/python` | client SDKs (0.2.0 published on npm / PyPI; the tree is at 0.3.0, to be re-aligned to `viper-testnet-2` before republishing) | Apache-2.0 |
+| `sdk/typescript`, `sdk/python` | client SDKs (0.2.0 published on npm / PyPI; the tree is at 0.3.0, to be re-aligned to `viper-testnet-3` before republishing) | Apache-2.0 |
 | `tests/acvp`, `fuzz/` | ACVP conformance vectors; cargo-fuzz targets | Apache-2.0 / BUSL-1.1 |
 | `vendor/` | patched `libp2p-tls`, `libp2p-quic` (post-quantum handshake), `slh-dsa` | upstream |
 
@@ -60,7 +74,7 @@ Anyone can run a full, rpc or archive node; validators are admitted by the exist
 |---|---|---|
 | transactions, consensus | ML-DSA-65 (default), ML-DSA-87 | ML-DSA-44 allowed for transactions only (ADR-046) |
 | consensus fallback, archival overlay | SLH-DSA-SHAKE-192s, -256s | hash-based; priced ~60× higher per verification |
-| P2P transport | ML-KEM-768 sessions; X25519MLKEM768 hybrid TLS on libp2p (`hybrid-kem-tls`) | the GossipSub envelope is still Ed25519 (R-14) |
+| P2P transport | QUIC (primary) and TCP/TLS 1.3 (fallback) on libp2p, both with X25519MLKEM768 hybrid key exchange (`hybrid-kem-tls`); ML-KEM-768 sessions | the GossipSub envelope is still Ed25519 (R-14) |
 | hashing | SHA3 / SHAKE with a hash registry | upgradable through governance, never by reset |
 | encoding | deterministic CBOR (RFC 8949) | `alg_id` and `key_version` are part of every signed object |
 
@@ -118,8 +132,8 @@ test map, load-test baselines and fuzz harnesses.
 | [API.md](API.md) | HTTP read API, transaction submission, service endpoints |
 | [DECISIONS.md](DECISIONS.md) | every architecture decision (ADR-001 …), superseded ones marked |
 | [docs/operators/RUNBOOK.md](docs/operators/RUNBOOK.md), [docs/validator-onboarding.md](docs/validator-onboarding.md) | run and join |
-| [KNOWN-ISSUES.md](KNOWN-ISSUES.md), [ROADMAP.md](ROADMAP.md), [TASKS.md](TASKS.md) | what is open, what is next |
-| [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), [AGENTS.md](AGENTS.md) | disclosure, contributions, repository rules |
+| [KNOWN-ISSUES.md](KNOWN-ISSUES.md), [ROADMAP.md](ROADMAP.md), TASKS.md | what is open, what is next |
+| [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), AGENTS.md | disclosure, contributions, repository rules |
 | [docs/INDEX.md](docs/INDEX.md) | the full map of `docs/` |
 
 ## Security

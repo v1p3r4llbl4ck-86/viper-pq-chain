@@ -298,6 +298,14 @@ fn headless_multiaddr(fullname: &str, role: &str, ns: &str, salt: Option<&[u8; 3
     format!("/dns4/{fullname}-pqcd-{role}-headless.{ns}.svc.cluster.local/tcp/26656/p2p/{peer_id}")
 }
 
+/// The QUIC twin of a `/tcp/26656/` bootstrap multiaddr (ADR-041: QUIC is the
+/// primary transport, TCP/TLS the fallback). Bootstrap lists carry the QUIC
+/// address first so libp2p tries it first; the TCP one stays for networks
+/// that drop UDP.
+fn quic_twin(tcp_multiaddr: &str) -> String {
+    tcp_multiaddr.replacen("/tcp/26656/", "/udp/26656/quic-v1/", 1)
+}
+
 /// Multiaddr of one specific pod through its headless Service
 /// (`<pod>.<headless>.<ns>.svc.cluster.local`).
 fn pod_multiaddr(
@@ -354,7 +362,7 @@ fn build_node_json(
     libp2p_obj.insert("gossip_mesh_n".into(), serde_json::Value::from(2));
     libp2p_obj.insert("gossip_mesh_n_low".into(), serde_json::Value::from(1));
     libp2p_obj.insert("gossip_mesh_n_high".into(), serde_json::Value::from(3));
-    libp2p_obj.insert("quic_enabled".into(), serde_json::Value::Bool(false));
+    libp2p_obj.insert("quic_enabled".into(), serde_json::Value::Bool(true));
     libp2p_obj.insert("tcp_tls_fallback".into(), serde_json::Value::Bool(true));
     libp2p_obj.insert("max_peers_per_asn".into(), serde_json::Value::from(3));
     libp2p_obj.insert(
@@ -396,18 +404,25 @@ fn build_node_json(
             "proposer_address_hex": proposer_address_hex,
             "epoch_duration":    60u64,
             "unbonding_period":  120u64,
-            "validators": validators.iter().map(|v| serde_json::json!({
-                "node_id":         v.node_id,
-                "address_hex":     v.address_hex,
-                "sig_alg_id":      v.consensus_alg_id,
-                "public_key_hex":  v.public_key_hex,
-                // Every node ships every validator's commit_seed_hex so the
-                // distributed-signing path can sign on behalf of any locally-
-                // resident validator (mirrors the legacy producer-falls-through
-                // branch of the Ansible template; tighten to per-host seed
-                // distribution when ADR-051 N+2 lands operationally).
-                "commit_seed_hex": v.commit_seed_hex,
-            })).collect::<Vec<_>>(),
+            "validators": validators.iter().map(|v| {
+                let mut entry = serde_json::json!({
+                    "node_id":         v.node_id,
+                    "address_hex":     v.address_hex,
+                    "sig_alg_id":      v.consensus_alg_id,
+                    "public_key_hex":  v.public_key_hex,
+                });
+                // Only a signing role gets the signing seeds. Sentry / full /
+                // rpc / archive / bootnode verify commits with the public
+                // keys alone; a seed in their node.json (a ConfigMap, or a
+                // config handed to the public) would let anyone who reads it
+                // sign as the validator. The validator's own node.json must
+                // come from a Secret (`chainNode.validator.config.secretRef`).
+                if role.is_validator() || matches!(role, NodeRole::SingleNode) {
+                    entry["commit_seed_hex"] =
+                        serde_json::Value::String(v.commit_seed_hex.clone());
+                }
+                entry
+            }).collect::<Vec<_>>(),
         },
         "genesis_accounts": validators.iter().map(|v| serde_json::json!({
             "address_hex": v.address_hex,
@@ -700,9 +715,12 @@ pub fn generate_ceremony_values(
     let libp2p_for = |role: NodeRole| -> Libp2pSection {
         let bootstrap_peers = match role {
             NodeRole::Validator | NodeRole::SingleNode => vec![],
-            NodeRole::Sentry => vec![validator_multiaddr.clone()],
+            NodeRole::Sentry => vec![quic_twin(&validator_multiaddr), validator_multiaddr.clone()],
             NodeRole::Full | NodeRole::Rpc | NodeRole::Archive | NodeRole::Bootnode => {
-                sentry_multiaddrs.clone()
+                sentry_multiaddrs
+                    .iter()
+                    .flat_map(|m| [quic_twin(m), m.clone()])
+                    .collect()
             }
         };
         Libp2pSection {

@@ -6,9 +6,8 @@ Licensed CC BY 4.0 (see `LICENSE.md`). The node binary is source-available under
 BUSL-1.1; the verification-path crates are Apache-2.0. Host names in examples are
 placeholders (`<host>`, `203.0.113.x`).
 
-`viper-testnet-2` is live since 2026-08-25 (single validator, public notary); it was created with `pqcd ceremony` — the
-endpoints named in §11 exist at genesis, not before. Everything else in this
-runbook works today on a laptop.
+`viper-testnet-3` (a TEST network: no token, may be reset) is live since 2026-11-16, created with
+`pqcd ceremony`; §11 tells how to join it. Everything else in this runbook works on a laptop.
 
 ## Contents
 
@@ -429,9 +428,9 @@ mounted (`docker/README.md`).
 
 ## 11. Joining a network as an external operator
 
-This section describes joining `viper-testnet-2`, the public network to be created
-at genesis after the public release. Until then the endpoints below do not
-resolve; the procedure is the same for any chain started per §12.
+This section describes joining `viper-testnet-3`, the public test network
+(`scripts/join-testnet.sh` automates it for a `full` node); the procedure is the
+same for any chain started per §12.
 
 | Purpose | Address (at genesis) |
 |---|---|

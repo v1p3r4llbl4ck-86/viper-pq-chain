@@ -43,18 +43,5 @@ spec:
           {{ else }}
           echo "(no chain-node role enabled — skipping chain RPC test)"
           {{ end }}
-          {{ if .Values.notary.enabled }}
-          echo
-          echo "── notary: /health ──────────────────────────────────"
-          curl --fail --silent --show-error --max-time 10 \
-            "http://{{ include "viper-pq-chain.notaryName" . }}:{{ .Values.notary.service.port }}/health"
-          echo
-          echo "── notary: /api/qeaa/issuers (3 demo issuers expected) ──"
-          curl --fail --silent --show-error --max-time 10 \
-            "http://{{ include "viper-pq-chain.notaryName" . }}:{{ .Values.notary.service.port }}/api/qeaa/issuers"
-          echo
-          {{ else }}
-          echo "(notary disabled — skipping notary tests)"
-          {{ end }}
           echo "All tests passed."
 {{- end }}

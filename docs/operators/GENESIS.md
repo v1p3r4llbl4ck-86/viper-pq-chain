@@ -11,7 +11,7 @@ How a network is born, from the ceremony to the first external node. Written for
 - the **genesis artefact** `genesis/<chain-id>.json` and its digest.
 
 From the first external state onwards Policy P-COMPAT-001 applies: no reset, migrations
-only ([AGENTS.md](../../AGENTS.md)). Everything before that is rehearsal.
+only (AGENTS.md). Everything before that is rehearsal.
 
 ## 1. Prerequisites
 

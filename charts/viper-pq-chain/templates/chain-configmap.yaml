@@ -43,7 +43,10 @@ data:
 {{- if not $merged.config }}
 {{- $merged = mustMerge $merged (dict "config" dict) -}}
 {{- end }}
-{{- if not $merged.config.configMapRef }}
+{{- /* config.secretRef: node.json comes from an existing Secret (e.g. an
+     ExternalSecret) because a validator's node.json carries commit_seed_hex
+     and must never sit in a ConfigMap. */ -}}
+{{- if not (or $merged.config.configMapRef $merged.config.secretRef) }}
 ---
 apiVersion: v1
 kind: ConfigMap

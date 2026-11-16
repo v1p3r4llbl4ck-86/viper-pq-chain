@@ -20,7 +20,7 @@
 
 ## 0. Status banner
 
-There is no live network at the time of the public release. This specification was written for `viper-pq-1`, launched on 2026-04-25 from commit `879ce62` and since retired (archived at height 33,976); its `chain_id_hex` = `76697065722d70712d31` (the ASCII bytes of `"viper-pq-1"`, no separator) and the `genesis-viper-pq-1.json` artefact referenced throughout are kept as the historical worked example. The tokenless successors `viper-research-1` and `viper-lab-1` are retired as well. The public chain **`viper-testnet-2`** is created after the public release with `pqcd ceremony` (SPEC-CEREMONY-001); its `chain_id_hex`, `genesis_validators_root`, `genesis_hash` and validator roster are assigned at genesis and published with the genesis file. `viper-testnet-2` has no native token: the genesis account balances, founder / treasury / reserved tranches and the storage fund described below belong to the `token_economics` Cargo feature (see SPEC-TOKEN-002, status Reserved) and are compiled out of the public chain build. The previous chain id `viper-mainnet-1` from the v1.0 ceremony plan was never launched; its design context survives in Appendix A and in `DECISIONS.md` ADR-025 / ADR-053. Per Policy P-COMPAT-001, every breaking change on a running chain rides an activation height (ADR-053 §T2.3, code path: `crates/pqc-state/src/store.rs::pending_upgrades`), never a reset.
+The live public network is the test network `viper-testnet-3` (2026-11-16; genesis in `genesis/viper-testnet-3/`). This specification was written for `viper-pq-1`, launched on 2026-04-25 from commit `879ce62` and since retired (archived at height 33,976); its `chain_id_hex` = `76697065722d70712d31` (the ASCII bytes of `"viper-pq-1"`, no separator) and the `genesis-viper-pq-1.json` artefact referenced throughout are kept as the historical worked example. The tokenless successors `viper-research-1` and `viper-lab-1` are retired as well. The public test chains are created with `pqcd ceremony` (SPEC-CEREMONY-001); their `chain_id_hex`, `genesis_validators_root`, `genesis_hash` and validator roster are published with the genesis file. They have no native token; the storage fund described below belongs to the dormant `token_economics` Cargo feature and is compiled out of the public chain build. The previous chain id `viper-mainnet-1` from the v1.0 ceremony plan was never launched; its design context survives in Appendix A and in `DECISIONS.md` ADR-025 / ADR-053. Per Policy P-COMPAT-001, every breaking change on a running chain rides an activation height (ADR-053 §T2.3, code path: `crates/pqc-state/src/store.rs::pending_upgrades`), never a reset.
 
 ---
 
@@ -66,25 +66,16 @@ These fields are protocol-level invariants pinned at height 0. They mirror the l
 
 ### 2.1 Account Table
 
-Accounts are inserted in the order defined by ADR-025 and SPEC-TOKEN-002 §4. The state root is deterministic regardless of insertion order — leaf hashes are sorted before folding into the binary Merkle tree (ADR-053 §T3.1 / TASK-195).
+The state root is deterministic regardless of insertion order — leaf hashes are sorted before
+folding into the binary Merkle tree (ADR-053 §T3.1).
 
-| Account | Balance (venom) | Key type | Notes |
-|---------|----------------|---------|-------|
-| Founder | 2 × 10^26 | ML-DSA-65 | 4-year vesting, off-chain custody |
-| Treasury | 3 × 10^26 | ML-DSA-65 | Governance-controlled; key held by multi-sig (Phase 6) |
-| Genesis validator accounts | 10^24 each (1,000,000 VPR) | ML-DSA-65 | One account per genesis validator; balance equals `min_stake` |
-| Reserved | 4 × 10^26 | ML-DSA-65 | Governance-locked; no disbursement without governance vote |
+| Account | Key type | Notes |
+|---------|---------|-------|
+| Genesis validator accounts | ML-DSA-65 | One account per genesis validator (`pqcd ceremony`, `--genesis-balance`) |
+| Operator service accounts | ML-DSA-65 | Accounts of the operator's own services, funded at genesis so they can pay fees (ADR-072; `--service-account`) |
 
-Every Account at genesis carries `verifier_template_id = 0x0001` (EOA) and `auth_data = []` (ADR-053 §T3.5). The genesis validator account balances above are in addition to any amounts allocated from the 10 % genesis-validator share; validators commit their `min_stake` as `self_bond` at registration.
-
-Total genesis balance check:
-
-```
-200,000,000 + 300,000,000 + 100,000,000 + 400,000,000 = 1,000,000,000 VPR
-= 10^27 venom
-```
-
-Note on the `viper-pq-1` dev launch (historical): at the 2026-04-25 ceremony the three genesis hosts launched with `bond_amount = 1_000_000_000` venom per validator (symmetric across the 3 genesis validators), and the founder/treasury/reserved tranches are deferred to the public mainnet ceremony per Policy P-COMPAT-001.
+There is no other genesis allocation: the public networks have no token. Every Account at genesis
+carries `verifier_template_id = 0x0001` (EOA) and `auth_data = []` (ADR-053 §T3.5).
 
 ### 2.2 Algorithm Registry
 
@@ -126,7 +117,6 @@ Initial on-chain governed parameters:
 | `byte_fee` | 2 venom | SPEC-FEE-001 §6.4 / ADR-024 |
 | `sigverify_fee_v_b` | 14,000 venom | SPEC-FEE-001 §6.4 / ADR-024 |
 | `exec_fee_per_gas` | 43 venom | SPEC-FEE-001 §6.4 / ADR-024 |
-| `min_stake` | 10^24 venom (1 M VPR) | SPEC-TOKEN-002 §5 |
 | `max_active_set_size` | 24 | ADR-013 |
 | `unbonding_period_blocks` | 120 | `crates/pqc-consensus/src/epoch.rs` (ADR-042 / ADR-053 §T1.5) |
 | `epoch_duration_blocks` | 60 | `crates/pqc-consensus/src/epoch.rs` |
@@ -205,7 +195,7 @@ The ceremony coordinator collects from each genesis validator and writes them in
 
 The coordinator builds `deploy/ansible/files/genesis-viper-pq-1.json` with:
 
-- All genesis accounts (founder, treasury, validators, reserved) with balances
+- All genesis accounts (validator accounts and operator service accounts, ADR-072) with balances
 - All validators from Step 2
 - Initial fee market parameters (§2.4)
 - Initial `auth_template_registry`, `slashing_verifier_registry`, `hash_registry`, `alg_registry` (§2.0–§2.3)
@@ -301,11 +291,9 @@ The following invariants must hold at and after genesis:
 ## 7. Reference
 
 - ADR-025 — Genesis block specification decision
-- ADR-024 — Viper token economics (supply, distribution, staking parameters)
 - ADR-013 — Maximum active validator set size (24)
 - ADR-053 — `viper-pq-1` launch architecture (Tier-1 / Tier-2 / Tier-3 fields, BIP340 double-tagged hashing, multi-dim fee market, storage fund, ePBS reservations, smart-account templates, sync committee)
 - Policy P-COMPAT-001 — every breaking change rides an activation height; no chain resets
-- SPEC-TOKEN-002 (`specs/tokenomics.md`) — numeric token parameters
 - SPEC-ACCOUNT-001 (`specs/account-keyset-registry.md`) — account structure and Algorithm Registry initial state
 - SPEC-FEE-001 §6.4 — calibrated fee coefficients (byte / sigverify / exec)
 - SPEC-FEE-002 (`specs/fee-market.md`) v0.2 — multi-dim EIP-4844 fee market

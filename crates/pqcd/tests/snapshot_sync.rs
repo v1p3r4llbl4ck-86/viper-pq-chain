@@ -751,6 +751,7 @@ fn source_node_libp2p_config(
             // Force TCP only on loopback — QUIC needs an IP stack that
             // tolerates the loopback mtu and reserve-port collisions
             // are less common on TCP.
+            external_addrs: vec![],
             quic_enabled: Some(false),
             tcp_tls_fallback: Some(true),
             max_peers_per_asn: Some(8),
@@ -801,6 +802,7 @@ fn cold_start_follower_libp2p_config(
             gossip_mesh_n: Some(1),
             gossip_mesh_n_low: Some(1),
             gossip_mesh_n_high: Some(2),
+            external_addrs: vec![],
             quic_enabled: Some(false),
             tcp_tls_fallback: Some(true),
             max_peers_per_asn: Some(8),

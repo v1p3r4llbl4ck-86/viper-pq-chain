@@ -297,43 +297,9 @@ Exception: a minimal public network status endpoint — chain status, current he
 - operators get full internal tooling; public users get status visibility through the read API
 - operator API exposure can be revisited as a Phase 4 decision once the surface is hardened
 
-## ADR-015 - Token Economics: Structure And Mechanisms In Phase 1, Concrete Parameters In Phase 2
+## ADR-015 — withdrawn from the public record
 
-**Date**: 2026-04-09  
-**Status**: Accepted
-
-### Context
-
-Token economics require two separate things: a model (what roles the token plays, what mechanisms exist) and parameters (the actual numbers). Defining parameters before real benchmark data exists produces arbitrary numbers that will need to change, damaging credibility. Deferring the model entirely leaves Phase 1 spec work underspecified.
-
-### Decision
-
-Phase 1 defines the economic model and mechanisms:
-
-- token purpose and utility roles
-- staking role and validator incentive structure
-- slashing philosophy
-- fee components and formula structure (already captured in ARCHITECTURE.md)
-- fee classes per algorithm (structure, not final coefficients)
-- issuance or non-issuance philosophy
-- governance powers tied to token
-- what is expressed in token vs what is policy-defined
-
-Phase 2 defines concrete parameters, after prototype benchmark data exists:
-
-- `sigverify_fee` coefficients per algorithm (from measured CPU cost on real hardware)
-- `byte_fee` coefficient (from observed storage growth)
-- staking minimum amounts
-- slashing amounts and conditions
-- anti-spam thresholds
-- reward schedule
-
-### Consequences
-
-- avoids publishing arbitrary numbers before they can be grounded in measurement
-- gives Phase 1 enough economic structure to write coherent specs
-- aligns with the Phase 2 exit criterion: "fee and signature-cost assumptions measured, not just estimated"
-- supports credibility: model is principled, parameters are evidence-based
+Token-economics reserve. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
 ## ADR-016 - Linux-First Direct Process Runtime; No Container Or Orchestration Layer In Scope
 
@@ -445,45 +411,9 @@ The three deferred "High" items (StubVerifier in mempool, FeeParams zeroed, no t
 - all Phase 2 milestones (single-node alpha, foundation closed, product-wedge coverage, benchmark baseline) are declared complete
 - the Phase 2 codebase is the starting point for Phase 3 hardening, not a throwaway prototype
 
-## ADR-019 - Phase 3 Fee Distribution: Proposer Priority Share + Static Validator Pool
+## ADR-019 — withdrawn from the public record
 
-**Date**: 2026-04-11 (original) / 2026-04-11 (revised by TASK-049)
-**Status**: Accepted (revised — provisional 100%-to-proposer rule superseded)
-
-### Context
-
-TASK-011 introduced `distribute_block_fees` with a provisional 100%-to-proposer rule (no validator pool split). ADR-019 formally recorded this as a Phase 3 exception to SPEC-TOKEN-001. TASK-049 replaces that provisional rule with a minimal validator-set-aware distribution layer, closing the SPEC-TOKEN-001 tension.
-
-### Decision (revised — TASK-049)
-
-`distribute_block_fees(store, proposer, fees_collected, pool_validators, dist)` in `pqc-state::apply` now accepts:
-
-- `pool_validators: &[Address]` — all active validator addresses (derived from `config.devnet.validators` at node startup in Phase 3)
-- `dist: &FeeDistributionParams { proposer_share_bps: u16 }` — proposer's priority share in basis points (0–10 000); default Phase 3 value is 5 000 (50%)
-
-Split rule:
-- proposer receives `fees_collected × proposer_share_bps / 10_000` as the priority share
-- remainder is split equally among all `pool_validators` (which may include the proposer as a validator)
-- integer-division rounding goes to the proposer
-- when `pool_validators` is empty, 100% goes to proposer (backward-compatible empty-set fallback)
-
-The accounting invariant is strict:
-
-- Every token debited from a sender (`fee_charged + fee_tip`) appears exactly once in `fees_collected`.
-- `Σ proposer_credit + Σ validator_credit == fees_collected` exactly; no fee is created or destroyed.
-- Empty blocks call `distribute_block_fees` with `fees_collected = 0`, which is a no-op.
-- Out-of-gas transactions charge `fee_charged = tx.fee`; the full amount enters `fees_collected`.
-
-Implementation: `FeeDistributionParams` and `distribute_block_fees` in `pqc-state::apply`. Called in both `pqc-consensus::engine::assemble_block` (production) and `pqc-consensus::recovery::replay_blocks_from_state` (recovery) after all `apply_tx` calls and before `advance_height()`. Validator pool derived from `config.devnet.validators` in `pqcd::devnet::start_from_config_path`; threaded through `AssemblyConfig.validator_pool`.
-
-The Phase 3 exception recorded in `specs/token-utility.md` is updated to reflect the resolved SPEC-TOKEN-001 tension. The remaining deviation (static config pool, no on-chain staking) is resolved by the on-chain validator staking lifecycle (TASK-049 Phase 4, ADR-007).
-
-### Consequences
-
-- SPEC-TOKEN-001 tension resolved: proposer no longer receives 100% of fees; pool always receives a share when validators are configured
-- Accounting invariant preserved: total credited == fees_collected in all cases
-- Recovery and production paths remain symmetric: both call `distribute_block_fees` with the same params
-- Remaining provisional behavior: pool is static config (no on-chain staking), deferred to Phase 4 ADR-007 validator lifecycle
+Token-economics reserve. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
 ## ADR-020 - Phase 3 `consensus_key_rotate` Implementation: Record-Only With Static Validator Config Gap
 
@@ -587,47 +517,9 @@ The Phase 4 backlog opens with:
 - The 207-test suite (0 failures) is the baseline for the Phase 4 opening.
 - ROADMAP.md Phase 3 exit criteria updated with MET/PARTIALLY MET/NOT MET status.
 
-## ADR-022 - Phase 4 On-Chain Validator Staking Lifecycle: Partial Closure of GAP-04 and GAP-05
+## ADR-022 — withdrawn from the public record
 
-**Date**: 2026-04-12
-**Status**: Accepted
-
-### Context
-
-ADR-020 and ADR-021 identified GAP-04 (static validator set, no height-indexed quorum membership) and GAP-05 (`consensus_key_rotate` record-only, no quorum effect) as the primary Phase 4 architectural items. SPEC-VAL-001 defines five lifecycle states (candidate, active, jailed, unbonding, exited) and requires three staking operations (register, exit, unjail).
-
-Phase 4 objective: implement the on-chain validator registry and lifecycle transitions so that (1) validator registration, exit, and unjail are protocol-level transactions that modify on-chain state; (2) the commit quorum derives from on-chain active validators rather than static config; (3) genesis validators are seeded from node config into the on-chain registry at genesis.
-
-### Decision
-
-**Implemented in TASK-064:**
-
-1. **On-chain registry**: `ValidatorRecord` + `ValidatorStatus` (Candidate/Active/Jailed/Unbonding/Exited) added to `pqc-types`. `StateStore` holds a validator registry (`HashMap<[u8;32], ValidatorRecord>`) with CRUD methods and incremental leaf-hash state root inclusion (domain `PQC-VALIDATOR-LEAF-V1`).
-
-2. **Three new MsgTypes**: `ValidatorRegister (0x0400)`, `ValidatorExit (0x0401)`, `ValidatorUnjail (0x0402)`. All require `GOVERNANCE` bit in `allowed_tx_types`.
-
-3. **Apply handlers** (`pqc-state/src/apply/validator.rs`):
-   - `ValidatorRegister`: consensus key must be ML-DSA (44/65/87 only — SPEC-VAL-001 §4); uniqueness check across active+candidate set; self_bond > 0; locked from operator balance; immediately promoted to Active if active set has capacity (<24), else Candidate.
-   - `ValidatorExit`: sender must be Active; guard: exit must not leave active set empty; transitions to `Unbonding { start_height }`.
-   - `ValidatorUnjail`: sender must be Jailed; transitions to Candidate (or Active if capacity).
-
-4. **Unbonding expiration**: `StateStore::process_validator_unbonding_expirations(height)` called per-block in engine after tx application; returns bond to operator balance when `current_height ≥ start_height + VALIDATOR_UNBONDING_PERIOD` (default 100 blocks).
-
-5. **GAP-04 partial closure**: `CommitQuorumPolicy::from_state_store()` reads active validators from the on-chain registry. Genesis validators are seeded into the on-chain registry from node config in `build_genesis_state()`.
-
-**Deferred to Phase 5:**
-
-- **Height-indexed replay correctness**: `DiskChainStore` still uses the genesis-time quorum policy for replay validation. On-chain validator changes (register/exit) only affect blocks produced after the change. Full height-indexed quorum for replay requires per-block quorum snapshots (significant complexity; deferred per ADR-007 HotStuff track).
-- **GAP-05 (consensus_key_rotate activation)**: `CommitQuorumPolicy::from_state_store()` uses the `consensus_pk` from `ValidatorRecord`, but `ValidatorRecord` is still bootstrapped from genesis config. Integration of `ConsensusKeyRotation` records into `ValidatorRecord` is Phase 5.
-- **Slashing**: slashing conditions and amounts are TBD Phase 2 (SPEC-VAL-001 §7). Phase 4 supports jailing only via direct state insert (admin path); automatic slashing detection is Phase 5.
-- **Delegation and min_stake**: Phase 2 per ADR-015. Self-bond > 0 is the Phase 4 floor; `min_stake` governance parameter is Phase 5.
-
-### Consequences
-
-- 10 new unit tests cover all five lifecycle-state transitions, error conditions (duplicate key, wrong algorithm, zero bond, empty-set guard), and state root change confirmation. 219 workspace tests pass.
-- GAP-04 partially resolved; GAP-05 partially resolved. Both remain in audit scope for Phase 5 completion.
-- SPEC-VAL-001 §4 (ML-DSA-only consensus key) is now enforced at the apply layer.
-- State root now includes validators; replay tests updated to seed identical validator state for deterministic root matching.
+Token-economics reserve. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
 ## ADR-023 - Declare Phase 4 Exit: Hardening and Audit Readiness Complete
 
@@ -678,7 +570,6 @@ The following items are accepted Phase 5 risks; they are explicitly acknowledged
 4. Height-indexed quorum replay (per-block quorum snapshots for validator-churn replay determinism)
 5. `consensus_key_rotate` activation into `ValidatorRecord` (GAP-05)
 6. 200 TPS performance target — next bottleneck is HashMap structure clone per block tick (~6 ms/10K accounts)
-7. ~~Tokenomics finalization~~ — resolved by ADR-024 (Phase 5)
 8. ~~Genesis block specification~~ — resolved by ADR-025 (Phase 5)
 9. 7-day staging testnet dress rehearsal (procedure documented; execution is Phase 6 prerequisite)
 
@@ -690,190 +581,17 @@ The following items are accepted Phase 5 risks; they are explicitly acknowledged
 - `specs/launch-readiness.md` is the authoritative Phase 4 exit artifact.
 - ROADMAP.md Phase 4 exit criteria updated; README.md current-status updated.
 
-## ADR-024 - Viper Token Economics: Fixed Supply, Genesis Distribution, and Staking Parameters
+## ADR-024 — withdrawn from the public record
 
-**Date**: 2026-04-12
-**Status**: Accepted
+Token-economics reserve. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
-### Context
+## ADR-025 — withdrawn from the public record
 
-ADR-015 established the token model (4 roles: fee payment, validator self-bond, governance, slashing) and deferred all numeric parameters pending benchmark data. Phase 4 load tests (TASK-062, TASK-066) and the Ubuntu VM calibration (TASK-042) now provide the evidence base. Phase 5 requires a formal tokenomics document before the genesis block can be specified.
+Token-economics reserve (genesis allocation). This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
-The project was rebranded to Viper PQ Chain (TASK-069). The native token is named Viper, ticker VPR, atomic unit venom (1 VPR = 10^18 venom).
+## ADR-026 — withdrawn from the public record
 
-### Decision
-
-**Token identity:**
-- Name: Viper; Ticker: VPR; Decimals: 18; Atomic unit: venom (1 VPR = 10^18 venom)
-- Supply model: fixed — no inflation, no minting after genesis
-
-**Total supply:** 1,000,000,000 VPR (1 billion)
-- In venom: 10^27 venom; fits in `u128` (max ~3.4 × 10^38) with headroom
-
-**Genesis distribution:**
-
-| Allocation | Percentage | VPR amount | Vesting | Purpose |
-|---|---|---|---|---|
-| Founder | 20% | 200,000,000 | 4-year linear, 1-year cliff (off-chain custody) | Long-term alignment |
-| Treasury | 30% | 300,000,000 | Governance-controlled, no lockup schedule | Ecosystem development, grants, partnerships |
-| Genesis validators | 10% | 100,000,000 | No vesting; committed as stake at genesis | Bootstrap consensus |
-| Reserved | 40% | 400,000,000 | Locked until governance vote | Future distribution: community, sales, partners |
-
-Vesting note: Phase 1 has no on-chain vesting contract. Founder vesting is managed off-chain via custody arrangement. This ADR documents the commitment; enforcement deferred to a future governance-controlled vesting module.
-
-**Staking parameters:**
-
-| Parameter | Value | Rationale |
-|---|---|---|
-| `min_stake` | 1,000,000 VPR (0.1% of supply) | 24 validators × 1M = 24M staked minimum (2.4% of supply) |
-| `unbonding_period` | 14 days in blocks (at target block time) | Standard PoS; long enough for slashing evidence to materialize |
-| `evidence_validity_window` | 28 days | 2× unbonding period |
-| `max_active_set_size` | 24 (VALIDATOR_MAX_ACTIVE_SET_SIZE, ADR-013) | Prototype cap; Phase 6 governance may raise |
-
-**Slashing parameters:**
-
-| Offense | Slash % of stake | Rationale |
-|---|---|---|
-| Equivocation (double sign) | 5% | Severe deterrent; not destructive to small operators |
-| Liveness failure | 0.5% | Punishes downtime without destroying good-faith operators |
-| Invalid vote (repeated) | 2% | Between liveness and equivocation |
-
-Note: slashing execution code is not yet implemented (Phase 5 deliverable). These parameters are the governance target; enforcement requires the slashing module.
-
-**Fee coefficients (production floor):**
-
-The Phase 4 calibrated coefficients (TASK-042) are expressed in venom. They represent the technical cost floor, not the economic price floor. With 18 decimals, current values produce fees in the sub-femto-VPR range — economically negligible. During the dress rehearsal (Phase 5), a fee multiplier will be determined so that a typical `token_transfer` costs between 0.001 and 0.01 VPR. The final multiplier is a governance parameter, not a protocol constant.
-
-| Coefficient | Current value | Unit |
-|---|---|---|
-| `base_fee` | 500 | venom/tx |
-| `byte_fee` | 2 | venom/byte |
-| `sigverify_fee_v_b` | 14,000 | venom (ML-DSA-65 baseline) |
-| `exec_fee_per_gas` | 43 | venom/gas |
-
-### Consequences
-
-- Total supply is final and immutable; no code path may mint after genesis.
-- Genesis distribution table is the input for ADR-025 (genesis block specification).
-- Slashing percentages require implementation of the slashing module before mainnet.
-- Fee recalibration is a Phase 5 dress-rehearsal deliverable; current values are the technical floor.
-- `specs/tokenomics.md` (SPEC-TOKEN-002) is the normative document for these parameters.
-
-## ADR-025 - Viper PQ Chain Genesis Block Specification
-
-**Date**: 2026-04-12
-**Status**: Accepted
-
-### Context
-
-A mainnet genesis block must be fully deterministic: any operator given the same genesis inputs must independently arrive at the same genesis hash. This ADR defines the structure, state composition, hash derivation formula, and ceremony procedure for the Viper PQ Chain genesis block.
-
-### Decision
-
-**Chain ID:** `viper-mainnet-1` (UTF-8 encoded, then hex for config files)
-
-**Genesis block fields:**
-- `height = 0` (genesis does not execute transactions)
-- `prev_hash = [0x00; 32]` (null anchor — no predecessor)
-- `timestamp`: set at ceremony time; not pre-determined
-- `state_root`: computed deterministically from the initial state (accounts, Algorithm Registry, governance parameters, validator set)
-- `genesis_hash`: derived after all fields are fixed (see formula below)
-
-**Genesis state composition:**
-
-1. **Account table** — from ADR-024 distribution:
-   - Founder account: 200,000,000 × 10^18 venom, ML-DSA-65 key
-   - Treasury account: 300,000,000 × 10^18 venom, ML-DSA-65 key (multi-sig deferred to Phase 6)
-   - Genesis validator accounts: each holding `min_stake` balance (1,000,000 × 10^18 venom); one account per genesis validator
-   - Reserved account: 400,000,000 × 10^18 venom, ML-DSA-65 key (governance-locked)
-
-2. **Algorithm Registry** — initial state per SPEC-ACCOUNT-001 §6.3: ML-DSA-44, ML-DSA-65, ML-DSA-87, SLH-DSA-SHA2-128s all Active; FN-DSA-padded-512, FN-DSA-padded-1024 Active (signing deferred until FIPS 206); ML-KEM-768 Active
-
-3. **Governance parameters** — initial values from `specs/governance.md` and SPEC-FEE-001; all fee coefficients from ADR-024
-
-4. **Validator set** — genesis validators with operator addresses, consensus keys (ML-DSA-65), and `self_bond = min_stake`
-
-**Genesis hash derivation:**
-
-```
-genesis_hash = SHAKE-256(
-    "VIPER-GENESIS-V1" ||
-    chain_id_bytes       ||
-    state_root           ||
-    timestamp_be64,
-    output_len = 32
-)
-```
-
-The domain string `"VIPER-GENESIS-V1"` provides uniqueness against any other SHAKE-256 usage in the protocol. This formula must be implemented in `pqcd genesis-verify` before mainnet.
-
-**Genesis ceremony procedure:**
-1. Each genesis validator generates an ML-DSA-65 keypair offline (air-gapped recommended)
-2. Validator public keys and operator addresses are collected and published
-3. The genesis config file (`configs/mainnet-genesis.json`) is constructed with all accounts, validators, and governance parameters
-4. One operator runs `pqcd genesis-init configs/mainnet-genesis.json` to produce the genesis block
-5. The resulting `genesis_hash` is published; every candidate validator independently runs `pqcd genesis-verify` against the same config and confirms the hash matches
-6. Chain launch proceeds only when all genesis validators confirm the same hash
-
-**Verification procedure:**
-Any operator can verify their node has the correct genesis by running:
-```
-GET /v1/status → tip_hash at height 0 must equal the published genesis_hash
-```
-
-### Consequences
-
-- `specs/genesis-spec.md` (normative) documents these fields and procedures in full.
-- The `pqcd genesis-init` and `pqcd genesis-verify` CLI commands are Phase 5 implementation targets (not yet implemented).
-- The genesis timestamp is not pre-determined — it is set at ceremony time and included in the published genesis config for independent verification.
-- Any deviation from the published genesis config produces a different `state_root` and therefore a different `genesis_hash`; nodes with wrong genesis configs cannot join the network.
-
-## ADR-026 - Declare Phase 5 Exit: Mainnet Economics and Genesis Preparation Complete
-
-**Date**: 2026-04-12
-**Status**: Accepted
-
-### Context
-
-Phase 5 — Mainnet Economics and Genesis Preparation — opened on 2026-04-12 following the Phase 4 exit declaration in ADR-023. The objective was to finalize the economic parameters and genesis block specification required before mainnet launch.
-
-Five tasks were executed (TASK-069 through TASK-073). This ADR records the formal criterion-by-criterion exit evaluation.
-
-### Exit Criteria Evaluation
-
-| Criterion | Status | Evidence |
-|---|---|---|
-| Tokenomics parameters ratified in a formal document (ADR accepted) | **MET** | ADR-024 accepted; `specs/tokenomics.md` (SPEC-TOKEN-002) produced: 1B VPR fixed supply, 20/30/10/40 distribution, min_stake=1M VPR, slashing 5%/0.5%/2% |
-| Genesis block specification reviewed, deterministic genesis hash formula agreed | **MET** | ADR-025 accepted; `specs/genesis-spec.md` (SPEC-GENESIS-001) produced: chain ID `viper-mainnet-1`, SHAKE-256 genesis hash formula, ceremony procedure, verification procedure |
-| All candidate validators completed KYC/KYB and hardware attestation | **NOT MET** | Deferred to Phase 6 (no genesis validators yet contracted); format and channel TBD by ceremony coordinator |
-| 7-day dress rehearsal completed | **PARTIALLY MET** | Procedure documented (`docs/dress-rehearsal-procedure.md`); execution requires live infrastructure — is a Phase 6 prerequisite, not a Phase 5 document deliverable |
-| Validator production onboarding documented | **MET** | `docs/validator-onboarding.md` produced: hardware requirements, key generation, registration, operations, SLA expectations |
-
-### Rationale for Partial Credit on Dress Rehearsal
-
-The dress rehearsal procedure is fully documented and matches the ROADMAP.md Phase 5 deliverable ("dress rehearsal procedure documented"). Execution of the rehearsal requires live validator infrastructure and 7 days of calendar time — neither is possible in a documentation-only session. The ROADMAP.md Phase 5 exit criteria state "dress rehearsal completed"; this is accepted as partially met: the procedure is ready for execution, which becomes the first Phase 6 activity.
-
-### Phase 5 Work Summary
-
-**TASK-069** (rebranding): Project renamed to Viper PQ Chain; token is Viper (VPR, 18 decimals, venom atomic unit). Updated CONVENTIONS.md, AGENTS.md, README.md, WHITEPAPER.md, CONTEXT.md, pq_chain_foundation_v2.md. No code changes.
-
-**TASK-070** (tokenomics): ADR-024 accepted. `specs/tokenomics.md` produced. 1B VPR fixed supply; 20% founder (4-year vesting off-chain), 30% treasury, 10% genesis validators, 40% reserved; min_stake = 1M VPR; slashing 5%/0.5%/2%; fee recalibration deferred to dress rehearsal.
-
-**TASK-071** (genesis spec): ADR-025 accepted. `specs/genesis-spec.md` produced. Chain ID `viper-mainnet-1`; genesis hash = SHAKE-256("VIPER-GENESIS-V1" || chain_id || state_root || timestamp_be64); ceremony procedure in 6 steps.
-
-**TASK-072** (validator onboarding): `docs/validator-onboarding.md` produced. Hardware requirements (Ryzen 7 7700, 32 GB, 1 TB NVMe), key generation (operator vs. consensus key, air-gap recommended), registration via msg_type 0x0400, operations guide, SLA expectations.
-
-**TASK-073** (dress rehearsal procedure): `docs/dress-rehearsal-procedure.md` produced. 7-day checklist with specific per-day drills: bootstrap (D1), load test (D2), key rotation (D3), deprecation (D4), validator restart (D5), snapshot import (D6), autonomous operation (D7). Exit criteria, failure procedure, and post-rehearsal report format defined.
-
-### Deferred to Phase 6
-
-1. `pqcd genesis-init` and `pqcd genesis-verify` CLI command implementation
-2. Genesis ceremony execution (key collection, genesis config construction, genesis hash agreement)
-3. Validator KYC/KYB documentation and hardware attestation collection
-4. 7-day dress rehearsal execution on live infrastructure
-5. Fee coefficient economic recalibration (multiplier for 0.001–0.01 VPR/tx target)
-6. On-chain vesting module (founder vesting currently off-chain)
-7. Treasury multi-sig key management
+Token-economics reserve. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
 ## ADR-027 - Adopt Tendermint-like BFT Consensus with PQ Signatures
 
@@ -927,7 +645,7 @@ This ADR supersedes the "Proposed" status of ADR-007, which is now Accepted with
 - Phase 5 declared complete as of 2026-04-12 (document deliverables MET; operational items deferred to Phase 6).
 - Phase 6 — Mainnet Launch and Stabilization — prerequisites: dress rehearsal execution, genesis ceremony, KYC/KYB collection.
 - **221 tests, 0 failures** as of Phase 5 exit (no code changes in Phase 5).
-- `specs/tokenomics.md`, `specs/genesis-spec.md`, `docs/validator-onboarding.md`, `docs/dress-rehearsal-procedure.md` are the authoritative Phase 5 exit artifacts.
+- `specs/genesis-spec.md`, `docs/validator-onboarding.md`, `docs/dress-rehearsal-procedure.md` are the authoritative Phase 5 exit artifacts.
 
 ## ADR-028 - Bound ChainStore In-Memory Window Using Trusted Checkpoints
 
@@ -1149,7 +867,7 @@ Additionally, the current address derivation in devnet uses `SHAKE-256(pk_bytes)
 
 ### Consequences
 
-- Users can create wallets, send VPR, and interact with the chain from the CLI without writing custom code.
+- Users can create wallets, send the reserve unit, and interact with the chain from the CLI without writing custom code.
 - SDKs gain a real signing path: build unsigned transaction → `pqcd wallet sign` → submit signed transaction to node.
 - The address derivation change breaks backward compatibility with existing devnet state — a chain reset is required. This is acceptable at the current stage (pre-mainnet).
 - Mnemonic recovery is possible: the same 12 or 24 words (plus optional passphrase) produce the same address on any machine.
@@ -1213,61 +931,13 @@ Keep FN-DSA in the registry as Active (future-proofing). Do NOT implement FN-DSA
 - No security risk: FN-DSA keys can be registered/rotated at state level but cannot produce valid signatures.
 - Mainnet (Phase 6) does not require FN-DSA; ML-DSA-65 is the mandatory consensus algorithm.
 
-## ADR-037 - GitLab CI/CD Pipeline: Build Once on Runner, Deploy via Ansible
+## ADR-037 — withdrawn from the public record
 
-**Date**: 2026-04-16
-**Status**: Accepted
+Private CI infrastructure. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
-### Context
+## ADR-038 — withdrawn from the public record
 
-The `make deploy` / `make deploy-binary` targets previously triggered `cargo build --release` on each target node (producer-1, follower-1, follower-2). This caused repeated failures when C build dependencies (`clang`, `libclang-dev`) were absent or stale on nodes, and wasted compile time rebuilding the same binary three times in parallel.
-
-### Decision
-
-Introduce a GitLab CI/CD pipeline on the existing self-hosted runner (`agws-runner`, #52492470). The pipeline:
-
-1. Validates (fmt, clippy, secret detection) and tests on every push.
-2. Builds `pqcd --release` once on the runner for `main` branch and tags; the binary is saved as a GitLab artifact.
-3. Exposes manual deploy jobs that use Ansible to distribute the pre-built artifact to nodes (`pipeline-deploy.yml`) rather than building on each node.
-4. Retains `make deploy` (full provision, build-on-node) for first-time infrastructure setup and major infra changes where Rust must be verified on the node.
-
-The runner already has SSH access to all devnet nodes and the Ansible inventory; no new secrets or network paths are required.
-
-### Consequences
-
-- Nodes no longer require Rust toolchain or `clang`/`libclang-dev` for normal binary updates.
-- Incremental builds use the runner's on-disk cargo cache; after the first run, re-builds compile only changed crates.
-- `reset-chain`, `health`, `deploy:config` are available as one-click manual jobs in the GitLab UI.
-- `deploy:full` (build-on-node via `site.yml`) is retained for first-time provisioning and infrastructure debugging.
-- Binary provenance is the GitLab artifact SHA; no artifact signing yet (deferred to Phase 6 mainnet preparation).
-
----
-
-## ADR-038 - ValidatorRegister `self_bond` Field Encoded as 16-Byte Big-Endian bstr
-
-**Date**: 2026-04-17
-**Status**: Accepted
-
-### Context
-
-`encode_register_payload` in `pqc-state::apply::validator` encoded `self_bond` (a `u128` field) as `Value::Integer((p.self_bond as i64).into())`. This cast silently truncates any bond value > `i64::MAX` (~9.2 × 10^18). Since 1 VPR = 10^18 venom, a validator bonding > 9.2 VPR would have their bond amount corrupted on-chain without any error.
-
-This is a CBOR format change to the `ValidatorRegister (0x0400)` transaction payload (field 4), covered by the SPEC-TX-001 backwards-compatibility rule.
-
-### Decision
-
-Encode `self_bond` as `Value::Bytes(p.self_bond.to_be_bytes().to_vec())` — a 16-byte big-endian byte string, consistent with how `MultisigAccountState.balance` and similar `u128` fields are encoded. The decoder is updated to parse the 16-byte bstr form. Old integer-encoded payloads are no longer accepted.
-
-This is a breaking change at the devnet stage only (no mainnet). A chain reset clears all existing `ValidatorRegister` payloads from history; future re-registrations will use the new encoding.
-
-### Consequences
-
-- Bonds up to `u128::MAX` (~3.4 × 10^38 venom) are representable without truncation.
-- Existing devnet validator register payloads (integer-encoded) are incompatible; requires a chain reset before deploying this binary.
-- Consistent with the `u128` bstr encoding pattern used for balance fields throughout the codebase.
-- Audit finding F-023 resolved.
-
----
+Token-economics reserve. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
 ## ADR-039 - ProposalStatus::ExecutionFailed — New Governance Execution Failure State
 
@@ -1297,44 +967,9 @@ The `ExecutionFailed` state is terminal and observable via `GET /v1/governance/r
 
 ---
 
-## ADR-040 - Phase 6 Mainnet Launch, Stabilization Window, and Phase 7 SDK Publication
+## ADR-040 — withdrawn from the public record
 
-**Date**: 2026-04-20
-**Status**: Accepted
-
-### Context
-
-Phase 6 (Mainnet Launch and Stabilization) requires a live genesis block, a minimum BFT-viable validator set, and a 30-day uninterrupted stabilization window. Phase 7 exit criteria include publishing the TypeScript and Python SDKs to public registries.
-
-### Decisions
-
-**Mainnet genesis (2026-04-20T16:32:47Z)**
-
-Chain ID `viper-mainnet-1` launched with 3 validators (ML-DSA-65, FIPS 204). Genesis block hash `6c5462ad8072d233aa366921dbb6bdafcd49ba480c5493fa80cb8701fa93e4e6`; `prev_hash` all-zeros (anchor per ADR-025). Three validators provisioned via Ansible (`deploy/ansible/playbooks/site.yml`) on Contabo VPS infrastructure: producer-1, follower-a, follower-b. Real keypairs generated with `pqcd keygen`; seeds stored in Argon2id+XChaCha20-Poly1305 keystores (`~/.viper/keystore/`); never committed to the repository. Mainnet-specific secrets kept in gitignored `deploy/ansible/group_vars/all/mainnet_keys.yml`.
-
-**30-day stabilization window**
-
-Starts 2026-04-20, ends 2026-05-20. No protocol upgrades during this window without emergency governance (≥ ⅘ threshold, SPEC-GOV-001 §7.4). Prometheus metrics active at `/v1/metrics` on all nodes.
-
-**Infrastructure note — Contabo hosted firewall**
-
-A stale firewall rule on the producer VPS referenced the decommissioned follower-1 address instead of the replacement host. This asymmetrically blocked follower-1 from initiating P2P connections to the producer. Resolved by updating the hosted-firewall rule. An SSH reverse-tunnel workaround was deployed and subsequently removed once the root cause was fixed. The configure role now supports a `viper_producer_p2p_addr_override` per-host inventory variable (ADR-037 pattern) to allow future per-node transport overrides without template changes.
-
-**Phase 7 SDK publication**
-
-- `viper-pqchain==0.1.0` published to PyPI (2026-04-20): `pip install viper-pqchain`
-- `@v1p3r4llbl4ck/sdk@0.1.0` published to npm (2026-04-20): `npm install @v1p3r4llbl4ck/sdk`
-
-The npm scope `@viper-pqchain` requires an npm organisation; deferred to Phase 8 when the scope will be migrated. The `pyproject.toml` build backend was corrected from `setuptools.backends.legacy:build` (Python 3.9 incompatible) to `setuptools.build_meta`.
-
-### Consequences
-
-- Phase 6 stabilization window is formally open; exit requires 30 uninterrupted days, one IR drill, and fee-revenue data collection.
-- Phase 7 is fully complete; all code deliverables done and both SDKs accessible via public registries.
-- The npm package name `@v1p3r4llbl4ck/sdk` is a temporary name; a Phase 8 task will migrate it to `@viper-pqchain/sdk` and deprecate the old name.
-- Validator keystores must be backed up off-site; loss of all three seeds would require a chain reset and new genesis ceremony.
-
----
+Private deployment history. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
 ## ADR-041 - P2P Layer Phase 8 — libp2p + QUIC + X25519MLKEM768
 
@@ -1612,54 +1247,9 @@ Migration plan. Devnet-2 keeps the config allow-list (no migration cost). Testne
 
 ---
 
-## ADR-048 - Correlation Penalty Multiplier (Ethereum ETH2-Style)
+## ADR-048 — withdrawn from the public record
 
-**Status**: Accepted
-**Date**: 2026-04-23
-**Deciders**: Alberto Galassi
-**Refines**: ADR-024, ADR-042, SPEC-SLASH-001
-**Closes**: KNOWN-ISSUES D-02 (TASK — not separately numbered)
-
-### Context
-
-SPEC-SLASH-001 §10 sets the base equivocation slash at 500 bps (5% of `self_bond`). That is adequate against a lone misconfigured validator but under-prices a coordinated Byzantine attack: at a 5% flat rate, slashing 1/3 of stake costs only `0.333 × 0.05 × total_active_stake ≈ 1.67%` of the attacker's aggregate bond — below the profit threshold for a successful safety violation against a 24-committee. Ethereum's ETH2 design addresses the same asymmetry with a *correlation penalty*: the slash fraction scales with the fraction of stake slashed in a sliding window, so simultaneous slashes are disproportionately expensive. SPEC-SLASH-001 §17 already formalises this direction; KNOWN-ISSUES D-02 tracked the code landing. `pqc-types::slashing::RecentSlashEntry` and `StateStore::recent_slashes: VecDeque<RecentSlashEntry>` (leaf domain `VIPER-RECENT-SLASHES-V1`, folded into `state_root()`) provide the consensus-critical substrate.
-
-Three shape options were considered. (A) **Linear multiplier** `mult = min(1.0, fraction_slashed × K)` with a per-validator additive boost `effective = base × (1 + mult × B)` — Ethereum's actual shape (K=3 in ETH2; `B` a governance-tunable max boost). (B) **Quadratic** `mult = min(1.0, (fraction_slashed / threshold)²)` — steeper curve near the threshold but less predictable at mid-range; requires a square-root divide for bound analysis. (C) **Stepwise tiers** — simpler to audit but discontinuous at boundaries, creating sharp economic cliffs that a sophisticated attacker can dance around.
-
-### Decision
-
-Adopt **Option A**, matching Ethereum's general shape but with protocol-specific parameters tuned for a smaller committee (ADR-013 sets `VALIDATOR_MAX_ACTIVE_SET_SIZE = 24`). The concrete formula, all in u128 basis-point arithmetic:
-
-```
-ratio_bps     = min(10_000, window_slashed_stake × 10_000 / active_stake)
-multiplier    = min(10_000, ratio_bps × CORRELATION_BASE_MULT)       // cap at 1.0
-boost         = 10_000 + multiplier × MAX_MULT_BOOST                  // 10_000 = ×1.0
-effective_bps = min(10_000, base_fraction_bps × boost / 10_000)
-```
-
-with `CORRELATION_BASE_MULT = 3` and `MAX_MULT_BOOST = 19`. `CORRELATION_WINDOW_BLOCKS = 6_220_800` (36 days at 500 ms/block, matching `EpochConfig::mainnet()`). Single-validator slashes see an empty window and keep the 500 bps base — SPEC-SLASH-001 §10 byte-stability preserved. At the 1/3 stake threshold `multiplier = 10_000` so `effective_bps = 500 × 200_000 / 10_000 = 10_000` (100% slash, capped at `self_bond`). The 20× boost cap (`MAX_MULT_BOOST = 19`, so `1 + 1.0 × 19 = 20`) is intentionally aggressive for a 24-validator committee — Ethereum runs with 300K+ validators where 1/3 is a much larger absolute stake; a smaller set needs a steeper penalty to preserve the same attacker-cost floor. This is the "calibrated-conservative" choice called out in the task brief.
-
-Single-slash path is unchanged (the test `single_equivocation_applies_base_5pct_no_correlation` pins the byte-stable invariant). Multi-slash path is boosted starting from the second slash in the window: the first slash records its entry AFTER computing the multiplier, so two simultaneous slashes produce `(base 5%) + (5% × correlation_boost)` rather than double-boosting the first. This is the Ethereum semantics.
-
-### Consequences
-
-- Fresh consensus-critical state column on `StateStore` (`recent_slashes: VecDeque<RecentSlashEntry>`) with leaf domain `VIPER-RECENT-SLASHES-V1` folded into the state root. Snapshot sync byte-stability is preserved because the ledger starts empty and only grows on slashes.
-- Lazy pruning (on each slash apply) keeps the ledger bounded to the window even without a per-block sweep. Two validators processing the same slash at the same height run an identical prune+insert sequence, so state roots converge.
-- No changes to the base 500 bps SPEC-SLASH-001 §10 constant — `SLASH_FRACTION_BPS` stays hardcoded per ADR-042 (a governance-immutable safety invariant). Only the correlation multiplier is composition-on-top.
-- If ≥ 1/3 of active stake is slashed in the 36-day window, subsequent slashes reach 100% of self_bond. This is the same upper bound as the pre-ADR-048 `self_bond` floor (§13 edge case).
-- Overflow analysis: all intermediate `u128` products stay below `u128::MAX ≈ 3.4 × 10^38`. Largest realistic: `window_slashed_stake × 10_000` with `window_slashed_stake ≤ total_supply ≤ 10^27` → `10^31`, well inside u128. `saturating_mul` is defensive belt-and-braces.
-- Future governance can tune `CORRELATION_WINDOW_BLOCKS`, `CORRELATION_BASE_MULT`, and `MAX_MULT_BOOST` via supermajority per SPEC-SLASH-001 §17.2, but the threshold (1/3) is hardcoded — same logic as ADR-042's base slash fraction.
-- The pluggable verifier registry (ADR-042 §16, KNOWN-ISSUES D-01) can reuse this ledger unchanged; any future slashable offense just calls `record_recent_slash` on apply.
-
-### References
-
-- Vitalik Buterin, *"Accountable safety via correlation penalties"* (Ethereum research forum, 2019)
-- Ethereum ETH2 slashing: see `consensus-specs/specs/phase0/beacon-chain.md` §`process_slashings`
-- SPEC-SLASH-001 §17 (in-repo) for the protocol-level spec body
-- ADR-013 (24-validator committee target)
-- ADR-042 (hardcoded offense parameters + correlation penalty direction)
-
----
+Token-economics reserve. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
 ## ADR-049 - AddAlgorithm Governance Proposal (Runtime Registry Extension)
 
@@ -2180,118 +1770,9 @@ Implementation is staged across nine tasks (TASK-207..215), targeted under the n
 
 ---
 
-## ADR-055 - Three Attestation-Derived Public Services on Top of `viper-pq-1`
+## ADR-055 — withdrawn from the public record
 
-**Status**: Accepted 2026-04-27
-**Depends on**: ADR-002 (notary as first wedge); ADR-052 (P-COMPAT-001 non-breaking envelope); existing `attestation_create` primitive (`pqc-state` apply path) and `viper-notary` HTTP backend (the notary service (private)).
-**Governs**: the public product surface exposed over HTTP by the producer-side notary service. Does **not** add new chain primitives, new opcodes, new state types, or new consensus rules.
-
-### Context
-
-`viper-pq-1` ships with a single concrete public service today (`POST /api/notarize`, document proof of existence). The marketing surface (`agwswebconsulting.it/it/viper-pq-chain/`) still describes the project as "vault + attestations + notarization + identity proofs" — broad, vague, hard to convert. After the 2026-04-27 stealth-mode positioning review, three concrete additional services were identified that:
-
-1. solve a clearly named problem with a regulated buyer in EU (NIS2 / DORA / eIDAS 2),
-2. can be built **entirely on top of the existing `attestation_create` primitive** without touching consensus, state schema, or fee model,
-3. give three distinct LinkedIn / sales narratives instead of one generic "blockchain" pitch.
-
-The three services are:
-
-- **PQ Timestamping Authority** (RFC 3161-style API, post-quantum token format) — buyer: legal tech, GED, archives, CI/CD, eIDAS-qualified TSA candidates.
-- **Evidence Chain** (immutable append-only audit log of process events) — buyer: NIS2 / DORA compliance, internal-audit teams, regulated SaaS.
-- **Code Release Attestation** (signed build/release attestation anchored on chain, sigstore-PQ pattern) — buyer: dev/security teams in supply-chain-aware orgs.
-
-This ADR records the architectural decision to ship them as **thin HTTP wrappers in the existing `viper-notary` backend** rather than as new chain modules or as separate microservices.
-
-### Decision
-
-#### D1. No new chain primitives
-
-The three services share `attestation_create` as their on-chain primitive. They differ only in:
-
-- the shape of the off-chain receipt they return,
-- the `metadata` field they pack inside the attestation payload,
-- the verification semantics on the read side.
-
-There is no new transaction kind, no new state entry, no new opcode, no governance proposal needed. P-COMPAT-001 §1 (chain reset prohibition) is not engaged because nothing on-chain changes.
-
-#### D2. Single backend, three endpoint groups
-
-The services are added to the existing `viper-notary` backend (the notary service (private)) as three new endpoint groups, mounted on the same Axum `Router` as `/api/notarize`. The service account (consensus seed in `notary.env` → `service_signer_seed_hex`) submits all attestations.
-
-**Timestamping**:
-- `POST /api/timestamp` — body: `{ digest: hex32, hash_alg: "sha-256" | "sha3-256" | "shake-256", policy?: string }`. Submits an `attestation_create` whose payload metadata records `kind=timestamp`, `policy`, `client_nonce`. Returns a `TimeStampToken`-shaped JSON receipt with `serialNumber`, `genTime`, `messageImprint`, `accuracy`, `tsa_signature` (over the receipt itself, PQ).
-- `GET /api/timestamp/{token_id}` — returns the receipt + chain anchor proof.
-
-**Evidence Chain**:
-- `POST /api/evidence` — body: `{ stream_id: string (≤64 chars), event_type: string, payload_digest: hex32, prev_event_id?: string, occurred_at: rfc3339 }`. Submits an `attestation_create` whose payload metadata carries `kind=evidence`, `stream_id`, `seq` (server-assigned monotonic, persisted in a small RocksDB sidecar), `event_type`, `prev_event_id`. Hash-chains within a stream so a missing event is detectable client-side.
-- `GET /api/evidence/{stream_id}/events?since=<seq>&limit=<n>` — paginated read.
-- `GET /api/evidence/{stream_id}/head` — current head (seq + event_id + chain anchor).
-
-**Release Attestation**:
-- `POST /api/release/sign` — body: `{ artifact_hash: hex32, repo: string, ref: string (tag or commit), builder_id: string, build_log_hash?: hex32, sbom_hash?: hex32 }`. Submits an `attestation_create` whose payload metadata carries `kind=release`, `repo`, `ref`, `builder_id`, optional `build_log_hash`, optional `sbom_hash`. Returns a release-attestation receipt JSON.
-- `GET /api/release/{attestation_id}/verify` — returns the attestation + verification verdict (matches expected hashes? signature valid? finalized?).
-
-All three groups share the **same chain submission infrastructure** as `/api/notarize` (`tx_builder::build_attestation_create_tx`, `chain::NodeClient::submit_tx_and_wait`, `NOTARY_FINALIZATION_TIMEOUT_MS`).
-
-#### D3. Per-service service-account is OUT OF SCOPE at launch
-
-All three services share the single service signer of `viper-notary`. Per-service signing identity (so a customer can pin a `release-tsa` issuer key separately from the `notary` issuer key) is a future follow-up. The decision: **don't fragment keys before there is concrete operator demand**. ADR-049 `AddAlgorithm` is not engaged.
-
-#### D4. No new state schema; per-service local sidecar OK
-
-Evidence Chain needs a server-side `(stream_id, seq) → event_id` index to assign monotonic seq and to serve `GET /events`. This is **off-chain**, in a small RocksDB column family inside the notary process (`evidence_streams` CF). The on-chain attestation remains the source of truth; the local index is a cache that can be rebuilt from chain state by replaying attestations whose metadata `kind=evidence` matches the stream id.
-
-Same for Release Attestation if a `repo → latest_release` view is needed.
-
-#### D5. No frontend coupling
-
-The notary frontend (the notary SPA) keeps its current Dashboard / Explorer / Notarize tabs. The three new services are **API-first**. The three customer-facing landing pages live on the AGWS Web Consulting site (`/it/strumenti/{timestamp,evidence,release}`) as preview / "request access" pages. UI behind authentication and the actual API consoles ship after the company is incorporated and a billing plan is in place. This is consistent with the stealth-mode strategy.
-
-#### D6. Same systemd unit, same ansible role
-
-Deployment uses the existing `notary` ansible role on producer nodes. The endpoint groups are added to the same `viper-notary` binary. No new systemd units, no new firewall rules, no new ports.
-
-### Consequences
-
-**For the chain.** Zero impact. No consensus change, no state-schema change, no fee-table change, no governance event. P-COMPAT-001 §1 is not engaged.
-
-**For the notary backend.** The single-binary surface grows from 4 routes (`/api/notarize`, `/api/verify/{id}`, `/health`, plus `/v1/*` proxies) to roughly 12 routes. Backend code grows by an estimated 800–1200 LOC across three new modules + a small sidecar storage layer for Evidence Chain. Build time delta is negligible.
-
-**For the marketing site.** The `viper-pq-chain` page now references four concrete services (notarization + the three new ones) instead of vague "use cases". Three new tool pages on `/strumenti/` give individual deep-link targets for LinkedIn posts and conversations, each with its own narrative angle.
-
-**For the product positioning.** Three distinct buyer narratives instead of one generic "blockchain" pitch: legal/eIDAS, NIS2/DORA compliance, dev/security supply chain. Each is independently defensible and independently sellable.
-
-**For service-key fragmentation.** Postponed. If a customer eventually requires a separately-pinned issuer for one of the services, the migration is "spawn a second service-account key, migrate that endpoint group" — not a chain change.
-
-**For operator burden.** Slight. The notary systemd unit gets a few more env vars (one per service-group feature flag) and the RocksDB working set grows by the Evidence Chain CF. Backups (`/var/lib/pqchain/notary.db`) cover it transparently.
-
-### Out of scope
-
-- Per-service signer keys (D3).
-- Authenticated, billed API consoles (D5).
-- Customer self-service signup (deferred until company incorporation).
-- New on-chain primitives, new opcodes, new state, new fee dimensions.
-- Aggregating multiple events into a single `attestation_create` — each evidence event is its own attestation. Batch optimization is a fee-model question, not a launch question.
-- A separate "release-attestation" verifier UI on the notary frontend. The verify endpoint returns JSON; a UI can be added later without touching the backend.
-
-### Tracking tasks
-
-- TASK-229 — `/api/timestamp` + `/api/timestamp/{id}` (PQ Timestamping)
-- TASK-230 — `/api/evidence/*` + RocksDB sidecar (Evidence Chain)
-- TASK-231 — `/api/release/sign` + `/api/release/{id}/verify` (Release Attestation)
-- TASK-232 — three AGWS landing pages (`/strumenti/timestamp`, `/strumenti/evidence`, `/strumenti/release`)
-
-### Related
-
-- ADR-002 (notary as first wedge — this ADR is "second / third / fourth wedge")
-- ADR-049 (AddAlgorithm — not engaged: no new algorithm; same signer alg as `viper-notary`)
-- ADR-052 (P-COMPAT-001 — not engaged: no chain change)
-- ADR-053 (genesis architecture — orthogonal; this ADR sits entirely above the chain)
-- the notary service (private) (existing service that becomes the carrier of the three new endpoint groups)
-- 2026-04-27 LinkedIn stealth-mode positioning review (operator session log)
-
-
----
+Business planning. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
 ## ADR-056 - Chart Deploy Ceremony Tooling (`pqcd ceremony` Subcommand)
 
@@ -2783,321 +2264,17 @@ Adds a 3rd algorithm (foundational diversity beyond ML-DSA + SLH-DSA — preferr
 
 ---
 
-## ADR-064 - Fee-Primacy Crossover Taper Schedule *(reserved)*
+## ADR-064 — withdrawn from the public record
 
-**Status**: Reserved 2026-05-06; trigger conditions not yet met.
-**Authority:** `docs/long-horizon-roadmap.md` §4.
-**Y-band:** Y8-Y12 (2034-2038), gated on 90-consecutive-day fee revenue > inflation aggregated network-wide at 256+ active set.
+Token-economics reserve. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
-### Reservation rationale
+## ADR-065 — withdrawn from the public record
 
-When sustained fee revenue overtakes inflation, governance opens the inflation taper schedule. Reserving the closure ADR ID for the schedule decision; default proposal (linear taper to ~0.5%/year security floor over 8-12 years) is a starting point — actual schedule is governance-decided when the trigger fires.
+Token-economics reserve (validator-set economics). This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
-### Related
+## ADR-066 — withdrawn from the public record
 
-- ADR-022 (genesis tokenomics + fee model)
-- `docs/long-horizon-roadmap.md` §4 — full crossover definition
-- TASK-118 (recurring 30-day fee-revenue measurement vehicle)
-
-
----
-
-## ADR-065 - Scale-Up Plan: Committee 3 → 64 → 256 → 1024 Validators
-
-**Status**: Accepted 2026-05-06.
-**Depends on:** ADR-013 (closed-cohort baseline that this scale-up evolves from), ADR-041 (libp2p + GossipSub v1.2 transport), ADR-042 (validator identity + ValidatorPeerId binding), ADR-046 (consensus-key rotation framework, Phase-3 partial), ADR-051/052 (BFT signing + P-COMPAT-001 state-evolution policy), ADR-053 (`viper-pq-1` genesis architecture), TASK-222 (GossipSub peer-score calibration — already calibrated for the 64-256 band).
-**Governs:** the staged growth ladder from the current 3-validator launch through 64 / 256 / 1024 active validators, with the explicit gate conditions each step must clear.
-
-### Context
-
-`viper-pq-1` launched 2026-04-25 with 3 validators on a single operator's infrastructure (devnet-2 hardware re-purposed for mainnet-discipline operation). The ADR-053 genesis architecture was sized for this baseline — `EpochConfig::viper_pq_1()` defaults `churn` to 39 / 313 bps which approximates the legacy `/256` and `/32` per-epoch limits at uniform stake (TASK-194 commit `341aee9`).
-
-The chain is engineered for multi-decade operation; staying at 3 validators indefinitely defeats every decentralisation property the project commits to. But brute-force scaling to N validators surfaces a layered set of constraints that each need their own closure work. This ADR sequences the four growth steps with explicit gate conditions, owner-tasks, and exit criteria, so the operator running the cohort onboarding (TASK-185) and the protocol team driving the technical gates (TASK-222 / 223 / 186) work from the same forecast.
-
-The framing the project rejects: "open to permissionless tomorrow". The framing the project accepts: phased growth, each step gated on observable closure of the previous step's constraints, with a multi-year arc that takes the chain from operator-controlled launch to fully-permissionless-with-diversity-targets at the Y10 horizon (per `docs/long-horizon-roadmap.md` §5).
-
-### Decision
-
-#### D1. Four-step ladder
-
-| Step | Active size | Phase | Gate(s) closed before opening | Hardware target per validator |
-|------|-------------|-------|-------------------------------|-------------------------------|
-| 0 | 3 | 8.5 (current) | n/a — launch baseline | 4-core / 16 GB / 500 GB NVMe |
-| 1 | 4 → 64 | 9 | TASK-185 onboarding closed; TASK-223 dynamic keystore landed; TASK-186 block-time decision pinned | 8-core / 32 GB / 1 TB NVMe |
-| 2 | 64 → 256 | 10 | TASK-222 peer-score telemetry shows steady-state under cohort load (DONE-pending-soak); fee-revenue trajectory stable per TASK-118 | 16-core / 64 GB / 2 TB NVMe |
-| 3 | 256 → 1024+ | 11+ | STARK aggregation matured (ADR-061 closure); committee size economically rational (TASK-118 fee data); hardware re-baseline | re-baselined post-aggregation |
-
-Each step is opened by a governance vote against on-chain `max_active_validators` (currently a `viper-pq-1` mainnet constant; promoted to a governance-mutable parameter in Step 1). The vote MUST cite this ADR and the specific gate-closure evidence.
-
-#### D2. Step 1 (3 → 64): the cohort step
-
-**Owner-tasks:**
-- TASK-185 — external operator onboarding (≥5 operators × 7-day soak by 2026-05-20)
-- TASK-223 — online consensus-key rotation + dynamic keystore (unblocks TASK-113 Step 6)
-- TASK-186 — final block-time decision (the per-block budget at 64 × 3 sigs / block needs the right envelope)
-- TASK-222 — GossipSub peer-score calibration (DONE 2026-05-06) — already sized for this step
-
-**Constraints unblocked:**
-- The `LocalProposer` test harness keystore caps at 3 keys (TASK-113 Step 6 `#[ignore]`d at 4-validator scale because `INSUFFICIENT_COMMIT_QUORUM` fires when the producer can't sign for the 4th validator). The unblock is *not* a code change to LocalProposer — it is a real keystore-layer that loads dynamically-registered validators' signing material per ADR-046's full path. TASK-223 is exactly that work.
-- BFT quorum threshold `ceil((2N+1)/3)` grows with N; without dynamic keystore the producer becomes the bottleneck. With dynamic keystore + distributed signing (ADR-051 M2b N+2 — already live), each validator signs for itself and gossips its precommit; the producer waits for ≥ threshold gossip-collected sigs.
-
-**Hardware target rationale:** at 64 validators × 3 sigs / block × 1 s block-time (post-TASK-186 likely landing) ≈ 192 sigs/s × 3.3 KB ≈ 4 MB/s pure consensus traffic. 1 TB NVMe at ~4 GB/day chain-data growth (KNOWN-ISSUES R-10) supports ~250 days before TASK-187a prune fires; weekly prune brings steady-state to ~30 GB. 8-core / 32 GB sized for the GossipSub peer-score sampler + RocksDB compaction headroom under the larger mesh (mesh_n=8 across 64 peers).
-
-**Exit criterion:** 64 validators × 7-day soak with zero unplanned halts; `pqchain_p2p_gossip_peers_graylisted` stays at 0 across the 64-node cohort; chain growth tracks the TASK-186 forecast within 10 %.
-
-#### D3. Step 2 (64 → 256): the Phase 10 step
-
-**Owner-tasks:**
-- TASK-222 peer-score calibration tuned from Step 1 soak data (the calibration was *intended* for this band but the actual numbers may shift ±2× per the documented "tune from soak data" workflow)
-- TASK-118 fee-revenue trajectory stable (the chain economics need real signal at the 64-band before the 256-band opens)
-- Hardware spec re-baseline if Step 1 soak surfaces unexpected I/O or memory pressure
-
-**Constraints unblocked:**
-- GossipSub IDONTWANT (already wired) becomes essential: at 256 × 3 sigs × 16 KB SLH-DSA-256s archival sig × 0.1 archival-cadence-fraction ≈ 1.2 MB/s archival overlay traffic alone. Without IDONTWANT the duplicate-message bandwidth would be O(N) larger per gossip round.
-- TASK-186 block-time decision becomes load-bearing: at 500 ms / 256 / 3 sigs the chain produces ~17 GB/h pure consensus chatter — sustainable only if the 7-day soak supports it. If Step 1 soak shows the 500 ms cadence is too aggressive, governance shifts to 1000 ms before opening Step 2.
-- Validator-set divergence risk grows quadratically with N (more pairs of equivocation-evidence to track). The slashing-evidence-registry's per-validator memory footprint is `O(N × evidence_count)`; ADR-050 caps it but at 256 the cap matters.
-
-**Hardware target rationale:** 16-core / 64 GB sized for the 256-peer GossipSub mesh + the higher chain-data growth rate. 2 TB NVMe at the steady-state growth (post-prune ~120 GB) plus 6× headroom for incident-response (snapshot import, RocksDB compaction blowup).
-
-**Exit criterion:** 256 validators × 7-day soak; fee-revenue trajectory monotonically positive (TASK-118 reports); peer-score telemetry stable; `pqchain_p2p_block_gap_total` stays bounded under cohort load.
-
-#### D4. Step 3 (256 → 1024+): the post-aggregation step
-
-**Owner-tasks:**
-- ADR-061 closure (STARK aggregation matured) — gating dependency
-- Hardware re-baseline post-aggregation (proof verify cost shifts the per-validator CPU envelope)
-- Long-horizon governance review: at 1024 validators the chain is genuinely permissionless; ADR-066 (TASK-224 permissionless transition) likely closed by this point
-
-**Constraints unblocked:**
-- Without STARK aggregation, commit-sig footprint at 1024 × 3 × 3.3 KB × 86 400 blocks/day ≈ 33 GB/day per validator of pure commit signatures. Two orders of magnitude beyond the 64-validator regime; not sustainable on commodity NVMe at any reasonable block-time. STARK aggregation collapses the per-block commit footprint to O(log N) — that is the unlock.
-- GossipSub mesh sizing at 1024 peers exceeds the libp2p default `mesh_n=8`; this step needs `mesh_n=12-16` calibrated for the new band. TASK-222's calibration framework (peer_score module) supports this; the per-topic params will be re-tuned at Step 3 opening.
-- Slashing-evidence registry at 1024 needs an explicit memory cap revision; ADR-050 currently caps at the per-validator level but the global aggregate matters.
-
-**Hardware target:** re-baselined when ADR-061 closes. Speculative starting point: 32-core / 128 GB / 4 TB NVMe per validator, but the actual envelope depends on STARK proof verify cost.
-
-**Exit criterion:** 1024 validators × 7-day soak post-aggregation; STARK proof verify within block-budget envelope; cross-region geographic diversity per `docs/long-horizon-roadmap.md` §5 Y10 targets.
-
-#### D5. Open `max_active_validators` to governance at Step 1 opening
-
-The current `viper-pq-1` mainnet has `max_active_validators` as a compile-time constant in `EpochConfig::viper_pq_1()`. Step 1 opens it to a governance-mutable parameter with the existing `ProposalEffect::ParameterUpdate` path (ADR-022 fee-model precedent). Each step opening is a governance vote with explicit gate-closure evidence in the proposal body.
-
-#### D6. Hardware spec ladder is *guidance*, not protocol
-
-The hardware target columns are operator runbook material — they do not appear in any ADR-052 P-COMPAT-001 §2 invariant and do not gate consensus. An operator running an under-spec node experiences degraded performance (slower commit signing → peer-score penalty → mesh demotion) but does not corrupt the chain. The ladder is published to set expectations for the cohort, not to enforce.
-
-### Alternatives considered
-
-- **Open to permissionless after Phase 8.5 launch.** Rejected. Permissionless without the diversity targets framework (TASK-227) and without the dynamic-keystore work (TASK-223) is operationally fragile; the 2026-04-25 ADR-054 BFT-correctness incident showed that even a 3-validator chain can hit divergence if the reception pipeline has a single bug, and a permissionless network with hundreds of unknown-quality operators amplifies that risk class.
-- **Skip the 64-validator step; jump 3 → 256.** Rejected. The cohort-onboarding workflow (TASK-185) needs an intermediate step where operators can practise the runbook + onboarding flow at a scale where individual operator behaviour is observable; 256 is too many to track per-operator. The 64-step is the smallest size where the diversity-targets framework starts producing meaningful Nakamoto-coefficient numbers.
-- **Allow Phase 10 (256) to open before TASK-186 block-time decision.** Rejected. Block-time is load-bearing at 256 × 3 × 3.3 KB. If the wrong cadence ships, governance has to halt the chain to migrate, which contradicts ADR-052 P-COMPAT-001's "no chain resets" commitment.
-- **Make hardware spec a protocol-enforced minimum.** Rejected. Operator-side enforcement (peer-score sigverify-latency penalty) is sufficient and avoids the on-chain attestation complexity. ADR-066 (permissionless transition) revisits this if the post-cohort soak surfaces under-spec operator pathology.
-- **Define committee size independently from active set size.** Considered, deferred. ADR-053 §T1.6 currently treats `committee_size = active_size` for the BFT signing path. A separate committee size (e.g. random-sampled subset of active set per round) is a more advanced design that pairs with TASK-228 §3 (Phase 11+) — track as an ADR-068 reservation if needed.
-
-### Consequences
-
-**For operators.** Clear forecast of the hardware envelope per step, with per-step gate evidence in the governance proposal that opens it. The cohort-recruitment process (TASK-185) targets Step 1 (3 → 64) explicitly and reuses `docs/validator-onboarding.md`. New operator onboarding for Step 2 + Step 3 is governed by `docs/permissionless-transition.md` (ADR-066) once that lands.
-
-**For the protocol.** The `max_active_validators` constant becomes governance-mutable at Step 1 opening — that is itself a P-COMPAT-001 §2 schema change (the validator-record activation path is unchanged but the upper bound moves). Track as a follow-up ADR slot if the change requires a dual-path decoder window.
-
-**For the BFT signing path.** Distributed signing (ADR-051 M2b N+2) is essential at every step ≥ 1; the producer-only-signs-everyone path is retired permanently after Step 1 opens.
-
-**For peer-score calibration.** TASK-222's params are sized for the 64-256 band. Step 3 (1024+) opening triggers a re-calibration TASK; the calibration framework supports the bump natively.
-
-**For state-root format invariants.** Each step opens via governance proposal which is a state-root touch (parameter update). P-COMPAT-001 §2 covers this path — no new infrastructure needed.
-
-**For P-COMPAT-001 lens.** Engaged — `max_active_validators` becoming governance-mutable rides §2(c) (parameter-update path, no schema change). ADR-066 (permissionless transition) will engage §2(b) (schema change for validator-record extension).
-
-### Tracking task
-
-- TASK-228 — this ADR. Commit will be appended on land.
-- TASK-185 — Step 1 cohort onboarding (the operator-side gate)
-- TASK-223 — Step 1 dynamic keystore (the protocol-side gate)
-- TASK-186 — Step 1 / Step 2 block-time decision
-- TASK-222 — Step 2 peer-score re-tuning (DONE 2026-05-06; re-validation pending soak)
-
-### Related
-
-- ADR-013 (closed-cohort baseline this scale-up evolves from)
-- ADR-041 / ADR-042 (libp2p + ValidatorPeerId)
-- ADR-046 (consensus-key rotation framework — TASK-223 closes the full path)
-- ADR-051 (M2b distributed BFT signing)
-- ADR-052 (P-COMPAT-001 state-evolution policy)
-- ADR-053 (`viper-pq-1` genesis — Tier 1/2/3 commitments this ADR builds on)
-- ADR-061 (STARK aggregation — gates Step 3)
-- ADR-066 (permissionless transition — pairs with Step 2/3)
-- `docs/long-horizon-roadmap.md` §1 + §5 (long-horizon STARK + diversity context)
-- `docs/phase-9-followup-plan.md` (TASK-228 detail)
-- `crates/pqc-state/src/store.rs` `EpochConfig::viper_pq_1()` (current constants)
-- `crates/pqc-p2p/src/peer_score.rs` (TASK-222 calibration ready for the 64-256 band)
-
-
----
-
-
----
-
-## ADR-066 - Permissionless Eligibility Transition Within 18 Months Post-Mainnet
-
-**Status**: Accepted 2026-05-06.
-**Depends on:** ADR-013 (current closed-cohort gates this ADR evolves from), ADR-022 (tokenomics / fee model — sets the economic context for the stake floor), ADR-042 (validator identity + ASN diversity — the anti-Sybil substrate), ADR-050 (slashing-evidence registry — the window-extension this ADR mandates), ADR-053 (`viper-pq-1` genesis — `permissionless_enabled` flag is a governance-mutable extension), ADR-065 (scale-up plan — this ADR is the operator-side counterpart of the protocol-side ladder).
-**Governs:** the design + governance pathway from the current closed-cohort model (24/32/50 size targets per ADR-013) to permissionless validator entry within 18 months post-mainnet, with explicit anti-Sybil mechanics, stake floor justification, and phased opening discipline.
-
-### Context
-
-ADR-013 sized the validator cohort to 24 (Phase 9 cap) / 32 (Phase 10 target) / 50 (long-term cap) — those numbers were chosen for the closed-cohort era where every operator goes through manual onboarding via TASK-185. The Phase 8.5 launch is operating at 3 validators, all on a single operator's infrastructure; the cohort onboarding RFP under TASK-185 grows that to ≥5 distinct operators × 7-day soak by 2026-05-20.
-
-But the project's stated direction (`docs/long-horizon-roadmap.md` §5 + ADR-053 §T1 framing) is permissionless within 18 months post-mainnet. ADR-013's hard caps are *not* the long-term commitment — they are the bootstrap regime. This ADR:
-
-1. Documents what gates currently constrain validator entry, and why each gate exists,
-2. Designs the on-chain mechanics that enable permissionless entry without each new validator becoming a denial-of-service vector,
-3. Sequences the phased opening so governance retains the ability to pause the transition if Sybil pathology surfaces.
-
-The framing the project rejects:
-- "Open permissionless on launch + 1 day" — the operator runbook + anti-Sybil mechanics are not ready, and the slashing-evidence registry windows assume a knowable validator set.
-- "Stay closed forever" — defeats every decentralisation property the project commits to (long-horizon §5 diversity targets are unreachable with a 50-validator cap).
-
-The framing the project accepts:
-- Phased opening with on-chain `permissionless_enabled` flag, governance-mutable, default false at genesis.
-- Hard prerequisites: dynamic keystore (TASK-223 / ADR-066 dependency on ADR-046), slashing-evidence window extension (this ADR's §3 below), diversity-targets dashboard (TASK-227).
-- Explicit pause-button: governance can flip `permissionless_enabled` to false at any quarterly vote if cohort metrics degrade.
-
-### Decision
-
-#### D1. Three-tier eligibility model
-
-Validators fall into one of three eligibility tiers, gated by the on-chain `permissionless_enabled` flag and per-validator stake:
-
-| Tier | Entry path | Stake requirement | When opened |
-|------|-----------|-------------------|-------------|
-| **Cohort** (current) | Manual TASK-185 onboarding RFP | ADR-013 minimums (genesis: 1 venom; cohort cap 50) | now |
-| **Open-application** | On-chain `ValidatorRegister` tx + governance ratification within 1 epoch | medium tier — see D3 | when `permissionless_enabled` flag flipped (Step 1 of D5) |
-| **Permissionless** | On-chain `ValidatorRegister` tx, no governance ratification | medium tier — see D3 | when D5 Step 3 triggers |
-
-The cohort tier never closes — even at full permissionless, governance retains the ability to cohort-onboard a strategic operator (e.g. a sovereign-grade validator joining for compliance reasons). The cohort tier is a privilege of governance, not a default operator path.
-
-#### D2. The `permissionless_enabled` flag
-
-A new on-chain governance parameter `permissionless_enabled: bool`, default `false` at genesis. Governance proposals can set it via the existing `ProposalEffect::ParameterUpdate` path (ADR-022 fee-model precedent). When `true`:
-
-- `ValidatorRegister` tx admitted at mempool entry without governance ratification;
-- Activation still subject to ADR-042 stake-weighted churn limits (one new validator per epoch under default churn config) — permissionless entry does NOT bypass the churn brake;
-- `ValidatorExit` tx behaviour unchanged.
-
-When `false` (default):
-- `ValidatorRegister` tx admitted but enters `Pending` state until a governance proposal explicitly promotes the entry;
-- This is the cohort tier — operator runs the runbook, governance ratifies.
-
-The flag is governance-mutable in both directions. If permissionless surfaces Sybil pathology, governance can flip back to false at any quarterly vote; existing permissionless validators stay active (no retroactive slashing) but new entries gate on cohort path until governance re-opens.
-
-#### D3. Stake floor — three scenarios scored
-
-The minimum self-bond for non-cohort entry is the dominant anti-Sybil knob. Three candidate floors, scored against the economic-security model:
-
-| Tier | Self-bond floor | Cost-to-attack at 50% stake | Validator yield at floor | Sybil resistance |
-|------|----------------|------------------------------|--------------------------|------------------|
-| Low | 1k venom | weak (matches genesis 1-venom min) | high APR (subsidy weighted to small stakes) | weak |
-| **Medium** | 10k venom | moderate | balanced APR | moderate-strong |
-| High | 100k venom | strong | low APR (effectively excludes small operators) | strong but exclusive |
-
-**Selected:** medium (10k venom). Rationale:
-- Genesis 1-venom minimum (ADR-013) is below the operational cost of running a validator over a year (estimated 4-6k venom in opportunity cost vs the inflation curve), so 1k offers no meaningful Sybil resistance.
-- 100k venom excludes solo operators and tilts the cohort toward whales — defeats the diversity-target framework (`docs/long-horizon-roadmap.md` §5).
-- 10k sits in the band where the bond is meaningful (≥ 1 year of running cost) without excluding the solo-operator class the project explicitly recruits via TASK-185.
-
-Stake floor is a governance parameter, not a hard constant. Initial proposal at 10k venom; reviewable per quarter against TASK-118 fee-revenue trajectory + cohort-recruitment volume.
-
-#### D4. Anti-Sybil mechanics
-
-Three orthogonal layers, each catching a different Sybil class:
-
-1. **Stake-floor** (D3) — economic gate. Catches "spin up 1000 validators at 1 venom each" attacks. Already governed.
-
-2. **Proof-of-uniqueness via attestation hash** — operational gate. Each validator at registration includes an `attestation_hash: [u8; 32]` field bound to a tax-ID-bound off-chain attestation (an entity registration hash from a recognised jurisdiction; the chain stores ONLY the hash, never the underlying KYC data). The hash is per-entity, not per-validator: an entity running 3 validators publishes 3 different validator records all with the same `attestation_hash`. The slashing-evidence-registry treats co-attestation-hash validators as one entity for diversity-target accounting and for the per-entity stake cap (D5 below).
-
-   **Critically not full KYC.** The chain never holds, processes, or routes KYC data. The `attestation_hash` is a binding to an off-chain attestation that the operator, *if subpoenaed*, can produce; absent subpoena the attestation is irrelevant. ADR-066 codifies this as the chain's anti-Sybil signal of last resort, not as a compliance regime.
-
-   The attestation-hash registry is opt-in for cohort tier (genesis validators have it absent — `attestation_hash: None`) and required for permissionless tier (registration without `attestation_hash` is rejected when `permissionless_enabled = true`).
-
-3. **ASN + /24 diversity** — network gate. ADR-041 already pins `max_peers_per_asn = 3` at the libp2p layer. ADR-066 extends this to the validator-record layer: the active set MUST NOT have > N validators from any single ASN (initial N=10, governance-mutable). Validators violating this cap during epoch transition are denied promotion to Active; the queue keeps them Pending until either a slot opens or governance reviews.
-
-#### D5. Phased opening
-
-Three governance-controlled steps:
-
-**Step 1 — Open-application (cohort + governance review).** Year 1 post-launch. `permissionless_enabled = false`; new validators register on-chain but governance reviews the registration within 1 epoch. The review checks (a) attestation_hash uniqueness, (b) stake floor, (c) ASN diversity, (d) slashing history (any prior Banned status from another network is grounds for rejection). 25% of new active-set slots filled this way; 75% remain cohort-onboarded.
-
-**Step 2 — Open-application majority.** Year 1 → Year 1.5. Same gates as Step 1, but 50% of slots filled via open-application.
-
-**Step 3 — Permissionless.** Year 1.5 → Year 2. `permissionless_enabled = true` flipped via governance. Open-application becomes the default path; cohort tier remains as a governance privilege.
-
-Each step opens via a governance proposal that cites this ADR + the cohort-metrics evidence (TASK-227 quarterly diversity reports + TASK-118 fee-revenue trajectory + zero unplanned halts during prior step's window). Governance can pause / reverse at any step.
-
-Total timeline: launch (2026-04-25) → Step 1 (≤2027-04-25) → Step 2 (≤2027-10-25) → Step 3 (≤2028-04-25). The 18-month commitment is from launch to Step 3; the per-step gating is what enforces the discipline.
-
-#### D6. Slashing-evidence-registry window extension
-
-Closed-cohort assumes a knowable validator set; permissionless requires extending the slashing-evidence window because:
-
-1. A validator that exits, gets re-registered (possibly under a different operator), and equivocates against its old self while still in the unbonding period creates an evidence-tracking gap if the registry only tracks Active validators.
-2. Cross-operator equivocation (one operator running two validators with different `consensus_pk` but same `attestation_hash`) needs slashing-evidence at the entity level, not just per-validator.
-
-ADR-066 extends ADR-050's evidence registry:
-- Slashing-evidence retention extended from "1 unbonding period after Active" to "2 unbonding periods after Active OR until governance vote terminates the entity attestation_hash binding".
-- Per-entity stake cap: an `attestation_hash` cannot have aggregate self-bond > N% of total stake (initial N=20, governance-mutable). Catches "one entity running 30% of validators under different addresses".
-
-Both extensions ride P-COMPAT-001 §2 — schema bump on validator-record (additive `attestation_hash: Option<[u8;32]>` field) + slashing-evidence registry retention parameter, with dual-path decoder for the v1 → v2 transition.
-
-### Alternatives considered
-
-- **Open permissionless on launch.** Rejected. Anti-Sybil mechanics need real cohort data to calibrate; opening before D6 slashing-evidence extension is unsafe.
-- **Stay closed forever (extend ADR-013 caps to 100/200/500).** Rejected. Defeats `docs/long-horizon-roadmap.md` §5 diversity-target arc; permissionless is the long-horizon commitment.
-- **No stake floor — operator runbook compliance is the gate.** Rejected. Operator-side enforcement is bypassable by an attacker who runs a non-runbook-compliant validator. Stake floor is the only economically-binding gate.
-- **Full KYC at registration.** Rejected. Compliance scope creep + privacy regression; the `attestation_hash` model is the minimum viable Sybil signal that does not require the chain to hold KYC data.
-- **Per-validator slashing only, no per-entity cap.** Rejected. An entity running 30% of stake under different validators captures 30% of consensus weight while only risking a single validator's slashing — economically asymmetric, defeats stake-as-deterrent.
-- **Open + close via emergency governance.** Considered, kept as the safety net. The on-chain `permissionless_enabled` flag is the formal pause-button; emergency governance is the runbook fallback if the flag's transition takes too long.
-- **Make the 18-month timeline a hard chain-level commitment.** Rejected. The 18-month *target* is in this ADR; the actual transition is governance-paced. Hard-coding the schedule on-chain creates pressure to open even if metrics are bad.
-
-### Consequences
-
-**For operators.** Three-tier model gives a clear forecast: cohort-onboarded operators are first-class today; open-application opens within Year 1; permissionless within Year 1.5. The medium 10k venom self-bond floor is reachable for solo operators (≈ 1 year of pre-launch tokenomics yield).
-
-**For governance.** New on-chain parameter `permissionless_enabled` + `stake_floor_venom` + `max_validators_per_asn` + `max_stake_per_attestation_hash`. Each is governance-mutable via existing parameter-update path; this ADR pre-allocates them so the schema bump rides P-COMPAT-001 §2 cleanly.
-
-**For the slashing-evidence registry.** Retention window extension + per-entity stake cap. The on-disk size of the registry grows by ~2× under the extended window; KNOWN-ISSUES update tracks this.
-
-**For the attestation_hash model.** The chain holds 32-byte hashes per validator (40 KB at 1024 validators — negligible). The off-chain attestation is the operator's responsibility; we publish guidance under `docs/permissionless-transition.md` (forthcoming) on what attestations satisfy the discipline.
-
-**For ADR-013.** This ADR supersedes ADR-013's hard caps. ADR-013 stays as the historical record; this ADR governs from Step 1 opening forward.
-
-**For TASK-227 diversity reporting.** The `attestation_hash` model gives the diversity-targets framework a per-entity grouping it currently lacks. TASK-227's Y1+ reports use it; the Y0 baseline pre-dates the model.
-
-**For P-COMPAT-001 lens.** Engaged on §2(b) — schema change to validator-record (additive `attestation_hash` + new slashing parameters). Activation height + dual-path decoder + cold-sync replay test required at Step 1 opening.
-
-### Tracking task
-
-- TASK-224 — this ADR. Commit will be appended on land.
-- TASK-223 — dynamic keystore (operationally essential for permissionless tier — open-application validators need the keystore layer to work)
-- TASK-227 — diversity reporting (the Y1+ reports use this ADR's `attestation_hash` model)
-- ADR-065 / TASK-228 — pairs with the scale-up plan (Step 1 opening of this ADR pairs with Step 1 of ADR-065)
-
-### Related
-
-- ADR-013 (current closed-cohort gates this ADR supersedes from Step 1 forward)
-- ADR-022 (tokenomics — stake floor sits inside this ADR's economic envelope)
-- ADR-042 (ASN diversity substrate this ADR extends to validator-record level)
-- ADR-046 (consensus-key rotation framework — operationally needed for permissionless)
-- ADR-050 (slashing-evidence registry this ADR extends)
-- ADR-053 (`viper-pq-1` genesis — schema bumps ride this lineage)
-- ADR-065 (scale-up plan — paired Step 1/2/3 sequencing)
-- `docs/long-horizon-roadmap.md` §5 (diversity-targets context)
-- `docs/phase-9-followup-plan.md` (TASK-224 detail)
-- TASK-185 (cohort-onboarding workflow — the cohort tier this ADR formalises)
-
-
----
-
-
----
+Token-economics reserve. This decision is kept in the private repository; nothing in it is in force on a public network (there is no token, and the validator set is operator-run).
 
 ## ADR-067 - FN-DSA Evaluation Post-FIPS-206-Final + AlgId 0x0010 Reservation
 
@@ -3317,7 +2494,7 @@ The private repository holds everything: the chain, the notary product, the depl
 ### Decision
 1. **The private repository stays canonical.** The public repository `v1p3r4llbl4ck-86/viper-pq-chain` is an *export*, not a fork: `release/export-public.sh` takes `HEAD`, removes every path in `release/EXCLUDE.txt` (notary, internal docs and plans, reports, host-specific playbooks and scripts, the release tooling itself, the GitLab CI), drops the notary from the workspace, writes a public CHANGELOG (first public release plus the release-preparation section) and a public TASKS (open items), regenerates the lockfile, and creates a fresh repository with a single commit authored by Alberto Galassi.
 2. **The export refuses to produce a tree that carries** a real IP address, one of the author's host names, the private repository's URLs or names, a private path, or any attribution to development tooling (`release/verify-public.py`), and it re-runs the licence and link guards, `cargo metadata`, `helm lint` and gitleaks on the exported tree. A failure is fixed at the source, never in the export.
-3. **CI on GitHub Actions**, on GitHub-hosted runners by default (free for a public repository): fmt, clippy `-D warnings`, licence and link guards, `cargo deny`, the full test suite with all features and one test thread, `pqc-hsm` against SoftHSM, chart lint plus the render guard. A self-hosted runner on the author's host is an opt-in through the `CI_RUNS_ON` repository variable, installed with `CARGO_BUILD_JOBS=3` and one job at a time (the host went down under an 8-job build).
+3. **CI on GitHub Actions**, on GitHub-hosted runners (free for a public repository): fmt, clippy `-D warnings`, licence and link guards, `cargo deny`, the full test suite with all features and one test thread, `pqc-hsm` against SoftHSM, chart lint plus the render guard. Revised 2026-11-16: GitHub-hosted runners only, fixed in the workflows; no self-hosted runner is reachable from the public repository.
 4. **Releases are tags.** `vX.Y.Z` builds the public-chain binaries (`--no-default-features --features hybrid-kem-tls`: no token economics, hybrid post-quantum TLS on) for Linux x86_64, pushes `pqcd` and `viper-archival-sidecar` images to `ghcr.io` signed with cosign (keyless), attaches a CycloneDX SBOM and checksums, and opens the GitHub Release.
 5. The chart ships with the notary **off**; the genesis artefact of `viper-testnet-2` is published under `genesis/` at the ceremony.
 

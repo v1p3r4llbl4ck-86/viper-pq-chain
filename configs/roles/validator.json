@@ -34,7 +34,7 @@
     "enable": true,
     "validator_listen": "0.0.0.0:26656",
     "bootstrap_peers": [],
-    "quic_enabled": false,
+    "quic_enabled": true,
     "tcp_tls_fallback": true,
     "max_peers_per_asn": 3
   }

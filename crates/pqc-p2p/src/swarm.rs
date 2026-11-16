@@ -481,10 +481,22 @@ pub fn spawn(config: P2pConfig, keypair: Keypair) -> Result<(SwarmHandle, SwarmE
         .kademlia
         .set_mode(Some(kad::Mode::Server));
 
-    if let Some(addr) = listen_addr_for_role(&config) {
+    // ADR-041: QUIC is the primary transport, TCP/TLS 1.3 the fallback.
+    // Both listen on the same port number (UDP for QUIC, TCP for TLS).
+    for addr in listen_addrs_for_role(&config)? {
         swarm
             .listen_on(addr.clone())
             .map_err(|e| P2pError::Transport(format!("listen {addr}: {e}")))?;
+        info!("p2p: listening on {addr}");
+    }
+    for ext in &config.external_addrs {
+        match ext.parse::<Multiaddr>() {
+            Ok(ma) => {
+                info!("p2p: advertising external address {ma}");
+                swarm.add_external_address(ma);
+            }
+            Err(e) => warn!("invalid external address {ext}: {e}"),
+        }
     }
 
     // Parse bootstrap peers once into (PeerId, Multiaddr) pairs. Multiaddrs
@@ -1116,17 +1128,87 @@ fn decode_gossip_message(raw: gossipsub::Message) -> Result<GossipMessage, P2pEr
         .map_err(|e| P2pError::InvalidMessage(format!("cbor decode: {e}")))
 }
 
-fn listen_addr_for_role(config: &P2pConfig) -> Option<Multiaddr> {
+/// Listen multiaddrs for this node's role: QUIC first (`/udp/<port>/quic-v1`)
+/// when `quic_enabled`, then TCP/TLS when `tcp_tls_fallback`. A role without
+/// a listen address listens on nothing (outbound-only node). Having both
+/// transports switched off is a configuration error, not a silent no-op.
+pub(crate) fn listen_addrs_for_role(config: &P2pConfig) -> Result<Vec<Multiaddr>, P2pError> {
     use crate::config::NodeRole;
-    match config.role {
-        NodeRole::Validator => config.validator_listen.map(addr_to_multiaddr),
-        NodeRole::ValidatorFullnode => config.vfn_listen.map(addr_to_multiaddr),
-        NodeRole::PublicFullnode => config.public_listen.map(addr_to_multiaddr),
+    let sock = match config.role {
+        NodeRole::Validator => config.validator_listen,
+        NodeRole::ValidatorFullnode => config.vfn_listen,
+        NodeRole::PublicFullnode => config.public_listen,
+    };
+    if !config.quic_enabled && !config.tcp_tls_fallback {
+        return Err(P2pError::Config(
+            "libp2p: quic_enabled and tcp_tls_fallback are both false — no transport left".into(),
+        ));
     }
+    let Some(a) = sock else { return Ok(vec![]) };
+    let mut out = Vec::with_capacity(2);
+    if config.quic_enabled {
+        out.push(socket_multiaddr(a, "udp", Some("quic-v1")));
+    }
+    if config.tcp_tls_fallback {
+        out.push(socket_multiaddr(a, "tcp", None));
+    }
+    Ok(out)
 }
 
-fn addr_to_multiaddr(a: std::net::SocketAddr) -> Multiaddr {
-    format!("/ip4/{}/tcp/{}", a.ip(), a.port())
+fn socket_multiaddr(a: std::net::SocketAddr, l4: &str, suffix: Option<&str>) -> Multiaddr {
+    let ip = match a.ip() {
+        std::net::IpAddr::V4(v4) => format!("/ip4/{v4}"),
+        std::net::IpAddr::V6(v6) => format!("/ip6/{v6}"),
+    };
+    let tail = suffix.map(|s| format!("/{s}")).unwrap_or_default();
+    format!("{ip}/{l4}/{}{tail}", a.port())
         .parse()
         .expect("valid multiaddr from SocketAddr")
+}
+
+#[cfg(test)]
+mod listen_addr_tests {
+    use super::*;
+    use crate::config::{NodeRole, P2pConfig};
+
+    fn cfg(quic: bool, tcp: bool) -> P2pConfig {
+        let mut c = P2pConfig::devnet("t");
+        c.role = NodeRole::Validator;
+        c.quic_enabled = quic;
+        c.tcp_tls_fallback = tcp;
+        c
+    }
+
+    #[test]
+    fn quic_is_listed_first_then_tcp() {
+        let got = listen_addrs_for_role(&cfg(true, true)).unwrap();
+        let got: Vec<String> = got.iter().map(|m| m.to_string()).collect();
+        assert_eq!(
+            got,
+            vec!["/ip4/0.0.0.0/udp/26656/quic-v1", "/ip4/0.0.0.0/tcp/26656"]
+        );
+    }
+
+    #[test]
+    fn quic_only_and_tcp_only() {
+        let q = listen_addrs_for_role(&cfg(true, false)).unwrap();
+        assert_eq!(q.len(), 1);
+        assert_eq!(q[0].to_string(), "/ip4/0.0.0.0/udp/26656/quic-v1");
+        let t = listen_addrs_for_role(&cfg(false, true)).unwrap();
+        assert_eq!(t.len(), 1);
+        assert_eq!(t[0].to_string(), "/ip4/0.0.0.0/tcp/26656");
+    }
+
+    #[test]
+    fn no_transport_is_an_error() {
+        assert!(listen_addrs_for_role(&cfg(false, false)).is_err());
+    }
+
+    #[test]
+    fn ipv6_listen_address() {
+        let mut c = cfg(true, false);
+        c.validator_listen = Some("[::]:26656".parse().unwrap());
+        let q = listen_addrs_for_role(&c).unwrap();
+        assert_eq!(q[0].to_string(), "/ip6/::/udp/26656/quic-v1");
+    }
 }

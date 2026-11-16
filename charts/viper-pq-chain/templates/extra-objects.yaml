@@ -1,0 +1,6 @@
+{{- /* Extra objects rendered as-is, one per list item (e.g. ExternalSecret,
+     SealedSecret, SecretStore that the release needs). */}}
+{{- range .Values.extraObjects }}
+---
+{{ toYaml . }}
+{{- end }}
