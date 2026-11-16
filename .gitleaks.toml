@@ -100,4 +100,9 @@ regexes = [
 # would still fire.
 commits = [
     "5119d33a98551b523e1ac3aea653d1ced274099f",
+    # sonar-project.properties (2026-04-26, original history, reachable from
+    # main since the 2026-11-16 merge): the `generic-api-key` hit is line 1,
+    # `sonar.projectKey`, the public project name — not a credential.
+    # SonarCloud was removed the same day (a249fdd).
+    "d727af666e648604b01b58476ffebccc44155fb0",
 ]
