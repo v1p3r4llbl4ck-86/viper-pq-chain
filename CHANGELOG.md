@@ -19,6 +19,7 @@ KNOWN-ISSUES.md.
 - Public status page at <https://pqchain.agwswebconsulting.it/> (`site/`): height, block time, nodes connected to the seed, latest blocks, algorithms, how to join.
 - Contributions: pull requests are now reviewed and merged by the maintainer; commits must be signed off under the new [CLA](CLA.md), enforced by the `contributor-terms` check.
 - Docs: aligned with viper-testnet-3 (current network, endpoints, numbers, SDK status); notary references removed.
+- Security: `aws-smithy-json` 0.62.5 → 0.62.7 (GHSA-8ffr-xgwf-xj56, uncontrolled recursion). Only reachable through the optional `s3-upload` feature, which release binaries do not enable.
 
 ### 0.2.2 — release binaries that run on Ubuntu 22.04 / Debian 12 (2026-11-16)
 
