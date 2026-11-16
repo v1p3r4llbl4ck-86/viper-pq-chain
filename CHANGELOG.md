@@ -8,6 +8,11 @@ KNOWN-ISSUES.md.
 
 ## [Unreleased] — public release preparation (opened 2026-08-24)
 
+### 0.2.5 — Docker recipe that works, fast catch-up (2026-11-16)
+
+- **Docker recipe fixed** (docs/validator-onboarding.md). The previous one could not work: a blanket `sed` on `"node_id"` also renamed the genesis validator (`validator-1`), so the node computed a different validator set and forked at block 1 (`STATE_ROOT_MISMATCH`); the config was `chmod 600` but read by the image's user 10001 (`Permission denied`); the API listened on `127.0.0.1` inside the container, so the published port reached nothing; the named volume was root-owned. The new recipe edits only the node's own fields with a few lines of Python, runs the container as your user with a local `./data` directory, and was verified end to end against `viper-testnet-4`.
+- **Catch-up pipelining.** A node behind the network fetched one batch of 16 blocks per gossip block (one batch every 6 s), so joining a long chain took hours. After a full, cleanly imported batch it now requests the next one immediately; a short answer ends the run. Measured: 980 blocks in about a minute instead of about six. A node that joins after a checkpoint (every 1000 blocks) still starts from the seed's snapshot (14 s in the test).
+
 ### 0.2.4 — peer map data, honest peer counter, faster releases (2026-11-16)
 
 - `pqchain_p2p_peers_connected` counts **peers**, not connections: a node reached over both QUIC and TCP was counted twice. `PeerConnected` now fires on the first connection to a peer and `PeerDisconnected` on the last one closed.

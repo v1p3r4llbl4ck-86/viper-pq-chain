@@ -17,17 +17,28 @@ curl -fsSL https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/mai
 **Container** (the image's entrypoint is `pqcd`):
 
 ```bash
-mkdir -p ~/viper && cd ~/viper
+mkdir -p ~/viper/data && cd ~/viper
 curl -fsSLO https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/main/genesis/viper-testnet-4/full.json
-sed -i "s/\"node_id\": \"[^\"]*\"/\"node_id\": \"full-$(hostname -s)-$RANDOM\"/" full.json
-# per-node secret salts (what `pqcd wallet libp2p-init` / `kem-init` do on a host install):
-# without them the node's libp2p and ML-KEM keys would be derivable from its public node_id
-sed -i "s/\"role\": \"full\",/\"role\": \"full\", \"libp2p_seed_salt_hex\": \"$(openssl rand -hex 32)\", \"kem_seed_salt_hex\": \"$(openssl rand -hex 32)\",/" full.json
+# Edit only the node's own fields (a blanket sed on "node_id" would also rename the genesis
+# validator and fork the node at block 1): a unique node_id, the per-node secret salts (without
+# them the node's libp2p and ML-KEM keys would be derivable from its public node_id) and the API
+# on all interfaces inside the container (the host publishes it on 127.0.0.1 only).
+python3 - <<'PY'
+import json, secrets, socket
+c = json.load(open("full.json"))
+c["node_id"] = f"full-{socket.gethostname()[:20]}-{secrets.token_hex(3)}"
+c["devnet"]["libp2p_seed_salt_hex"] = secrets.token_hex(32)
+c["devnet"]["kem_seed_salt_hex"] = secrets.token_hex(32)
+c["api_listen_addr"] = "0.0.0.0:26657"
+json.dump(c, open("full.json", "w"), indent=2)
+PY
 chmod 600 full.json
-IMG=ghcr.io/v1p3r4llbl4ck-86/pqcd:v0.2.3
-docker run -d --name viper-testnet --restart unless-stopped \
+IMG=ghcr.io/v1p3r4llbl4ck-86/pqcd:v0.2.5
+# runs as your user, so it can read the 600 config and write ./data
+docker run -d --name viper-testnet --restart unless-stopped --user "$(id -u):$(id -g)" \
+  -e VIPER_AUDIT_LOG_DIR=/var/lib/pqchain/data/audit \
   -p 26656:26656/udp -p 26656:26656/tcp -p 127.0.0.1:26657:26657 \
-  -v "$PWD/full.json:/etc/pqchain/node.json:ro" -v viper-data:/var/lib/pqchain/data \
+  -v "$PWD/full.json:/etc/pqchain/node.json:ro" -v "$PWD/data:/var/lib/pqchain/data" \
   $IMG devnet-serve /etc/pqchain/node.json
 curl -s http://127.0.0.1:26657/v1/status
 ```

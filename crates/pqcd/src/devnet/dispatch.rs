@@ -1587,6 +1587,7 @@ pub(super) async fn handle_inbound_block_fetch_response(
     // batch completes — the await-dispatch happens after we drop the
     // guard so we never hold the lock across an await point.
     let mut parents_to_fetch: Vec<pqc_types::block::BlockHash> = Vec::new();
+    let mut batch_clean = true;
     for (idx, block_bytes) in response.blocks.iter().enumerate() {
         let block = match pqc_consensus::RocksDbChainStore::decode_block_bytes(block_bytes) {
             Ok(b) => b,
@@ -1595,6 +1596,7 @@ pub(super) async fn handle_inbound_block_fetch_response(
                     idx, error = %e,
                     "libp2p: block-fetch response entry decode failed — aborting batch"
                 );
+                batch_clean = false;
                 break;
             }
         };
@@ -1638,15 +1640,40 @@ pub(super) async fn handle_inbound_block_fetch_response(
                     error = format!("{e:#}"),
                     "libp2p: block-fetch entry ingest failed — aborting batch"
                 );
+                batch_clean = false;
                 break;
             }
         }
     }
     let p2p_handle = guard.p2p_handle.clone();
+    let local_tip = guard.disk.height();
     drop(guard);
 
     for parent_hash in parents_to_fetch {
         dispatch_orphan_parent_fetch(Some(peer), p2p_handle.clone(), parent_hash).await;
+    }
+
+    // Catch-up pipelining: a full, cleanly imported batch means the peer
+    // probably has more. Ask for the next range right away instead of
+    // waiting for the next gossip block (one batch per block time made a
+    // node joining a long chain take hours). A short or empty answer ends
+    // the run, so this never loops past the peer's tip.
+    let cap = pqc_p2p::MAX_BLOCKS_PER_REQUEST;
+    if batch_clean && n as u64 >= cap {
+        if let Some(handle) = p2p_handle {
+            let request = pqc_p2p::BlockFetchRequest {
+                from_height: local_tip + 1,
+                to_height: local_tip + cap,
+            };
+            if request.validate().is_ok() {
+                crate::p2p::incr_block_fetch_requests_sent();
+                if let Err(e) = handle.request_blocks(peer, request).await {
+                    tracing::warn!(error = %e, %peer, "libp2p: catch-up block-fetch dispatch failed");
+                } else {
+                    tracing::debug!(%peer, from = local_tip + 1, "libp2p: catch-up: next batch requested");
+                }
+            }
+        }
     }
 }
 
