@@ -2,9 +2,9 @@
 
 Shell scripts for local node operation and multi-VM devnet automation.
 
-## Status (2026-04-10)
+## Overview
 
-All scripts are implemented and tested. The node binary (`pqcd`) exposes:
+The node binary (`pqcd`) exposes:
 
 - `pqcd bootstrap <node.json>` — recover chain state, print tip
 - `pqcd status <node.json>` — print local chain status
@@ -19,7 +19,7 @@ Real runnable configs live in `configs/` (see `configs/README.md`).
 
 | Script | Purpose |
 |--------|---------|
-| `install_vm.sh` | Install apt deps, Rust toolchain, build pqcd release binary, copy to `/usr/local/bin` |
+| `join-testnet.sh` | Join `viper-testnet-4` as a full node (verifies the Sigstore signature) |
 | `setup_single_node.sh` | Create data dir, install config to `/etc/pqchain/single-node.json` |
 | `setup_local_devnet.sh` | Create data dirs, install validator/full-node configs to `/etc/pqchain/` |
 | `run_single_node_api.sh` | Run `pqcd bootstrap` then `pqcd api-serve` (foreground) |
@@ -35,8 +35,8 @@ All scripts use `set -euo pipefail` and are safe to run more than once.
 ## Quick-start — cold start on fresh VM
 
 ```sh
-# 1. Install deps + build
-scripts/install_vm.sh
+# 1. Install the Rust toolchain and build (`cargo build --release -p pqcd`);
+#    copy the binary to /usr/local/bin/pqcd. No VM install script is shipped.
 
 # 2a. Single-node path
 scripts/setup_single_node.sh
@@ -108,7 +108,7 @@ PQCHAIN_CONFIG_DIR=/tmp/pqchain/configs \
 Config:   `/etc/pqchain/<node>.json` (see `configs/`)
 Binary:   `/usr/local/bin/pqcd`
 Logs:     via systemd journal or `/tmp/pqchain-<node>.log` (background mode)
-Service:  `pqchain` Unix user (dedicated, no login shell, created by `install_vm.sh`)
+Service:  `pqchain` Unix user (dedicated, no login shell, created by you)
 
 ---
 
@@ -137,13 +137,3 @@ WantedBy=multi-user.target
 Repeat for `follower-a` and `follower-b`, changing `ExecStart` config path.
 
 ---
-
-## Planned (not yet written)
-
-| Script | Purpose |
-|--------|---------|
-| `checkpoint-backup.sh` | Copy latest trusted checkpoint to dated backup |
-| `restore-checkpoint.sh` | Restore a backup checkpoint into active data dir |
-| `healthcheck.sh` | Run `pqcd status` and exit non-zero if not ready |
-| `ansible/roles/pqchain-node/` | Ansible role for repeatable multi-VM provisioning |
-| `ansible/inventory/devnet.yml` | Devnet inventory (validator hosts, variables) |

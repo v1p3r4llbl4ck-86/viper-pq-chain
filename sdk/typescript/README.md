@@ -1,6 +1,6 @@
 # @v1p3r4llbl4ck/sdk
 
-> **Pre-pivot SDK version (2026-05-15 note)**: this SDK is `0.2.0`, published 2026-04-25 against `viper-pq-1` which has since been archived (height 33,976 on 2026-05-12). The live chain is now `viper-research-1` — a tokenless permissioned PoA research substrate. `POST /v1/txs` is disabled by runtime config on the live nodes, so `buildVaultTransfer` / `vprToVenom` / `venomToVpr` and similar VPR-token helpers below are **NOT functional against the live chain**. Read-only helpers (network status, block fetch, validator lookups) still work. A re-published SDK aligned to viper-research-1 is not yet shipped — see [VIPER_RESEARCH_1_PIVOT_PLAN.md](../../the private planning notes).
+> **Status**: version 0.3.0 (published 2026-04-25) targets the retired `viper-pq-1` API and has not been re-tested against `viper-testnet-4`. The chain has no token: the VPR/venom helpers below do not apply, and the public read API serves GET only (no `/v1/accounts`, no `POST /v1/txs`). Read-only helpers (status, blocks, validators) work against https://pqchain.agwswebconsulting.it.
 
 TypeScript SDK for [Viper PQ Chain](../../README.md) — post-quantum-native blockchain.
 
@@ -17,13 +17,13 @@ Requires Node.js 18+ (uses native `fetch`).
 ```typescript
 import { ViperClient, venomToVpr } from "@v1p3r4llbl4ck/sdk";
 
-const client = new ViperClient({ baseUrl: "http://localhost:9000" });
+const client = new ViperClient({ baseUrl: "http://localhost:26657" });
 
 // Chain status
 const status = await client.getStatus();
 console.log(`Height: ${status.height}, chain: ${status.chain_id}`);
 
-// Account balance
+// Account balance (not available on the public host: `expose_token_state` is off)
 const account = await client.getAccount("<32-byte-address-hex>");
 console.log(`Balance: ${venomToVpr(BigInt(account.balance_venom))} VPR`);
 

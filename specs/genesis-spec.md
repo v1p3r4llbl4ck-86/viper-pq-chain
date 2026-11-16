@@ -14,7 +14,7 @@
 | Version | Date       | Notes |
 |---------|-----------|-------|
 | 1.0     | 2026-04-12 | Initial Phase-5 ceremony spec (`viper-mainnet-1` framing, single-tag SHAKE-256 genesis hash, no Tier-1 fields). Superseded by 2.0. |
-| 2.0     | 2026-04-25 | Realigned to the live `viper-pq-1` launch artefact at `deploy/ansible/files/genesis-viper-pq-1.json`. ADR-053 §T1.1 / §T1.3 / §T1.4 / §T2.1 / §T2.2 / §T2.4 / §T3.4 / §T3.5 / §T3.6 fields added. Genesis hash migrated to BIP340 double-tagged form (TASK-202). Timestamps now `uint64` ns. The historical `viper-mainnet-1` ceremony moves to Appendix A. |
+| 2.0     | 2026-04-25 | Realigned to the live `viper-pq-1` launch artefact at `deploy/ansible/files/genesis-viper-pq-1.json`. ADR-053 §T1.1 / §T1.3 / §T1.4 / §T2.1 / §T2.2 / §T2.4 / §T3.4 / §T3.5 / §T3.6 fields added. Genesis hash migrated to BIP340 double-tagged form. Timestamps now `uint64` ns. The historical `viper-mainnet-1` ceremony moves to Appendix A. |
 
 ---
 
@@ -30,16 +30,16 @@ The genesis block is height 0. It contains no transactions. Its sole purpose is 
 
 | Field | Value | Notes |
 |-------|-------|-------|
-| `header_version` | `1` (u16) | ADR-053 §T1.1 / TASK-190. First u16 of every BlockHeader. Bumps only on a layout change; the preferred extension path is `extension_root` keys. |
+| `header_version` | `1` (u16) | ADR-053 §T1.1. First u16 of every BlockHeader. Bumps only on a layout change; the preferred extension path is `extension_root` keys. |
 | `height` | 0 | Genesis does not increment height. |
 | `prev_hash` | `[0x00; 32]` | Null anchor — no predecessor block. |
 | `timestamp_ns` | uint64 nanoseconds UTC | ADR-053 §T1.1 — Bitcoin-2106-immune; agreed out-of-band before the genesis ceremony, substituted at signing time. |
 | `proposer` | Ceremony coordinator address | 32-byte address of the party running `pqcd genesis-init`. |
 | `tx_hashes` | `[]` | Empty — no transactions in genesis block. |
 | `commit_signatures` | `[]` | Empty — BFT commit applies from height 1 onward. |
-| `state_root` | computed | BIP340 double-tagged binary Merkle state root (ADR-053 §T2.4 / §T3.1 / TASK-202; see `crates/pqc-state/src/store.rs:48-100` for the leaf/branch domains `VIPER-STATE-LEAF-V1` and `VIPER-STATE-BRANCH-V1`). |
-| `extension_root` | `tagged_hash("VIPER-EXT-EMPTY-V1", &[])` at genesis | ADR-053 §T3.4 / TASK-200. Reserved CBOR keys: `exec_payload_root`, `builder_bid_commitment` (ePBS / EIP-7732 forward-compat name claim only — neither key is present in v1 blocks). |
-| `hash_id` | `0x01` (SHAKE-256) | ADR-053 §T1.4 / TASK-193. Selector into the on-chain hash registry; every callsite dispatches on this id. |
+| `state_root` | computed | BIP340 double-tagged binary Merkle state root (ADR-053 §T2.4 / §T3.1; see `crates/pqc-state/src/store.rs:48-100` for the leaf/branch domains `VIPER-STATE-LEAF-V1` and `VIPER-STATE-BRANCH-V1`). |
+| `extension_root` | `tagged_hash("VIPER-EXT-EMPTY-V1", &[])` at genesis | ADR-053 §T3.4. Reserved CBOR keys: `exec_payload_root`, `builder_bid_commitment` (ePBS / EIP-7732 forward-compat name claim only — neither key is present in v1 blocks). |
+| `hash_id` | `0x01` (SHAKE-256) | ADR-053 §T1.4. Selector into the on-chain hash registry; every callsite dispatches on this id. |
 | `genesis_hash` | computed | BIP340 double-tagged hash, see §3. |
 
 The genesis block is NOT subject to commit quorum validation. It is trusted by definition — any node that accepts the published genesis config will independently compute the same `genesis_hash`.
@@ -54,14 +54,14 @@ The initial state is deterministically constructed from the genesis config file 
 
 These fields are protocol-level invariants pinned at height 0. They mirror the live JSON 1:1.
 
-- **`header_version: u16` — initial value `1`.** ADR-053 §T1.1 / TASK-190. Encoded as the first field of every `BlockHeader`. Future mandatory fields land via `extension_root` keys; the version number bumps only on a layout change, which Policy P-COMPAT-001 strongly discourages.
-- **`extension_root: [u8; 32]` — empty-extension sentinel `tagged_hash("VIPER-EXT-EMPTY-V1", &[])`.** ADR-053 §T3.4 / TASK-200. The two CBOR keys `exec_payload_root` and `builder_bid_commitment` are reserved at genesis for a future ePBS (enshrined proposer-builder separation) activation. Reservation is a name-claim only; activation rides an activation height under P-COMPAT-001.
-- **`hash_id: u8` — initial value `0x01` = SHAKE-256 (FIPS 202).** ADR-053 §T1.4 / TASK-193. The on-chain `hash_registry` (see `crates/pqc-crypto/src/hash_registry.rs::phase1_hash_registry()`) seeds a single entry. Sentinel `0x00` is rejected. Reserved range `0x01..=0x0F` is code-governed; AddHash governance proposals targeting the reserved range are rejected at decode time.
-- **`auth_template_registry: BTreeMap<u16, AuthTemplate>` — seeded `{0x0001 → EOA}`.** ADR-053 §T3.5 / TASK-196. Every Account at genesis carries `verifier_template_id = 0x0001` and `auth_data = []`, which is semantically identical to an Ethereum EOA. Future templates land via `ProposalEffect::AddAuthTemplate` (governance type `0x08`). The id `0x0001` is genesis-immutable. Mirrors `crates/pqc-types/src/account.rs::VERIFIER_TEMPLATE_ID_EOA`.
+- **`header_version: u16` — initial value `1`.** ADR-053 §T1.1. Encoded as the first field of every `BlockHeader`. Future mandatory fields land via `extension_root` keys; the version number bumps only on a layout change, which Policy P-COMPAT-001 strongly discourages.
+- **`extension_root: [u8; 32]` — empty-extension sentinel `tagged_hash("VIPER-EXT-EMPTY-V1", &[])`.** ADR-053 §T3.4. The two CBOR keys `exec_payload_root` and `builder_bid_commitment` are reserved at genesis for a future ePBS (enshrined proposer-builder separation) activation. Reservation is a name-claim only; activation rides an activation height under P-COMPAT-001.
+- **`hash_id: u8` — initial value `0x01` = SHAKE-256 (FIPS 202).** ADR-053 §T1.4. The on-chain `hash_registry` (see `crates/pqc-crypto/src/hash_registry.rs::phase1_hash_registry()`) seeds a single entry. Sentinel `0x00` is rejected. Reserved range `0x01..=0x0F` is code-governed; AddHash governance proposals targeting the reserved range are rejected at decode time.
+- **`auth_template_registry: BTreeMap<u16, AuthTemplate>` — seeded `{0x0001 → EOA}`.** ADR-053 §T3.5. Every Account at genesis carries `verifier_template_id = 0x0001` and `auth_data = []`, which is semantically identical to an Ethereum EOA. Future templates land via `ProposalEffect::AddAuthTemplate` (governance type `0x08`). The id `0x0001` is genesis-immutable. Mirrors `crates/pqc-types/src/account.rs::VERIFIER_TEMPLATE_ID_EOA`.
 - **`slashing_verifier_registry: BTreeMap<u8, SlashingVerifier>` — seeded `{0x01 → Equivocation, slash_fraction_bps = 500}`.** ADR-050 / SPEC-SLASH-001 §10. 5 % bond burn on equivocation; mirrors `SLASH_FRACTION_BPS = 500` in `crates/pqc-state/src/apply/slashing.rs`. Future offences (downtime `0x02`, double-proposal `0x03`, …) land via `ProposalEffect::AddSlashingVerifier` (governance type `0x06`).
-- **`fee_market: FeeMarketState` — 4-dimensional EIP-4844 exponential.** ADR-053 §T2.1 / TASK-201. See SPEC-FEE-002 v0.2 (`specs/fee-market.md`). At launch, only `compute` is wired to real tx activity; `storage`, `witness`, and `contention` are reserved slots (`target = 0`) pinned at `reserve_floor = 100`. Genesis values mirror `FeeMarketState::default()` in `crates/pqc-state/src/store.rs:311-321`.
-- **`storage_fund: StorageFundState` — Sui-style upfront perpetual storage.** ADR-053 §T2.2 / §T3.3 / TASK-199. Defaults: `balance = 0`, `perpetual_cost_per_byte = 1`, `rebate_fraction_bps = 9_900` (99 %). Mirrors `StorageFundState::default()` in `crates/pqc-state/src/storage_fund.rs:65-73`. Tx-path debits / delete-path rebates are a follow-up activation under P-COMPAT-001.
-- **`light_client: LightClientConfig` — sync committee size 16, quorum 11, gossip topic `viper-light-client-attestations-v1`.** ADR-053 §T3.6 / TASK-197 / SPEC-LIGHT-CLIENT-001. The gossip topic name is verbatim from `crates/pqc-consensus/src/light_client.rs::SYNC_COMMITTEE_GOSSIP_TOPIC`. Quorum = `16 − ⌊(16 − 1) / 3⌋ = 16 − 5 = 11`. At launch, the genesis set has 3 validators, so the first committee is exactly those 3 sampled; the size cap binds at the next epoch when more validators register. Sync committee members are slashable for signing invalid headers (the Altair flaw is fixed at `viper-pq-1` launch).
+- **`fee_market: FeeMarketState` — 4-dimensional EIP-4844 exponential.** ADR-053 §T2.1. See SPEC-FEE-002 v0.2 (`specs/fee-market.md`). At launch, only `compute` is wired to real tx activity; `storage`, `witness`, and `contention` are reserved slots (`target = 0`) pinned at `reserve_floor = 100`. Genesis values mirror `FeeMarketState::default()` in `crates/pqc-state/src/store.rs:311-321`.
+- **`storage_fund: StorageFundState` — Sui-style upfront perpetual storage.** ADR-053 §T2.2 / §T3.3. Defaults: `balance = 0`, `perpetual_cost_per_byte = 1`, `rebate_fraction_bps = 9_900` (99 %). Mirrors `StorageFundState::default()` in `crates/pqc-state/src/storage_fund.rs:65-73`. Tx-path debits / delete-path rebates are a follow-up activation under P-COMPAT-001.
+- **`light_client: LightClientConfig` — sync committee size 16, quorum 11, gossip topic `viper-light-client-attestations-v1`.** ADR-053 §T3.6 / SPEC-LIGHT-CLIENT-001. The gossip topic name is verbatim from `crates/pqc-consensus/src/light_client.rs::SYNC_COMMITTEE_GOSSIP_TOPIC`. Quorum = `16 − ⌊(16 − 1) / 3⌋ = 16 − 5 = 11`. At launch, the genesis set has 3 validators, so the first committee is exactly those 3 sampled; the size cap binds at the next epoch when more validators register. Sync committee members are slashable for signing invalid headers (the Altair flaw is fixed at `viper-pq-1` launch).
 - **Timestamps in `uint64` nanoseconds UTC.** ADR-053 §T1.1. Replaces the Phase-5 plan's `uint64` seconds. Bitcoin-2106-immune by construction.
 
 ### 2.1 Account Table
@@ -97,7 +97,7 @@ Sentinel `0x0000` is reserved (rejected at every entry point). Lifecycle transit
 
 ### 2.3 Hash Registry
 
-Single seed entry — ADR-053 §T1.4 / TASK-193. Mirrors `crates/pqc-crypto/src/hash_registry.rs::phase1_hash_registry()`:
+Single seed entry — ADR-053 §T1.4. Mirrors `crates/pqc-crypto/src/hash_registry.rs::phase1_hash_registry()`:
 
 | Hash | `hash_id` | Lifecycle | Notes |
 |------|-----------|-----------|-------|
@@ -120,22 +120,22 @@ Initial on-chain governed parameters:
 | `max_active_set_size` | 24 | ADR-013 |
 | `unbonding_period_blocks` | 120 | `crates/pqc-consensus/src/epoch.rs` (ADR-042 / ADR-053 §T1.5) |
 | `epoch_duration_blocks` | 60 | `crates/pqc-consensus/src/epoch.rs` |
-| `validator_churn_limit` | stake-weighted: `max(active_stake_frac_min_bps, active_stake_frac_target_bps × active_stake) / 10000` | ADR-053 §T1.5 / TASK-194 (replaces legacy count-based `max(4, active/256)`). |
+| `validator_churn_limit` | stake-weighted: `max(active_stake_frac_min_bps, active_stake_frac_target_bps × active_stake) / 10000` | ADR-053 §T1.5 (replaces legacy count-based `max(4, active/256)`). |
 | `block_time_ms` | 500 | TASK-186 may revise pre-public-mainnet under P-COMPAT-001. |
 | `distributed_signing` | `true` | ADR-051 — mandatory at launch (no legacy "producer-signs-for-everyone" fallback). |
 | `distributed_signing_quorum_wait_ms` | 1,500 (3 × `block_time_ms`) | ADR-051. |
-| `fork_version` | `1` (u32) | ADR-053 §T1.2 / TASK-191 — input to ForkDigest derivation. |
+| `fork_version` | `1` (u32) | ADR-053 §T1.2 — input to ForkDigest derivation. |
 
 ### 2.5 Validator Set
 
-Genesis validators are those who completed the ceremony procedure (§4). Each is inserted into the on-chain validator registry (TASK-064) with:
+Genesis validators are those who completed the ceremony procedure (§4). Each is inserted into the on-chain validator registry with:
 
 - `status = Active`
 - `self_bond = bond_amount` from the genesis JSON
 - `consensus_alg_id = 0x0002` (ML-DSA-65)
 - `registered_height = 0`
 
-The validator set is seeded from the genesis config file. The roster is published through the `viper-pq-1-roster.json.example` schema (see `docs/validator-onboarding.md` §0) once filled by the air-gapped key ceremony. **Address derivation is chain-id-bound** per ADR-053 §T1.3 / TASK-192:
+The validator set is seeded from the genesis config file. The roster is published through the `viper-pq-1-roster.json.example` schema (see `docs/validator-onboarding.md` §0) once filled by the air-gapped key ceremony. **Address derivation is chain-id-bound** per ADR-053 §T1.3:
 
 ```
 address = tagged_hash("VIPER-ADDR-V1", chain_id_bytes || u16_be(sig_alg_id) || pk_bytes)
@@ -156,7 +156,7 @@ genesis_hash = tagged_hash(
 
 Where:
 
-- `tagged_hash` is the BIP340 double-tagged primitive `H(H(tag) || H(tag) || data)` defined in `crates/pqc-crypto/src/hash.rs:111` (ADR-053 §T2.4 / TASK-202). The double-tag construction is immune to the CVE-2012-2459 class of attacks.
+- `tagged_hash` is the BIP340 double-tagged primitive `H(H(tag) || H(tag) || data)` defined in `crates/pqc-crypto/src/hash.rs:111` (ADR-053 §T2.4). The double-tag construction is immune to the CVE-2012-2459 class of attacks.
 - `b"VIPER-GENESIS-V1"` is the domain string. The 16-byte ASCII tag is hashed twice and prefixed inside `tagged_hash`; the caller passes the raw tag bytes.
 - `chain_id_bytes` is the UTF-8 encoding of the chain id string (`viper-pq-1` → `0x76 0x69 0x70 0x65 0x72 0x2d 0x70 0x71 0x2d 0x31`, hex `76697065722d70712d31`).
 - `state_root` is the 32-byte BIP340 double-tagged binary Merkle root over the genesis state (§2), under the `VIPER-STATE-LEAF-V1` / `VIPER-STATE-BRANCH-V1` domains.
@@ -300,7 +300,7 @@ The following invariants must hold at and after genesis:
 - SPEC-LIGHT-CLIENT-001 (`specs/SPEC-LIGHT-CLIENT-001.md`) — sync committee
 - SPEC-SLASH-001 (`specs/slashing.md`) — equivocation slashing (verifier id 0x01)
 - `deploy/ansible/files/genesis-viper-pq-1.json` — **historical genesis JSON of the retired `viper-pq-1` chain** with `_audit_provenance` mapping every ADR-053 commit to its tier
-- `deploy/ansible/playbooks/launch-viper-pq-1.yml` — launch playbook (TASK-205)
+- `deploy/ansible/playbooks/launch-viper-pq-1.yml` — launch playbook
 - `docs/validator-onboarding.md` §0 — bootstrap roster schema (`viper-pq-1-roster.json.example`)
 - `crates/pqcd/src/node.rs::build_genesis_state()` — current genesis bootstrap implementation
 - `crates/pqc-state/src/store.rs::state_root()` — binary Merkle state root (ADR-053 §T3.1)

@@ -32,12 +32,12 @@ It needs [`cosign`](https://docs.sigstore.dev/cosign/system_config/installation/
 against it (copies of [`genesis/viper-testnet-4/`](genesis/README.md)), generates the node's
 secret identity salts and prints the start command (`--systemd` installs a unit instead). Read the
 script first — it is about 200 lines. Your node then shows up in the counter on the
-[status page](https://pqchain.agwswebconsulting.it/). Other ways in (container image, build from source, other roles) are in
+[status page](https://agwswebconsulting.it/en/viper-pq-chain/network/) (IT: [/it/viper-pq-chain/rete/](https://agwswebconsulting.it/it/viper-pq-chain/rete/)). Other ways in (container image, build from source, other roles) are in
 [docs/validator-onboarding.md](docs/validator-onboarding.md).
 
 | What | Where |
 |---|---|
-| **live status page** (height, block time, nodes, latest blocks) | <https://pqchain.agwswebconsulting.it/> |
+| **live status page** (height, block time, nodes, latest blocks) | <https://agwswebconsulting.it/en/viper-pq-chain/network/> (IT: <https://agwswebconsulting.it/it/viper-pq-chain/rete/>) |
 | chain status, read API | `https://pqchain.agwswebconsulting.it/v1/status` |
 | P2P seed — **QUIC** (primary) | `/dns4/boot1.pqchain.agwswebconsulting.it/udp/26656/quic-v1/p2p/12D3KooWAf81hHDHnTHdsENKEHY5Q8kP43o69Nt7WCzEtX7L9XMj` |
 | P2P seed — TCP/TLS 1.3 (fallback) | `/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWAf81hHDHnTHdsENKEHY5Q8kP43o69Nt7WCzEtX7L9XMj` |
@@ -47,7 +47,7 @@ negotiate **X25519MLKEM768** (hybrid ML-KEM-768 + X25519, FIPS 203) on every han
 binary is built with `hybrid-kem-tls` — the release binaries and images are.
 
 The author runs the validator and the public seed. Anyone can run a `full`, `rpc` or `archive`
-node without asking; validators are admitted by the existing set (§7 of the onboarding guide).
+node without asking; validators are not open to outside operators yet (§7 of the onboarding guide describes the mechanism).
 
 Earlier networks — `viper-pq-1`, `viper-research-1`, an internal lab, `viper-testnet-1` and
 `viper-testnet-2` (2026-08-25 → 2026-09-23), and `viper-testnet-3` (2026-11-16, reset the
@@ -145,7 +145,7 @@ test map, load-test baselines and fuzz harnesses.
 
 Report vulnerabilities privately — see [SECURITY.md](SECURITY.md) and
 [.well-known/security.txt](.well-known/security.txt). No external cryptographic audit has been
-completed yet (TASK-115); the accepted risks are listed in [KNOWN-ISSUES.md](KNOWN-ISSUES.md).
+completed yet; the accepted risks are listed in [KNOWN-ISSUES.md](KNOWN-ISSUES.md).
 
 ## License
 

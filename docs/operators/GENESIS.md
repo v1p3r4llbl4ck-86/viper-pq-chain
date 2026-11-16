@@ -19,8 +19,8 @@ everything before the first non-test network is rehearsal.
 - A Kubernetes cluster for the author's nodes (k3s is enough) with an ingress controller
   (Traefik ships with k3s) — or Linux hosts with systemd for the Ansible path.
 - The release images on `ghcr.io/v1p3r4llbl4ck-86/{pqcd,viper-archival-sidecar}` at the
-  tag you are launching (`v0.1.1` at the time of writing), or a local build.
-- DNS you control for three names: the explorer/status page, the read API, the P2P seed.
+  tag you are launching (`v0.2.5` at the time of writing), or a local build.
+- DNS you control for two names: the read API and the P2P seed.
 - The pre-genesis gaps in [KNOWN-ISSUES.md §2](../../KNOWN-ISSUES.md) closed or accepted.
 
 ## 2. Ceremony
@@ -29,20 +29,17 @@ everything before the first non-test network is rehearsal.
 pqcd ceremony \
   --chain-id viper-testnet-4 \
   --validators 1 \
-  --block-time-ms 500 \
-  --image-repository ghcr.io/v1p3r4llbl4ck-86 --image-tag v0.1.1 \
+  --block-time-ms 6000 \
+  --image-repository ghcr.io/v1p3r4llbl4ck-86 --image-tag v0.2.5 \
   --release-name pqchain --namespace pqchain \
-  --service-account notary:<ml-dsa-65 public key hex> \
   --output values-viper-testnet-4.json --secrets-output secrets-viper-testnet-4.yaml
 ```
 
-`--service-account <label>:<pk>` (repeatable) funds an operator service at genesis — the
-notary, an operator wallet. Do it now or never: on a tokenless network every transaction still
-settles its fee from the sender's balance, `vault_create` opens accounts at balance 0 and
-transfers are not compiled in, so nothing can be funded after height 0 (that is why
+`--service-account <label>:<pk>` (repeatable) funds an operator account at genesis. Do it now
+or never: on a tokenless network nothing can be funded after height 0 (that is why
 `viper-testnet-1` was retired on its first day). Get the key with `pqcd wallet import-seed …`
 then `pqcd wallet public-key <keystore>`; the derived address is listed under
-`_service_accounts` in the values file and is what the notary takes as `NOTARY_ADDRESS_HEX`.
+`_service_accounts` in the values file.
 
 It produces:
 
@@ -62,7 +59,7 @@ it, everything else dials the sentries).
 kubectl create namespace pqchain
 kubectl apply -n pqchain -f secrets-viper-testnet-4.yaml
 helm install pqchain charts/viper-pq-chain -n pqchain -f values-viper-testnet-4.json
-kubectl -n pqchain get pods -w          # validator-0, sentry-0/1, full-0, frontend
+kubectl -n pqchain get pods -w          # validator-0, sentry-0/1, full-0
 ```
 
 Verify before exposing anything:
@@ -81,22 +78,22 @@ multiaddrs do not resolve: check the release name and namespace against the valu
 
 ## 4. Publish
 
-1. Copy the genesis from the values file to `genesis/viper-testnet-4.json`, compute
-   `sha256sum`, commit both, and attach them to the GitHub Release of the launch tag.
+1. Copy the genesis from the values file to `genesis/viper-testnet-4/genesis.json`, write its
+   digest to `genesis/viper-testnet-4/genesis.sha256`, add a `full.json`, commit, and attach
+   them to the GitHub Release of the launch tag.
 2. DNS (Cloudflare):
-   - `pqchain.<domain>` → the ingress (proxied): explorer at `/`, read API under `/v1/`;
-   - `rpc.pqchain.<domain>` → the ingress (proxied), read API only;
-   - `boot1.pqchain.<domain>` → the node host, **not proxied** (plain TCP 26656; the
+   - `pqchain.<domain>` → the ingress (proxied): read API under `/v1/` (GET only; the status page lives on a separate site);
+   - `boot1.pqchain.<domain>` → the node host, **not proxied** (UDP+TCP 26656; the
      Cloudflare proxy does not carry it).
-3. Open TCP 26656 on the host firewall for the bootnode/sentry service only.
+3. Open 26656/udp and 26656/tcp on the host firewall for the bootnode/sentry service only.
 4. Announce: the chain id, the genesis digest, the bootstrap multiaddr
-   (`/dns4/boot1.pqchain.<domain>/tcp/26656/p2p/<peer-id>`, from `pqcd peer-id <pod-name>`
+   (both `/dns4/boot1.pqchain.<domain>/udp/26656/quic-v1/p2p/<peer-id>` and `/dns4/boot1.pqchain.<domain>/tcp/26656/p2p/<peer-id>`, from `pqcd peer-id <pod-name>`
    with the role salt, or read it from the node's log line `local peer id`), and the
    validator admission path ([validator-onboarding.md](../validator-onboarding.md)).
 
 ## 5. First external node
 
-An operator follows [RUNBOOK.md §11](RUNBOOK.md): `configs/roles/full.json`, chain id and
+An operator follows [RUNBOOK.md §11](RUNBOOK.md): `genesis/viper-testnet-4/full.json`, chain id and
 anchor from the published genesis, `bootstrap_peers` = the announced multiaddr, own salts,
 `pqcd devnet-serve`. Sync is reached when `/v1/status` reports the validator's height.
 

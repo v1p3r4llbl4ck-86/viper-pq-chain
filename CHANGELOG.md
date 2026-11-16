@@ -8,6 +8,10 @@ KNOWN-ISSUES.md.
 
 ## [Unreleased] — public release preparation (opened 2026-08-24)
 
+### Docs
+
+- Docs: full consistency pass against viper-testnet-4 (GENESIS, RUNBOOK, openapi, SDK READMEs, docker/deploy READMEs, chart notes); `/v1/peers` documented; retired standalone status page `site/` removed; internal task ids dropped from newcomer docs.
+
 ### 0.2.5 — Docker recipe that works, fast catch-up (2026-11-16)
 
 - **Docker recipe fixed** (docs/validator-onboarding.md). The previous one could not work: a blanket `sed` on `"node_id"` also renamed the genesis validator (`validator-1`), so the node computed a different validator set and forked at block 1 (`STATE_ROOT_MISMATCH`); the config was `chmod 600` but read by the image's user 10001 (`Permission denied`); the API listened on `127.0.0.1` inside the container, so the published port reached nothing; the named volume was root-owned. The new recipe edits only the node's own fields with a few lines of Python, runs the container as your user with a local `./data` directory, and was verified end to end against `viper-testnet-4`.

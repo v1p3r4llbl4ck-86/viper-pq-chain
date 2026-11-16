@@ -8,9 +8,7 @@
 ╰─────────────────────────────────────────────────────────────────╯
 
 {{ if eq .Values.chain.id "viper-pq-1" -}}
-⚠️  WARNING: chain.id is "viper-pq-1" — this is the LIVE production chain.
-    The chart is intended for new networks. Override `chain.id` to a
-    distinct value (e.g. "viper-pq-2-test", "viper-pq-eidas-pilot").
+WARNING: chain.id "viper-pq-1" is a retired network id; choose a new one.
 {{ end }}
 
 Enabled chain-node roles: {{ if $roles }}{{ $roles }}{{ else }}(none — set chainNode.<role>.enabled=true){{ end }}

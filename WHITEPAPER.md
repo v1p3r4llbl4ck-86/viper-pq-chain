@@ -6,7 +6,7 @@ the design as built. Two sections are framed differently from the original: §12
 is operator-run proof of authority with no stake; §13 — the token utility is a **reserve** design
 behind the dormant `token_economics` feature, not a live mechanism and not an offer. The public
 **test** network is `viper-testnet-4` (2026-11-16): one validator, no token, may be reset at any time;
-`viper-testnet-2` ran from 2026-08-25 to 2026-09-23.
+`viper-testnet-1`, `-2` and `-3` ran in 2026-08-25 → 2026-11-16 and are retired.
 
 **Version**: 0.3 framing / 0.2 text
 
@@ -50,7 +50,7 @@ PQ Chain exists to answer that question with a purpose-built trust layer, not a 
 
 ## 3. Threat Model
 
-*Formal evaluation: [specs/threat-model.md](specs/threat-model.md) (TASK-061, Phase 4)*
+*Formal evaluation: [specs/threat-model.md](specs/threat-model.md) (Phase 4)*
 
 ### 3.1 Attacker Classes
 
@@ -376,7 +376,7 @@ Cargo feature (`token_economics`) and is not part of the public documentation.
 
 ## 14. Governance
 
-*Status: principles defined — full governance spec is TASK-010*
+*Status: principles defined — the full governance spec is not written yet*
 
 *Formal spec: [specs/governance-module.md](specs/governance-module.md)*
 
@@ -402,6 +402,7 @@ Governance controls:
 
 > The live plan is [ROADMAP.md](ROADMAP.md); the table below is the original phase plan, kept as
 > written. Phases 0–8.5 were completed on the private chains that preceded the public release.
+> Names such as `viper-mainnet-1` are historical; no mainnet exists or is planned.
 
 | Phase | Objective | Key deliverables |
 |-------|-----------|-----------------|
@@ -410,9 +411,9 @@ Governance controls:
 | 2 — Prototype Node and Controlled Devnet | validate architecture end-to-end | signature pipeline, mempool, block production, state persistence, observability, devnet with 24 validators |
 | 3 — Public Testnet | realistic operator and user workflows | public testnet, snapshots and state sync, public read API, validator onboarding, key rotation and algorithm lifecycle drills; testnet exit criteria per SPEC-TEST-001 |
 | 4 — Hardening and Audit Readiness | external review and production planning | cryptographic audit, threat review, performance tuning, governance playbooks, launch readiness checklist |
-| 5 — Mainnet Economics and Genesis Preparation | finalize economic parameters and production genesis specification | rebranding to Viper PQ Chain (TASK-069); genesis spec ADR-025 + SPEC-GENESIS-001; validator onboarding guide; dress rehearsal procedure |
+| 5 — Mainnet Economics and Genesis Preparation | finalize economic parameters and production genesis specification | rebranding to Viper PQ Chain; genesis spec ADR-025 + SPEC-GENESIS-001; validator onboarding guide; dress rehearsal procedure |
 | 6 — Mainnet Launch and Stabilization | produce genesis block, bring validators online, sustain 30-day stabilization | dress rehearsal execution; genesis ceremony (`viper-mainnet-1`); coordinated launch; 30-day no-upgrade stabilization window; production incident-response drills |
-| 7 — Product Layer and First Users | make the trust layer accessible to developers and end users | TypeScript and Python SDKs, block explorer, first vertical product spec, public documentation site |
+| 7 — Product Layer and First Users | make the trust layer accessible to developers and end users | TypeScript and Python SDKs, first vertical product spec, public documentation site |
 | 8 — Hardening and devnet-3 cutover | landing libp2p auth, M2 dynamic validator set, M2b distributed BFT signing, M4 archival overlay (RFC 3161 / RFC 4998), Phase-8 audit readiness | ML-KEM authenticated transport (ADR-041), `CommitQuorumPolicy::from_state_store()` (ADR-051), `viper-archival-sidecar` crate, internal audit kickoff |
 | 8.5 — `viper-pq-1` launch and mainnet-discipline pivot | replace the `phase-N-devnet-M-rcK` reset pattern with a permanent, forward-compatible chain | ADR-052 Policy P-COMPAT-001 (no resets, every breaking change ships with ADR + activation height + dual-path decoder + cold-sync test); ADR-053 Tier 1+2+3 (BlockHeader v1, ForkDigest signing domains, chain-id-bound addresses, hash registry, stake-weighted churn, multi-dim fee market, storage fund, BIP340 double-tagged hashing, binary Merkle state tree, ePBS-ready extension keys, unified smart-account, sync committee scaffolding); `launch-viper-pq-1.yml` ceremony executed 2026-04-25; SDKs `@v1p3r4llbl4ck/sdk@0.2.0` + `viper-pqchain==0.2.0` published; public site shell at `pqchain.agwswebconsulting.it` (landing + docs + explorer + notary) |
 

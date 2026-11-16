@@ -1,7 +1,7 @@
-# Phase 8 — Milestone M2: Dynamic Validator Set (TASK-113)
+# Phase 8 — Milestone M2: Dynamic Validator Set
 
 **Doc ID**: phase-8-m2-plan
-**Status**: **CLOSED — retained as design rationale + retrospective**. M2 implementation complete 2026-04-22 (code-path steps 1–5 delivered same day as plan publication, faster than the 2–3 week estimate). Step 6 landed `#[ignore]`d with documented harness limitation. Step 7 binary deployed to devnet-2 2026-04-22. M2b N+2 follow-ups (TASK-166/167/170/171/172) all closed on `develop` by 2026-04-23. ADR-053 §T1.5 (TASK-194, 2026-04-24) subsequently replaced the count-based churn with stake-weighted churn — see SPEC-VAL-001 v0.3 banner. The chain is now `viper-pq-1` (launched 2026-04-25). This plan stays for design-decision archival; no further work is tracked here.
+**Status**: **CLOSED — retained as design rationale + retrospective**. M2 implementation complete 2026-04-22 (code-path steps 1–5 delivered same day as plan publication, faster than the 2–3 week estimate). Step 6 landed `#[ignore]`d with documented harness limitation. Step 7 binary deployed to devnet-2 2026-04-22. M2b N+2 follow-ups (TASK-166/167/170/171/172) all closed on `develop` by 2026-04-23. ADR-053 §T1.5 (2026-04-24) subsequently replaced the count-based churn with stake-weighted churn — see SPEC-VAL-001 v0.3 banner. The chain is now `viper-pq-1` (launched 2026-04-25). This plan stays for design-decision archival; no further work is tracked here.
 **Owner**: alberto
 **Date**: 2026-04-22 (written), 2026-04-23 (retrospective added)
 **Depends on**: ADR-035, ADR-042 (accepted); Phase 8 M1 on-chain (`develop @ 71dd44d`)

@@ -58,11 +58,11 @@ ansible-playbook ... -e "kem_seed_salt=$SALT"
 
 ---
 
-## §3 — Migration sequence (3-node `viper-pq-1` host group)
+## §3 — Migration sequence (3-node host group)
 
 **Per-host order matters.** Restart validators LAST so peer-availability stays high during the rolling restart. The grace window is one epoch (default 60 blocks ≈ 30 s for devnet, 43 200 blocks ≈ 6 h for testnet).
 
-1. **Host follower-A** (`viper-pq-1-follower-a`):
+1. **Host follower-A** (`<chain>-follower-a`):
    ```bash
    sudo -u pqcd pqcd wallet kem-init --node-config /etc/pqcd/node.json
    sudo systemctl restart pqcd
@@ -71,9 +71,9 @@ ansible-playbook ... -e "kem_seed_salt=$SALT"
    - The Gap B `warn!` line about "node_id ONLY" should no longer appear.
    - At the next epoch boundary, look for `"ML-KEM identity keypair rotated at epoch boundary (Gap B)"` at info level.
 
-2. **Host follower-B** (`viper-pq-1-follower-b`): same procedure.
+2. **Host follower-B** (`<chain>-follower-b`): same procedure.
 
-3. **Host validator** (`viper-pq-1-producer`): same procedure, last.
+3. **Host validator** (`<chain>-producer`): same procedure, last.
 
 **Rollback.** If anything goes wrong, comment out / remove the `kem_seed_salt_hex` line from `node.json` and restart. The legacy `node_id`-only derivation kicks back in (with the Gap B `warn!` reappearing). The chain itself is unaffected — KEM identity keypair rotation is a P2P-layer concern, NOT a consensus-layer concern. Block production continues normally regardless of salt-presence.
 

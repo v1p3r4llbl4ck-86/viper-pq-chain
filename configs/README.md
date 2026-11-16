@@ -40,9 +40,9 @@ externally-facing network**.
 | Genesis account public key | ML-DSA-65 key derived from seed `[0x11; 32]` (validator-1 seed) |
 | `proposer_address_hex` | `9999...99` (producer only, matches test constant) |
 
-Fee values are calibrated from Linux reference node benchmarks (TASK-042, 2026-04-11).
+Fee values are calibrated from Linux reference node benchmarks (2026-04-11).
 `exec_fee_per_gas = 43` matches the 43.3 units/µs calibration rate used for sigverify fees.
-Per-operation gas costs are in `pqc-state::gas_schedule` (TASK-007).
+Per-operation gas costs are in `pqc-state::gas_schedule`.
 
 ---
 
@@ -120,7 +120,7 @@ PQCD=/opt/pqchain/bin/pqcd \
 
 | Path | Purpose |
 |------|---------|
-| `/usr/local/bin/pqcd` | Node binary (installed by `scripts/install_vm.sh`) |
+| `/usr/local/bin/pqcd` | Node binary (installed by you; no install script is shipped) |
 | `/etc/pqchain/*.json` | Config files (installed by setup scripts) |
 | `/var/lib/pqchain/<node>/` | Per-node chain data (blocks, checkpoints, indexes) |
 | `/tmp/pqchain-<node>.log` | Log file when started via `run_local_devnet.sh` |
@@ -129,6 +129,8 @@ PQCD=/opt/pqchain/bin/pqcd \
 ---
 
 ## External operator — public testnet
+
+To join `viper-testnet-4` do not edit these files: use `genesis/viper-testnet-4/full.json` or `scripts/join-testnet.sh`. The rest of this section is for building your own network.
 
 The shipped configs (`single-node.json`, `producer.json`, `follower-*.json`) are **local devnet configs** derived from public test seeds. **Never use these key material values on any externally-facing network.**
 
@@ -150,8 +152,8 @@ The shipped configs (`single-node.json`, `producer.json`, `follower-*.json`) are
 
 | Field | Reason |
 |-------|--------|
-| `fee_params.*` | Calibrated from Linux 6.8 reference benchmarks (TASK-042). Re-benchmark only if your hardware differs significantly from the reference. |
-| `devnet.block_time_ms` | 500 ms is appropriate for testnet. |
+| `fee_params.*` | Calibrated from Linux 6.8 reference benchmarks. Re-benchmark only if your hardware differs significantly from the reference. |
+| `devnet.block_time_ms` | 500 ms is appropriate for a local devnet; `viper-testnet-4` uses 6000 ms. |
 | `devnet.sync_interval_ms` | 100 ms is appropriate for LAN; increase to 500–1000 ms for WAN followers. |
 
 ### Mandatory uniformity across all cluster nodes

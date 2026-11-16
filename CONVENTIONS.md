@@ -74,8 +74,8 @@ This is the locked stack (ADR-053), carried unchanged through the private chains
 | PQ KEM | RustCrypto `ml-kem` 0.3.0-rc.2 (FIPS 203) | `Cargo.toml` |
 | Hashing | `sha3` 0.10 — SHAKE-256 XOF (FIPS 202) | `Cargo.toml` |
 | Serialization | `ciborium` 0.2 — deterministic CBOR (RFC 8949) per SPEC-TX-001 §4 | `Cargo.toml` |
-| Storage | RocksDB 0.22 (Apache 2.0); `multi-threaded-cf` + `lz4` | `Cargo.toml`, ADR-032 / TASK-103 |
-| P2P transport | rust-libp2p with ML-KEM-768 authenticated session handshake (TASK-045, ADR-041) | `crates/pqc-p2p` |
+| Storage | RocksDB 0.22 (Apache 2.0); `multi-threaded-cf` + `lz4` | `Cargo.toml`, ADR-032 |
+| P2P transport | rust-libp2p with ML-KEM-768 authenticated session handshake (ADR-041) | `crates/pqc-p2p` |
 | Logging / observability | `tracing` 0.1 + JSON subscriber; Prometheus text exposition under `/v1/metrics` | `Cargo.toml`, ADR `pqchain_*` metric namespace |
 | Build environment | `flake.nix` (Nix-pinned) | `flake.nix`, `flake.lock` |
 | Conformance | RustCrypto + ACVP vectors at `crates/pqc-crypto/tests/acvp_conformance.rs`; SUPERCOP / eBATS for cross-platform sanity | `tests/acvp/` |

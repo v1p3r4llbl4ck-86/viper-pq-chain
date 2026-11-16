@@ -79,7 +79,7 @@ Every file in this directory is in primary scope because each apply function enf
 | `apply/governance.rs` | Governance proposal execution: only `registry_update` path implemented; `min_fee` and lifecycle state update must not allow reversal of forward-only transitions (`active → discouraged → deprecated → banned`). |
 | `apply/proof_anchor.rs` | `InvalidClaimType` rejection; anchor record immutability after creation. |
 | `apply/consensus_rotate.rs` | Phase 3 record-only path (ADR-020); review that this path does not inadvertently affect the commit quorum membership used in `validate_block_commit_quorum`. |
-| `apply/validator.rs` | Validator staking lifecycle (TASK-064): `ValidatorRegister` consensus-key-must-be-ML-DSA enforcement; duplicate consensus-key rejection; `ValidatorExit` last-active-set guard; `ValidatorUnjail` state transition; self_bond deduction and return atomicity. |
+| `apply/validator.rs` | Validator staking lifecycle: `ValidatorRegister` consensus-key-must-be-ML-DSA enforcement; duplicate consensus-key rejection; `ValidatorExit` last-active-set guard; `ValidatorUnjail` state transition; self_bond deduction and return atomicity. |
 
 ### 3.5 `pqc-state/src/store.rs` — state root and mutation contract
 

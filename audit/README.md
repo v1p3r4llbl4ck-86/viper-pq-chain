@@ -1,6 +1,6 @@
 # Audit entry point
 
-No external cryptographic or protocol audit has been completed yet (TASK-115). This
+No external cryptographic or protocol audit has been completed yet. This
 directory is the entry point for one.
 
 - Scope, assets and threat assumptions: [specs/audit-scope.md](../specs/audit-scope.md) and

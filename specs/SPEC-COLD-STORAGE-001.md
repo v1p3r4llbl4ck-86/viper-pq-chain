@@ -25,7 +25,7 @@
 This spec governs both versions of the cold-storage rotation pipeline:
 
 - **v1** (`viper-cold-storage-v1`, TASK-188 / commit `b6d6e80`): export-only path. Manifest is unsigned; integrity inherits from the chain (anchor block hash) and from the operator's S3 bucket access policy. Restore is manual.
-- **v2** (`viper-cold-storage-v2`, TASK-188b): adds optional SLH-DSA-SHAKE-256s manifest signature, optional RFC 3161 TSA token, and an automated `pqcd cold-storage-import` restore subcommand. v2 is a strict additive superset of v1 — both fields are `Option`-typed with `skip_serializing_if = "Option::is_none"`, so a v2 manifest with neither field set serialises to bytes that differ from v1 only in the `schema_version` string. v1 readers parse v2 manifests successfully (unknown-field tolerance); v2 readers parse both formats.
+- **v2** (`viper-cold-storage-v2`): adds optional SLH-DSA-SHAKE-256s manifest signature, optional RFC 3161 TSA token, and an automated `pqcd cold-storage-import` restore subcommand. v2 is a strict additive superset of v1 — both fields are `Option`-typed with `skip_serializing_if = "Option::is_none"`, so a v2 manifest with neither field set serialises to bytes that differ from v1 only in the `schema_version` string. v1 readers parse v2 manifests successfully (unknown-field tolerance); v2 readers parse both formats.
 
 The transition rule under P-COMPAT-001: producers SHOULD emit v2 starting at TASK-188b's land commit. Existing v1 archives stay valid forever and remain restorable via `pqcd cold-storage-import --insecure-no-verify` (the operator explicitly opts into accepting an unauthenticated bundle).
 
@@ -64,7 +64,7 @@ schema_version ∈ { "viper-cold-storage-v1", "viper-cold-storage-v2" }
 ```
 
 - **v1** (TASK-188 — commit `b6d6e80`): no `signature` field, no `tsa_token` field.
-- **v2** (TASK-188b): both `signature` and `tsa_token` are present as `Option`-typed fields. A v2 manifest MAY have either, both, or neither set (e.g. a rotation run with `--anchor-tsa` but no `--sign-with-operator`).
+- **v2**: both `signature` and `tsa_token` are present as `Option`-typed fields. A v2 manifest MAY have either, both, or neither set (e.g. a rotation run with `--anchor-tsa` but no `--sign-with-operator`).
 
 The constants are exported as `MANIFEST_SCHEMA_VERSION_V1` and `MANIFEST_SCHEMA_VERSION_V2` in `crates/pqcd/src/cold_storage.rs`.
 
@@ -220,7 +220,7 @@ After Stage 2 completes and the operator has independently verified the upload (
 
 ---
 
-## 9. v2 Closure (TASK-188b)
+## 9. v2 Closure
 
 The v2 schema lands as TASK-188b under ADR-060. Three orthogonal additions on top of the v1 manifest, all `Option`-typed and additive under P-COMPAT-001:
 

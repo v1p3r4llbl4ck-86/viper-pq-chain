@@ -22,8 +22,8 @@ have no header. `scripts/check-licenses.sh` verifies all of it.
   the Licensed Work — or a service whose primary value derives from it — to third parties
   as a hosted or managed service, or using it to operate a network that is not a Viper PQ
   Chain network, is not.
-- **Change Date:** four years from the first public release of the version you are using
-  (for the first public release, 2030-09-30)
+- **Change Date:** four years from the date the version you are using was first publicly
+  released, and in any case not earlier than 2030-09-30
 - **Change License:** Apache-2.0
 
 In plain words: read, audit, build on and run the node for the network as much as you

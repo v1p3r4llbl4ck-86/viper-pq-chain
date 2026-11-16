@@ -1,6 +1,5 @@
 # Multicodec Mapping for Viper PQ Algorithms
 
-**Authority:** TASK-221.
 **Status:** Draft — mapping proposal; the upstream `multiformats/multicodec` PR has not been submitted.
 **Date:** 2026-05-06.
 **Cross-references:** ADR-044 (TLV envelope), `crates/pqc-crypto/src/alg.rs` (canonical AlgId enum), `crates/pqc-crypto/src/envelope.rs` (TLV codec).

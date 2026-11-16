@@ -262,7 +262,7 @@ The systemd unit sets `VIPER_NODE_ID` from the Ansible inventory
 
 A 60-second systemd timer that scans `journalctl -u pqcd` for known-bad
 patterns and exposes counters via the node_exporter textfile collector.
-Everything stays on the host; no Slack / PagerDuty / mail required.
+Everything stays on the host; no Slack / PagerDuty / mail required. (The watcher script and its units are not shipped in this repository; this section describes the design.)
 
 ### Deployment
 

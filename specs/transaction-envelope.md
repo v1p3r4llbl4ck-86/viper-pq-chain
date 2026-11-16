@@ -13,7 +13,7 @@
 > |---------|------|--------|
 > | 0.1 | 2025-Q4 | Initial envelope spec (pre-ADR-044). |
 > | 0.2 | 2026-04-21 | **Revised by ADR-044 (crypto agility)** — introduces signature and public-key TLV envelopes with explicit `algo_id`, on-chain Algorithm Registry verifier dispatch, and the `sig_alg_id`-in-envelope alignment. |
-> | 0.3 | 2026-04-25 | **Revised for `viper-pq-1` launch (ADR-053).** Adds §6.1 ForkDigest signing-domain prefix (ADR-053 §T1.2, TASK-191). §7 signed-preimage construction now wraps the body in BIP340 double-tagged hashing under `"PQC-TX-V1"` (ADR-053 §T2.4, TASK-202). §5.4 `sender` derivation references SPEC-ADDRESS-001 v0.3 (chain-id-bound, ADR-053 §T1.3). §12.1 retitled "viper-pq-1 launch compatibility" — the breaking change is now historical. |
+> | 0.3 | 2026-04-25 | **Revised for `viper-pq-1` launch (ADR-053).** Adds §6.1 ForkDigest signing-domain prefix (ADR-053 §T1.2). §7 signed-preimage construction now wraps the body in BIP340 double-tagged hashing under `"PQC-TX-V1"` (ADR-053 §T2.4). §5.4 `sender` derivation references SPEC-ADDRESS-001 v0.3 (chain-id-bound, ADR-053 §T1.3). §12.1 retitled "viper-pq-1 launch compatibility" — the breaking change is now historical. |
 
 ---
 
@@ -23,10 +23,10 @@ This document specifies the PQ Chain transaction envelope: the canonical wire fo
 
 This specification does not define:
 
-- the semantics of individual operation types (see SPEC-OPS, TASK-007)
-- KeySet lifecycle rules (see SPEC-ACCOUNT, TASK-004)
-- Algorithm Registry governance (see SPEC-ACCOUNT, TASK-004)
-- validator economics or staking (see TASK-005)
+- the semantics of individual operation types (see SPEC-OPS)
+- KeySet lifecycle rules (see SPEC-ACCOUNT)
+- Algorithm Registry governance (see SPEC-ACCOUNT)
+- validator economics or staking ()
 
 ---
 
@@ -100,7 +100,7 @@ Identifies the network. Prevents cross-network replay.
 Routes the `payload` to the correct execution handler.
 
 - MUST be a 16-bit unsigned integer
-- Defined ranges (see also SPEC-OPS, TASK-007):
+- Defined ranges (see also SPEC-OPS):
 
 | Range | Use |
 |-------|-----|
@@ -276,7 +276,7 @@ This indirection means new PQ algorithms can be activated on-chain without a pro
 
 ---
 
-## 6. ForkDigest Signing-Domain Prefix (ADR-053 §T1.2, TASK-191)
+## 6. ForkDigest Signing-Domain Prefix (ADR-053 §T1.2)
 
 ### 6.1 Construction
 
@@ -586,6 +586,6 @@ tx_hash = SHAKE-256(CBOR({1: 1, 2: ..., 12: h'<3309-byte sig>'}), 32)
 | ID | Item | Blocking? |
 |----|------|-----------|
 | TBD-TX-01 | `chain_id` exact format: is it a fixed 32-byte random identifier set at genesis, or a structured prefix+suffix? | No — networks can define it at genesis until a cross-chain spec is needed |
-| TBD-TX-02 | `gas_limit` unit definition: what constitutes one unit of execution gas? | Deferred to SPEC-OPS (TASK-007) where operation costs are defined |
+| TBD-TX-02 | `gas_limit` unit definition: what constitutes one unit of execution gas? | Deferred to SPEC-OPS where operation costs are defined |
 | TBD-TX-03 | Exact fee coefficient values (`byte_fee`, `sigverify_fee`, `exec_fee`) | Deferred to Phase 2 after prototype benchmarks (ADR-015) |
 | TBD-TX-04 | Batch nonce support for account abstraction or sponsored transactions | Not in Phase 1 scope |

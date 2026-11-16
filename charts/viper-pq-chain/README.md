@@ -1,17 +1,15 @@
 # Viper PQ Chain — Helm Chart
 
-Production-grade Helm chart for the Viper PQ Chain stack — a post-quantum
-blockchain (FIPS 203/204/205 baseline) with a role-based topology
-designed for permissioned-consortium deployments (PA / QTSP / regulated
-sectors) and for k8s-based dev/test clusters.
+Helm chart for the Viper PQ Chain stack — a post-quantum
+blockchain (FIPS 203/204/205 baseline) with a role-based topology,
+for Kubernetes dev/test clusters and test networks.
 
-> **Scope**: this chart deploys NEW networks (testnet, partner pilots,
-> audit envs). It does NOT manage the upstream live `viper-pq-1` chain
-> (that runs on systemd via Ansible — see `docs/operators/RUNBOOK.md` §10.1).
+> **Scope**: this chart deploys new networks (testnets, pilots, audit
+> environments); the public `viper-testnet-4` is deployed with it.
 
 ---
 
-## Quick install — fresh chain via `pqcd ceremony` (TASK-233, recommended)
+## Quick install — fresh chain via `pqcd ceremony` (recommended)
 
 The chart's per-role `node.json` placeholder is intentionally minimal —
 the pqcd binary refuses to start without `chain_id_hex`,
@@ -27,7 +25,6 @@ pqcd ceremony \
     --chain-id viper-pq-kind-test \
     --validators 3 \
     --namespace viper \
-    --deploy-token "<user>:<token>@<registry>" \
     --output values-ceremony.json \
     --secrets-output secrets-ceremony.yaml
 
@@ -35,7 +32,7 @@ pqcd ceremony \
 kind create cluster --name viper-test
 
 # 2. Apply the Secret manifests (validator consensus seed +
-#    optional dockerconfigjson for the registry pull credentials)
+#    optional dockerconfigjson, only for private registries)
 kubectl create namespace viper
 kubectl apply -n viper -f secrets-ceremony.yaml
 

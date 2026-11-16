@@ -15,10 +15,10 @@ serves two HTTP routers on port 26657:
   identical.
 
 On the public test network `viper-testnet-4` the read API of the author's full node is
-served at `https://pqchain.agwswebconsulting.it/v1/` (GET only; rate-limited). To submit
+served at `https://pqchain.agwswebconsulting.it/v1/` (GET only; rate limited to 150 requests per 10 s per IP). To submit
 transactions, run your own node (`scripts/join-testnet.sh`).
 
-Three configuration flags in the `api` section of `node.json` gate parts
+Four configuration flags in the `api` section of `node.json` gate parts
 of the runtime surface (`crates/pqcd/src/node.rs`, `ApiConfig`):
 
 | Flag | Gates | Default in code | In `configs/roles/*.json` |
@@ -26,6 +26,7 @@ of the runtime surface (`crates/pqcd/src/node.rs`, `ApiConfig`):
 | `public_tx_submission` | `POST /v1/txs` | `true` | `true` for `full`, `rpc`, `sentry`, `archive`; `false` for `validator`, `bootnode` (and `single_node` by role default) |
 | `expose_token_state` | `/v1/accounts/{address}`, `/v1/accounts/{address}/attestations`, `/v1/fee-market` | `true` | `false` in every role config (no native token) |
 | `expose_notary_routes` | `/api/credentials/*`, `/api/proofs/*` | `true` | `false` in every role config (the notary is a separate, private deployment) |
+| `expose_peer_addresses` | `GET /v1/peers` | `false` | `false` in every role config; off by default and blocked on the public host |
 
 The startup config lint reports a validator or bootnode that turns
 `public_tx_submission` on (ADR-069). `/internal/metrics` and
@@ -55,7 +56,7 @@ Runtime router (`pqcd devnet-serve`), always on:
 | GET | `/v1/metrics` | Prometheus text format |
 | GET | `/api/health` | health, height, uptime |
 | GET | `/openapi.yaml` | OpenAPI 3.0 document |
-| GET | `/docs` | Swagger UI |
+| GET | `/docs` | Swagger UI (served by the node; not exposed on the public host) |
 
 Runtime router, gated by the flags above:
 
@@ -69,6 +70,7 @@ Runtime router, gated by the flags above:
 | GET | `/api/credentials/{id}` | `expose_notary_routes` |
 | POST | `/api/proofs/anchor` | `expose_notary_routes` |
 | GET | `/api/proofs/{id}` | `expose_notary_routes` |
+| GET | `/v1/peers` | `expose_peer_addresses` |
 
 Read-only router (`pqcd api-serve`):
 
@@ -374,7 +376,22 @@ Serves the OpenAPI 3.0 specification as YAML. Content-type: `text/yaml`.
 
 ### GET /docs
 
-Serves the Swagger UI interactive documentation page. Content-type: `text/html`.
+Serves the Swagger UI interactive documentation page. Content-type: `text/html`. Not exposed on the public host.
+
+### GET /v1/peers
+
+Connected peers with the IP address of their connection and the transport. Registered only when `api.expose_peer_addresses` is `true` (default `false`); otherwise `404`. It is meant for a seed node whose API is internal, so a status page can draw an approximate map of the network. It is never exposed publicly: the public ingress blocks it and `https://pqchain.agwswebconsulting.it` does not serve it.
+
+```json
+{
+  "count": 1,
+  "peers": [
+    { "peer_id": "12D3KooW…", "ip": "203.0.113.7", "transport": "quic" }
+  ]
+}
+```
+
+`ip` may be `null`; `transport` is `quic`, `tcp` or `unknown`.
 
 ---
 
@@ -424,11 +441,13 @@ Public gateway: https://<network-host>/v1
 
 ### Success
 
+The `data`/`meta` envelope below is the specified shape; the implemented routes currently return the bare object shown in each section.
+
 ```json
 {
   "data": { },
   "meta": {
-    "network_id": "pqchain-testnet-1",
+    "network_id": "viper-testnet-4",
     "api_version": "v1",
     "height": 12345
   }

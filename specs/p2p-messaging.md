@@ -203,20 +203,20 @@ Message type disambiguation (for the P2P router) uses the `msg_type` byte at off
 | `0xC2` | Prevote |
 | `0xC3` | Precommit |
 
-**Note on envelope vs inner tag**: the `msg_type` byte above lives inside the CBOR-encoded consensus message payload. The Phase 8 libp2p gossip transport (SPEC-P2P-002) wraps this payload in an outer `GossipMessage` envelope whose own `MessageType` enum uses disjoint values (`0x01 Block`, `0x02 ConsensusVote`, `0x03 Transaction`, `0x04 ValidatorUpdate`) for topic routing and IDONTWANT suppression. The outer `MessageType::ConsensusVote` corresponds to any of the three inner `0xC1`/`0xC2`/`0xC3` values — envelope decoding does not reveal which. See SPEC-P2P-002 §4.2 and `crates/pqc-p2p/src/message.rs`; the split is tracked in TASK-131.
+**Note on envelope vs inner tag**: the `msg_type` byte above lives inside the CBOR-encoded consensus message payload. The Phase 8 libp2p gossip transport (SPEC-P2P-002) wraps this payload in an outer `GossipMessage` envelope whose own `MessageType` enum uses disjoint values (`0x01 Block`, `0x02 ConsensusVote`, `0x03 Transaction`, `0x04 ValidatorUpdate`) for topic routing and IDONTWANT suppression. The outer `MessageType::ConsensusVote` corresponds to any of the three inner `0xC1`/`0xC2`/`0xC3` values — envelope decoding does not reveal which. See SPEC-P2P-002 §4.2 and `crates/pqc-p2p/src/message.rs`; the split is tracked .
 
-**Wire format (resolved 2026-04-22 — TASK-147)**: the envelope `MessageType` discriminants (`0x01`..`0x04`) are enforced on the wire by `serde_repr::Serialize_repr`/`Deserialize_repr` in `crates/pqc-p2p/src/message.rs`. Each variant encodes as a single CBOR unsigned-integer byte equal to its discriminant. Unknown discriminants fail to decode. Two pin tests (`message_type_wire_format_is_u8_discriminant`, `message_type_rejects_unknown_discriminant`) block any regression to the pre-TASK-147 behaviour, in which default serde derives encoded the variant NAME as a CBOR text string.
+**Wire format (resolved 2026-04-22)**: the envelope `MessageType` discriminants (`0x01`..`0x04`) are enforced on the wire by `serde_repr::Serialize_repr`/`Deserialize_repr` in `crates/pqc-p2p/src/message.rs`. Each variant encodes as a single CBOR unsigned-integer byte equal to its discriminant. Unknown discriminants fail to decode. Two pin tests (`message_type_wire_format_is_u8_discriminant`, `message_type_rejects_unknown_discriminant`) block any regression to the pre-TASK-147 behaviour, in which default serde derives encoded the variant NAME as a CBOR text string.
 
 ---
 
 ## 7. Connection to Implementation (Phase 8)
 
-The Phase 8 P2P implementation uses rust-libp2p as specified in §3a. The legacy `pqc-p2p::session` ML-KEM-768 session establishment (TASK-045, ADR-010) is **superseded** by TLS 1.3 + X25519MLKEM768 via libp2p-quic and libp2p-noise (ADR-041). The `pqc-p2p::session` crate MUST NOT be used for new connections; it may be retained in the codebase only if needed for reading historical data from Phase 6 testnet snapshots.
+The Phase 8 P2P implementation uses rust-libp2p as specified in §3a. The legacy `pqc-p2p::session` ML-KEM-768 session establishment (ADR-010) is **superseded** by TLS 1.3 + X25519MLKEM768 via libp2p-quic and libp2p-noise (ADR-041). The `pqc-p2p::session` crate MUST NOT be used for new connections; it may be retained in the codebase only if needed for reading historical data from Phase 6 testnet snapshots.
 
 The consensus message routing path requires:
 - persistent libp2p connections on the validator network (port 26656)
 - a routing table: `validator_pubkey → multiaddr` derived from the on-chain validator registry
-- a receive buffer per `(validator_address, h, r)` fed into the consensus engine (TASK-083)
+- a receive buffer per `(validator_address, h, r)` fed into the consensus engine
 
 Block fetch and snapshot serve endpoints use libp2p request-response over QUIC on the VFN network (port 26666).
 

@@ -47,8 +47,8 @@ The rest of this guide is the manual path and the validator path.
 
 **Companion documents.** `docs/operators/RUNBOOK.md` (day-two
 operations), `docs/observability.md` (logs, metrics, audit log),
-`configs/README.md` (config field reference), `specs/consensus.md` and
-`specs/validator-staking.md` (protocol rules), ADR-069 in `DECISIONS.md`
+`configs/README.md` (config field reference), `specs/consensus.md`
+(protocol rules), ADR-069 in `DECISIONS.md`
 (node roles).
 
 ---
@@ -70,10 +70,10 @@ specifications are `Reserved`.
 | `validator` | operators admitted to the validator set | Signs votes and proposes blocks. Private API; sentries front it. |
 | `single_node` | local development only | One-process chain, no P2P. Never use it on the public network. |
 
-The validator set is **operator-run**: the author runs the first
-validator, its sentries and the bootnode, and admits external
-validators as described in §7. Anyone can run `full`, `rpc` and
-`archive` nodes without asking. The old role names `producer` and
+The validator set is **operator-run**: the author runs the only
+validator, its sentries and the bootnode. Anyone can run `full`, `rpc`
+and `archive` nodes without asking. Validator admission is not open;
+§7 documents how the mechanism would work. The old role names `producer` and
 `follower` are still read as aliases of `validator` and `full` but are
 never written; do not use them in new configs.
 
@@ -111,8 +111,10 @@ pqcd version
 
 ## 3. Join flow (every role)
 
-1. **Pick your role file.** Copy `configs/roles/<role>.json` to
-   `/etc/pqchain/node.json`. Each file already carries the right
+1. **Pick your starting file.** For `viper-testnet-4` copy
+   `genesis/viper-testnet-4/full.json` to `/etc/pqchain/node.json` (genesis
+   constants and seeds already filled). For other roles or networks start from
+   `configs/roles/<role>.json`. Each role file already carries the right
    `devnet.role`, listen field (`validator_listen`, `vfn_listen` or
    `public_listen`), API binding and `api.public_tx_submission` default
    for that role; the test
@@ -257,14 +259,13 @@ curl -s http://127.0.0.1:26657/v1/status | jq
 returns `height`, `chain_id`, `state_root`, `tip_hash`, `node_id`,
 `base_fee`, `epoch_number` and `epoch_length_blocks`. Compare `height`
 and `tip_hash` with the public read API
-(`https://pqchain.agwswebconsulting.it/v1/status`, published at
-genesis) or with any other operator's `rpc` node: you are in sync when
+(`https://pqchain.agwswebconsulting.it/v1/status`, GET only) or with any other operator's `rpc` node: you are in sync when
 your height stays within a block or two of theirs and the `tip_hash`
 at a common height matches. Note that the `syncing` field is a
 placeholder and is always `false`; use the height comparison, not that
-flag. `GET /v1/network` on the same node returns the same identity
-fields plus `recovery_source`. `GET /v1/validators` lists the validator
+flag. `GET /v1/validators` lists the validator
 set with its `status`, and `/v1/metrics` exposes Prometheus counters.
+(`/v1/network` exists only under `pqcd api-serve`, not on a running node.)
 
 Run `pqcd status /etc/pqchain/node.json` when the node is stopped to
 read the store directly.
@@ -272,7 +273,7 @@ read the store directly.
 ## 7. Becoming a validator
 
 What the code implements today (`crates/pqc-state/src/apply/validator.rs`,
-`crates/pqc-state/src/store.rs`, `specs/validator-staking.md`):
+`crates/pqc-state/src/store.rs`):
 
 - The validator set lives in state, seeded at genesis from
   `devnet.validators[]` (status `Active`, `self_bond` 0) and read by

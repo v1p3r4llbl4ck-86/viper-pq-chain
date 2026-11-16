@@ -25,18 +25,17 @@ Two protocol primitives cover every case below:
   hash and a schema identifier (`/v1/attestations/{id}`, issued through
   `/api/credentials/issue`).
 - **Proof anchor** — a timestamped hash of an arbitrary document or
-  batch (`/v1/proofs/{anchor_id}`, created through `/api/proofs/anchor`).
+  batch (`/v1/proofs/{anchor_id}`, created through a signed transaction; the `/api/proofs/anchor` wrapper is disabled on the public network).
 
 Both are ordinary transactions validated by every full node and served
-by every `rpc` node; the optional notary service in the Helm chart is a
-convenience front-end, not a protocol component.
+by every `rpc` node; an optional notary front-end exists outside this repository and is not a protocol component.
 
 ---
 
 ## 1. Document notarisation
 
 **Status**: exercised on the retired research chains (hash anchoring,
-verification by attestation id, explorer).
+verification by attestation id).
 
 **Who uses it**: notaries, law firms, companies, professionals.
 

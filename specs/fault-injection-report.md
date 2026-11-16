@@ -1,6 +1,6 @@
 # Fault Injection Report
 
-**TASK-056 / TASK-065 — Phase 3-alpha exit artifact and Phase 4 gap closure**  
+**TASK-056 — Phase 3-alpha exit artifact and Phase 4 gap closure**  
 **SPEC-TEST-001 §4.4 — Fault injection and Byzantine validator simulation**  
 **Date:** 2026-04-12 (updated from 2026-04-11)  
 **Status**: Historical
@@ -12,8 +12,8 @@
 ## Summary
 
 This report documents the fault injection and Byzantine validator scenarios tested
-as part of the Phase 3-alpha validation program (TASK-056) and the Phase 4
-hardening program (TASK-065). All scenarios are exercised against the `pqcd`
+as part of the Phase 3-alpha validation program and the Phase 4
+hardening program. All scenarios are exercised against the `pqcd`
 devnet runtime using the integration tests in
 `crates/pqcd/tests/fault_injection.rs`.
 
@@ -23,10 +23,10 @@ devnet runtime using the integration tests in
 
 ## Environment
 
-- Prototype node: `pqcd` (Phase 4 devnet runtime, on-chain validator registry — TASK-064)
+- Prototype node: `pqcd` (Phase 4 devnet runtime, on-chain validator registry)
 - Consensus: 3-validator set (ML-DSA-65 commit signatures), seeded from config into
   the on-chain validator registry at genesis
-- Transport: ML-KEM-768 authenticated P2P (TASK-045)
+- Transport: ML-KEM-768 authenticated P2P
 - Commit quorum: ⌈2/3 × N⌉ = 2 of 3 validators required
 
 ---
@@ -127,7 +127,7 @@ against the current block's hash is rejected.
 
 ---
 
-## Scenario 3 — Byzantine Majority Liveness Halt (TASK-065)
+## Scenario 3 — Byzantine Majority Liveness Halt
 
 **Test:** `byzantine_majority_liveness_halt`  
 **File:** `crates/pqcd/tests/fault_injection.rs`  
@@ -177,7 +177,7 @@ is a DoS-style liveness attack with no on-chain attribution in Phase 4.
 
 ---
 
-## Scenario 4 — Fork-Choice Split-Brain (TASK-065)
+## Scenario 4 — Fork-Choice Split-Brain
 
 **Test:** `split_brain_fork_chain_rejected`  
 **File:** `crates/pqcd/tests/fault_injection.rs`  
@@ -242,7 +242,7 @@ partition simulation and an active fork-choice rule (ADR-007 / Phase 5 track).
 
 ---
 
-## Remaining Gaps (not closed in TASK-065)
+## Remaining Gaps (not closed )
 
 The following scenarios remain blocked and are deferred to Phase 5 or the HotStuff
 consensus track (ADR-007).
@@ -253,7 +253,7 @@ consensus track (ADR-007).
 equivocation check to be bypassed (e.g., by claiming the equivocating signer was
 not yet in the set at that height).
 
-**Current status:** On-chain validator registry is implemented (TASK-064);
+**Current status:** On-chain validator registry is implemented;
 `CommitQuorumPolicy::from_state_store()` reads active validators at genesis. Full
 height-indexed membership — where `ValidatorExit` or `ValidatorRegister` committed
 at height H affects quorum only for blocks after H — is Phase 5 (see GAP-05 in
@@ -293,6 +293,6 @@ rollback path.
 - `crates/pqcd/tests/multi_node_devnet.rs` — baseline multi-node scenarios
 - ADR-007 — consensus protocol track (HotStuff deferred)
 - ADR-020 — Phase 3 `consensus_key_rotate` record-only implementation gap
-- ADR-022 — Phase 4 on-chain validator staking lifecycle (TASK-064)
+- ADR-022 — Phase 4 on-chain validator staking lifecycle
 - SPEC-TEST-001 §4.4 — fault injection test requirements
 - `specs/audit-scope.md` — GAP-04, GAP-05 (validator set gaps)

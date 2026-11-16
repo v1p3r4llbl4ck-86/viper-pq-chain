@@ -25,8 +25,8 @@ image:
 # Chain identity
 # ============================================================================
 chain:
-  # Logical chain id. Use a name DIFFERENT from the live `viper-pq-1` so
-  # operators don't confuse the dev/test cluster with production.
+  # Logical chain id of a local/dev install. The public test network
+  # (`viper-testnet-4`) is deployed from ceremony values, not from these defaults.
   id: viper-pq-2-test
 
   # Block target time in ms (informational — actual config is in node.json).

@@ -1,12 +1,12 @@
 # Testing Strategy
 
-## Current stage (2026-08-24)
+## Current stage (checked 2026-11-16, v0.2.5)
 
 Full suite on the public-release branch:
 
 ```text
 cargo test --workspace --all-features
-# 935 passed, 8 ignored, 0 failed   (2026-08-24, v0.1.x; the count changes with the tree)
+# all tests pass; 8 are ignored on purpose (the counts change with the tree)
 ```
 
 Notes that matter when you run it:
@@ -19,14 +19,14 @@ Notes that matter when you run it:
 - The multi-node integration tests in `crates/pqcd/tests/` start several
   in-process nodes over loopback with fixed deadlines. They are
   load-sensitive: on a small or busy machine run them serially
-  (`cargo test -p pqcd -- --test-threads=1`). Making them deterministic
-  under load is TASK-239 (`KNOWN-ISSUES.md` G-03).
+  (`cargo test -p pqcd -- --test-threads=1`). The fix is described in
+  `KNOWN-ISSUES.md` G-03.
 - The 8 ignored tests are ignored on purpose: ACVP conformance and
   timing profiles in `pqc-crypto` (auditor evidence, `-- --ignored`),
   and two long three-node soaks in `product_workflows.rs` (gossipsub
   mesh formation; 20× determinism, 5–7 minutes).
 - `crates/pqc-consensus/tests/cold_sync_replay.rs` is the always-on
-  replay-equivalence gate of policy P-COMPAT-001 (ADR-052, TASK-198):
+  replay-equivalence gate of policy P-COMPAT-001 (ADR-052):
   it asserts byte-identical state roots at every height against a pin
   vector and must never be ignored.
 
@@ -93,7 +93,7 @@ the opt-in `three_node_distributed_signing_20x_determinism`.
 - `crates/pqc-crypto/tests/timing_profile.rs` reports p50/p90/p99 and the
   coefficient of variation of sign/verify latencies as loose sanity
   bounds. It is evidence for an auditor, not a constant-time proof; a
-  dudect-style harness is TASK-155.
+  a dudect-style harness is not in place.
 
 ## Fuzz harnesses
 
@@ -147,8 +147,7 @@ Development workstation, Windows 11, debug build:
 
 Linux reference VM (Ubuntu 22.04, kernel 6.8, pure-Rust `ml-dsa`),
 release build, 10,000 transactions, before and after the
-`KeyEntry.pk_bytes: Vec<u8> → Arc<[u8]>` optimisation (TASK-062,
-TASK-066):
+`KeyEntry.pk_bytes: Vec<u8> → Arc<[u8]>` optimisation:
 
 | Metric | Before | After | Δ |
 |---|---|---|---|
@@ -167,7 +166,7 @@ the clone into reference-count increments. Storage: 10,000 ML-DSA-65
 transactions at ~3,600 B each is ~36 MB of block data; at 100 TPS
 sustained that extrapolates to ~31 GB/day.
 
-Protocol targets (SPEC-TEST-001): §3.3 devnet ≥ 100 TPS — met in the 2026 benchmark above (129.4, retired network, v0.1.x);
+Protocol targets (SPEC-TEST-001): §3.3 devnet ≥ 100 TPS — met in the 2026 benchmark above (129.4, retired network, earlier release);
 §4.5 ≥ 200 TPS — not met; the next bottleneck is the HashMap clone in
 `StateStore::clone()` (~6 ms per block at 10,000 accounts).
 

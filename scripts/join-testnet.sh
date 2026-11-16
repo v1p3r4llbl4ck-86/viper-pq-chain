@@ -11,7 +11,7 @@
 #      tarball against SHA256SUMS;
 #   2. downloads the testnet node config and genesis from this repository and checks
 #      the genesis against its published SHA-256;
-#   3. writes a per-node identity (node_id + libp2p seed salt) into the config;
+#   3. writes a per-node identity (node_id + libp2p and ML-KEM seed salts) into the config;
 #   4. prints the command that starts the node, or installs a systemd unit when run as root
 #      with --systemd.
 #

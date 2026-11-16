@@ -16,7 +16,7 @@ Two decoupled workstreams:
 - **(a) Archival overlay implementation** — this plan's primary scope. Breaks into **M4.1 → M4.7** (§3), sequenced over ~5 calendar weeks solo. Produces: `pqc-types::archival` module, `MsgType::ArchivalRecordSubmit` / `ArchivalRecordAddAnchor` / `ArchivalRecordRenew` tx paths, SLH-DSA-SHAKE-256s signing helpers, epoch-boundary hook, RFC 3161 sidecar, RFC 4998 renewal cron, and integration tests.
 - **(b) External cohort recruitment** — out of scope for this agent. Tracked at `docs/historical/phase-8-spec.md` §6 and executed by human ops: 8–12 operators, BYO hardware per `specs/launch-readiness.md` §3 (min spec: 8-core Zen4+/ARM, 32 GB ECC, 2 TB NVMe, 200 Mbps, US-participant carve-out). Incentives: 12-month lockup, no cash grant. Timeline: parallel to (a), target first ≥ 5 live by end of M4.6.
 
-**Effort for (a)**: ~5 calendar weeks solo. **Budget**: €0 dev, ~€3–9k/year TSA costs once live (budget in `reports/m4/budget.md`, drafted in TASK-164). **Rollback**: the overlay is additive-only — setting `archival_enabled = false` via emergency governance (§12 of SPEC-ARCHIVAL-001) stops new records without invalidating past ones.
+**Effort for (a)**: ~5 calendar weeks solo. **Budget**: €0 dev, ~€3–9k/year TSA costs once live (budget in `reports/m4/budget.md`, drafted ). **Rollback**: the overlay is additive-only — setting `archival_enabled = false` via emergency governance (§12 of SPEC-ARCHIVAL-001) stops new records without invalidating past ones.
 
 **Exit criterion (a)**: on devnet-2, one full epoch boundary produces an `ArchivalRecord` with ≥ 2 EU-qualified TSA anchors, the external verification protocol (SPEC-ARCHIVAL-001 §7) reconstructs from the `GET /v1/archival/proof` endpoint alone, and `pqchain_archival_records_pending_anchor` stays at 0 across a 24-hour soak.
 
@@ -154,7 +154,7 @@ Six sub-phases over ~5 calendar weeks, each producing a landable commit on `deve
   - T11 (SPEC-ARCHIVAL-001 §7 full-roundtrip): from a pinned chain snapshot + an `epoch_number`, the verification protocol reconstructs the `ArchivalProof` bundle without access to the live chain. This is a *pure* test (no network) that forces us to write the first reference verifier — the same code paths will ship in the SDKs post-audit (Phase 9).
   - RUNBOOK §22 section written: archival ops (sidecar restart, TSA outage response, renewal-overdue alert, governance proposal to disable archival in emergency).
   - CHANGELOG.md entry under `[Unreleased]` Added.
-  - ROADMAP.md M4 status flipped from "queued" → "design landed … implementation tracked in TASK-160..165" and eventually "implementation complete".
+  - ROADMAP.md M4 status flipped from "queued" → "design landed … implementation tracked ..165" and eventually "implementation complete".
   - TASKS.md TASK-160..165 flipped to `[x]`.
   - `reports/m4/2026-MM-DD.md` soak evidence (24-hour devnet run with archival enabled, all metrics healthy).
 
@@ -188,7 +188,7 @@ Recommendation: `rasn`.
 
 ### 4.3 Archival key custody inherits all consensus-key concerns
 
-Storing a second long-lived private key on every designated signer doubles the key-custody attack surface. Mitigation: archival sigs are slow enough (~3 000 verify/s) that the signer is NOT in the consensus hot path, so the archival key can live on **cold storage** and be moved to an air-gapped signer at epoch boundaries (once per hour). Documented as a deployment option in `docs/validator-onboarding.md` (to be extended in TASK-163).
+Storing a second long-lived private key on every designated signer doubles the key-custody attack surface. Mitigation: archival sigs are slow enough (~3 000 verify/s) that the signer is NOT in the consensus hot path, so the archival key can live on **cold storage** and be moved to an air-gapped signer at epoch boundaries (once per hour). Documented as a deployment option in `docs/validator-onboarding.md` (to be extended ).
 
 ### 4.4 No retroactive archival for pre-enablement epochs
 
@@ -211,7 +211,7 @@ M4.5 requires concrete TSA endpoints. Proposed initial list (confirmation deferr
 | 3 | Namirial TSA | IT | ~€0.10/TST | ✅ qualified | Cheapest qualified |
 | 4 | TrustPro Cloud TSA | EU | ~€0.15/TST | ✅ accredited | Redundancy, non-IT jurisdiction |
 
-Total estimated cost: 4 TSAs × 8 760 TSTs/year × €0.15 avg = **€5 256/year**. Budget entry in `reports/m4/budget.md` (TASK-164).
+Total estimated cost: 4 TSAs × 8 760 TSTs/year × €0.15 avg = **€5 256/year**. Budget entry in `reports/m4/budget.md`.
 
 Negotiation note: at anchor volumes (~8k/year × 4 = 32k TSTs/year total) most qualified TSAs offer bulk contracts. A 30% discount on list price is realistic — budget estimate stays conservative at the non-discounted figure.
 
@@ -289,7 +289,7 @@ For the full Phase 8 exit (both workstreams):
 - [ ] 7 consecutive days without unplanned halt
 - [ ] `pqchain_archival_records_pending_anchor = 0` throughout the 7-day window
 - [ ] ≥ 2 TSAs producing timely TSTs throughout the window
-- [ ] Cryptographic audit report received (TASK-115) with no critical findings unresolved
+- [ ] Cryptographic audit report received with no critical findings unresolved
 
 ---
 

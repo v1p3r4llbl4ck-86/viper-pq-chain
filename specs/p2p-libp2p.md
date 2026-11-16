@@ -116,7 +116,7 @@ pub struct GossipMessage {
 
 A `GossipMessage` with `msg_type = ConsensusVote` (outer) carries a CBOR-encoded payload whose first byte is `0xC1`/`0xC2`/`0xC3` (inner). Decoding the outer envelope does not decode the inner consensus byte — that is done by the consensus engine after `SwarmHandle` hands the payload up.
 
-**Wire format (resolved 2026-04-22 — TASK-147)**: `MessageType` is serialized via `serde_repr::Serialize_repr`/`Deserialize_repr` so each variant encodes as a **single CBOR unsigned-integer byte** equal to its `#[repr(u8)]` discriminant (`0x01`..`0x04`). The default serde derives were discovered to encode C-like enums as CBOR text strings of the variant name — TASK-147 reconciled this by adopting `serde_repr` before M1 cutover froze the wire format. The migration is pinned by two tests in `crates/pqc-p2p/src/message.rs`:
+**Wire format (resolved 2026-04-22)**: `MessageType` is serialized via `serde_repr::Serialize_repr`/`Deserialize_repr` so each variant encodes as a **single CBOR unsigned-integer byte** equal to its `#[repr(u8)]` discriminant (`0x01`..`0x04`). The default serde derives were discovered to encode C-like enums as CBOR text strings of the variant name — TASK-147 reconciled this by adopting `serde_repr` before M1 cutover froze the wire format. The migration is pinned by two tests in `crates/pqc-p2p/src/message.rs`:
 
 - `message_type_wire_format_is_u8_discriminant` — every variant encodes to exactly one byte matching the discriminant table above.
 - `message_type_rejects_unknown_discriminant` — unknown values (e.g. future `0x05`) fail to decode rather than aliasing to an existing variant.
@@ -270,7 +270,7 @@ These `/internal/p2p/*` endpoints on the validator's Phase 6 API are replaced by
 | `GET /internal/p2p/blocks/{height}` | request-response over QUIC | `/viper/block-fetch/1.0.0` |
 | `GET /internal/p2p/snapshot` | request-response over QUIC | `/viper/snapshot/1.0.0` |
 
-The Phase 6 SSH reverse tunnel (`pqchain-tunnel-follower1.service`) is removed by the cutover playbook (TASK-141).
+The Phase 6 SSH reverse tunnel (`pqchain-tunnel-follower1.service`) is removed by the cutover playbook.
 
 Backwards compatibility: M1 binaries MUST NOT accept the old endpoints. A `--legacy-p2p` flag is explicitly NOT provided — operators running a mixed fleet MUST cut over all three nodes in a single coordinated window (see `playbooks/cutover-libp2p.yml`).
 
@@ -337,7 +337,7 @@ Exposed at `/internal/metrics` (Prometheus text format) by `pqcd`, produced from
 | `pqchain_p2p_request_response_latency_seconds` | histogram | `protocol={block_fetch,snapshot}` | RPC latency |
 | `pqchain_p2p_snapshot_oversize_total` | counter | — | Snapshot exceeded operational cap |
 
-Health probe (`scripts/p2p-health.sh` added in TASK-143) reads `pqchain_p2p_peers_connected{network="validator"}` on the validator and returns non-zero if `< expected_validators - 1`.
+Health probe (`p2p-health.sh`, not shipped in this repository) reads `pqchain_p2p_peers_connected{network="validator"}` on the validator and returns non-zero if `< expected_validators - 1`.
 
 ---
 

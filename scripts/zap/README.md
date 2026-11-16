@@ -1,4 +1,4 @@
-# `scripts/zap/` — OWASP ZAP baseline scan (TASK-222 / L6b)
+# `scripts/zap/` — OWASP ZAP baseline scan
 
 OWASP ZAP (Zed Attack Proxy) is the de-facto baseline scanner for
 HTTP applications. It spiders the target, observes responses, and
@@ -60,7 +60,6 @@ are configured on nginx; the baseline confirms.
 
 ## Cross-references
 
-- `docs/security-testing-roadmap.md` §3 / TASK-222
-- `scripts/k6/notarize-abuse.js` — TASK-220 (load + abuse on the same
+- `scripts/k6/notarize-abuse.js` (load + abuse on the same
   surface; complementary to ZAP's passive spider)
 - `deploy/ansible/roles/nginx/` — where the response-header config lives

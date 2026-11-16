@@ -108,7 +108,7 @@ ML-DSA-65 (FIPS 204) is the consensus algorithm at launch; `alg_id = 0x0002` per
 
 ### 4.3 Address (chain-id-bound)
 
-Per ADR-053 §T1.3 / TASK-192 / SPEC-GENESIS-001 §2.5:
+Per ADR-053 §T1.3 / SPEC-GENESIS-001 §2.5:
 
 ```
 address = derive_address(chain_id_bytes, alg_id, pk_bytes)
@@ -190,7 +190,7 @@ The remaining libp2p fields track `viper_libp2p_common` from `deploy/ansible/gro
 
 ```
 {
-  "_generated_by":   "pqcd ceremony (TASK-233)",
+  "_generated_by":   "pqcd ceremony",
   "_chain_id":       "<chain_id>",
   "_chain_id_hex":   "<hex>",
   "image":           { ... },

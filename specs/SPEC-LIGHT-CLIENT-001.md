@@ -5,7 +5,7 @@
 **Status**: Draft
 **Date**: 2026-04-25
 **Implements**: ADR-053 §T3.6 (Light-client protocol as first-class feature)
-**Depends on**: ADR-053, SPEC-CONSENSUS-001, SPEC-VAL-001, SPEC-SLASH-001, SPEC-FORK-V1 (TASK-191), SPEC-P2P-001, SPEC-P2P-002
+**Depends on**: ADR-053, SPEC-CONSENSUS-001, SPEC-VAL-001, SPEC-SLASH-001, SPEC-FORK-V1, SPEC-P2P-001, SPEC-P2P-002
 **References**: ADR-051 (commit signature preimage convention), Ethereum Altair beacon chain (sync committee design), Bitcoin BIP340 (tagged hashing)
 
 ---
@@ -134,7 +134,7 @@ preimage = "VIPER-LIGHT-HEADER-V1" || fork_digest[4] || cbor(compact_header)
 Where:
 
 - `"VIPER-LIGHT-HEADER-V1"` is the domain tag for compact-header signatures.
-- `fork_digest` is the 4-byte `ForkDigest` defined in `pqc_types::fork::ForkDigest` (ADR-053 §T1.2 / SPEC-FORK-V1, TASK-191) for the active `(fork_version, genesis_validators_root)` pair. The prefix scopes every committee signature to its host chain so a signature on `viper-pq-1` cannot be replayed on any future fork.
+- `fork_digest` is the 4-byte `ForkDigest` defined in `pqc_types::fork::ForkDigest` (ADR-053 §T1.2 / SPEC-FORK-V1) for the active `(fork_version, genesis_validators_root)` pair. The prefix scopes every committee signature to its host chain so a signature on `viper-pq-1` cannot be replayed on any future fork.
 - `cbor(compact_header)` is the deterministic CBOR encoding from §3.2.
 
 Sync committee signatures use ML-DSA-65 (the same algorithm and key as the validator's BFT consensus key — SPEC-VAL-001 §5.2; SPEC-CONSENSUS-001 §13). Reusing the consensus key keeps key management simple and ensures slashing for sync-committee equivocation reaches the same `self_bond` slashed for BFT equivocation.
@@ -304,7 +304,7 @@ The compact-header preimage is fork-digest-scoped (§3.3), so sync-committee sig
 | SPEC-CONSENSUS-001 | BFT consensus protocol; finality rule; commit signatures |
 | SPEC-VAL-001 | Validator and staking model; lifecycle states |
 | SPEC-SLASH-001 | Slashing protocol; equivocation evidence; correlation penalty |
-| SPEC-FORK-V1 (TASK-191) | `ForkDigest` derivation and signing-domain prefix |
+| SPEC-FORK-V1 | `ForkDigest` derivation and signing-domain prefix |
 | SPEC-P2P-001 | libp2p gossip topology, topic naming convention |
 | SPEC-P2P-002 | Gossip envelope / `MessageType` discriminants |
 | SPEC-ARCHIVAL-001 | Archival overlay; long-term evidence persistence |

@@ -8,8 +8,8 @@
 **Depends on**: ADR-005 (fee model), ADR-011 (deprecation), ADR-015 (parameters deferred), ADR-053 §T2.1 (multi-dim fee market), ADR-053 §T2.2 (storage fund), SPEC-TX-001, SPEC-ACCOUNT-001, SPEC-FEE-002 (multi-dim revision)
 
 > **Revision banner (2026-04-25)**: this spec covers the four price components per transaction (`base_fee`, `byte_fee`, `sigverify_fee`, `exec_fee`) and remains valid as the per-tx fee algebra. Two newer mechanisms layer on top:
-> - **Multi-dimensional fee market** (ADR-053 §T2.1, TASK-201): the per-block `base_fee` is no longer a single scalar — it is a vector across `compute / storage / witness / contention` dimensions, each with its own EIP-4844 exponential update + reserve floor. See **SPEC-FEE-002 v0.2** for the dimension-level formulas. The per-tx `base_fee` of this spec is paid out of the `compute` dimension at apply-time.
-> - **Storage fund** (ADR-053 §T2.2, TASK-199): on every state-creating tx (vault create, attestation submit, governance proposal, archival anchor), an upfront `bytes × perpetual_cost_per_byte` is contributed to the storage fund (state-delegated, refunded fractionally on deletion). This is **on top of** the per-tx fee in this spec, not in lieu of it. Code: `crates/pqc-state/src/storage_fund.rs`.
+> - **Multi-dimensional fee market** (ADR-053 §T2.1): the per-block `base_fee` is no longer a single scalar — it is a vector across `compute / storage / witness / contention` dimensions, each with its own EIP-4844 exponential update + reserve floor. See **SPEC-FEE-002 v0.2** for the dimension-level formulas. The per-tx `base_fee` of this spec is paid out of the `compute` dimension at apply-time.
+> - **Storage fund** (ADR-053 §T2.2): on every state-creating tx (vault create, attestation submit, governance proposal, archival anchor), an upfront `bytes × perpetual_cost_per_byte` is contributed to the storage fund (state-delegated, refunded fractionally on deletion). This is **on top of** the per-tx fee in this spec, not in lieu of it. Code: `crates/pqc-state/src/storage_fund.rs`.
 > 
 > A v0.3 deeper revision will fold these two mechanisms into the body and re-derive the worked examples; until then read this spec alongside SPEC-FEE-002 v0.2.
 
@@ -24,7 +24,7 @@ This document specifies the PQ Chain fee model: the formula that determines the 
 This specification defines fee structure and enforcement. It does not define:
 
 - final numeric values for fee coefficients (`byte_fee`, `exec_fee_per_gas`, benchmark class fees) — deferred to Phase 2 after prototype measurements (ADR-015)
-- per-operation gas costs — deferred to SPEC-OPS (TASK-007)
+- per-operation gas costs — deferred to SPEC-OPS
 - staking rewards and fee distribution to validators — deferred to TASK-011
 - the governance process for updating fee parameters — deferred to TASK-010
 
@@ -86,7 +86,7 @@ If execution reaches `gas_limit`, execution halts, state changes from that trans
 
 Per-operation gas costs are defined in §4.4 below. `exec_fee_per_gas` converts gas units to fee token units at the same 43.3 units/µs calibration rate used for signature verification fees (see §6.4).
 
-### 4.4 Per-Operation Gas Schedule (TASK-007, resolved 2026-04-11)
+### 4.4 Per-Operation Gas Schedule (resolved 2026-04-11)
 
 Gas unit definition: **1 gas ≈ 1 µs of state-machine execution** on the Linux reference node (see SPEC-FEE-001 §6.4). Gas costs are derived from the block-production benchmarks: the empty-block baseline is ~7 µs; each additional state operation adds proportional cost for CBOR decode, balance/key/attestation write, and leaf-hash recompute.
 
@@ -173,7 +173,7 @@ These are the external measurements that inform class calibration. They are not 
 
 The fee class calibration MUST be derived from real measurements on actual node hardware, not extrapolated from these figures alone. These numbers establish the order-of-magnitude relationship between classes and justify the V-A / V-B / V-C distinction.
 
-### 6.3 Measured Performance — Prototype Node (TASK-039, 2026-04-10)
+### 6.3 Measured Performance — Prototype Node (2026-04-10)
 
 **Machine**: Windows 11 development workstation (release build, `--opt-level 3 --lto`). **Not** the reference Ubuntu VM; these are interim numbers pending Ubuntu VM re-run. Relative cost ratios are reliable; absolute verify/s figures will be higher on tuned Linux hardware.
 
@@ -235,7 +235,7 @@ The fee class calibration MUST be derived from real measurements on actual node 
 
 **Windows results are superseded by §6.4 Linux measurements** — the same pure-Rust ml-dsa crate produces different absolute throughput under different OS schedulers and CPU configurations. Relative ratios were confirmed stable; absolute token fee values were calibrated from the Linux numbers in §6.4.
 
-### 6.4 Measured Performance — Reference Linux Node (TASK-042, 2026-04-11)
+### 6.4 Measured Performance — Reference Linux Node (2026-04-11)
 
 **Machine**: Linux 6.8.0-107-generic (Ubuntu VM, release build, `--opt-level 3 --lto`). This is the reference hardware for fee calibration. **Crypto backend**: `ml-dsa` crate v0.1.0-rc.8 (pure-Rust FIPS 204), same as §6.3.
 
@@ -284,7 +284,7 @@ Sign latency on the reference VM showed moderate variability under sustained loa
 
 | Accounts | Median state_root cost | Notes |
 |----------|----------------------|-------|
-| 1 | 8.1 µs | incremental leaf-hash cache (TASK-047) |
+| 1 | 8.1 µs | incremental leaf-hash cache |
 | 10 | 11.7 µs | |
 | 100 | 59.8 µs | |
 | 500 | 272 µs | |
@@ -366,7 +366,7 @@ where `gas_used ≤ gas_limit` at completion.
 
 ### 8.2 Per-Operation Gas Costs
 
-Per-operation gas schedules (vault operations, attestation anchoring, key rotation, etc.) are defined in SPEC-OPS (TASK-007). This document specifies only that:
+Per-operation gas schedules (vault operations, attestation anchoring, key rotation, etc.) are defined in SPEC-OPS. This document specifies only that:
 
 - gas consumption is metered per operation type
 - if `gas_used` reaches `gas_limit` mid-execution, execution halts and state changes are discarded
@@ -531,7 +531,7 @@ The fee formula uses `gas_limit` (the declared maximum), not `gas_used` (the act
 
 ## 15. Open TBDs (Phase 3)
 
-TBD-FEE-01 through TBD-FEE-06 were resolved by the Linux reference benchmark (TASK-042, 2026-04-11). See §6.4 for the concrete values deployed in runnable configs.
+TBD-FEE-01 through TBD-FEE-06 were resolved by the Linux reference benchmark (2026-04-11). See §6.4 for the concrete values deployed in runnable configs.
 
 | ID | Parameter | Status |
 |----|-----------|--------|
@@ -541,7 +541,7 @@ TBD-FEE-01 through TBD-FEE-06 were resolved by the Linux reference benchmark (TA
 | TBD-FEE-04 | `benchmark_class_fee[V-B]` | **Resolved** → 14 000 (§6.4) |
 | TBD-FEE-05 | `benchmark_class_fee[V-C]` | **Resolved** → 810 000 (§6.4, eBATS ratio) |
 | TBD-FEE-06 | `exec_fee_per_gas` rate | **Resolved** → 1 placeholder (§6.4; update after TASK-007) |
-| TBD-FEE-07 | Per-operation gas schedules | Open — deferred to SPEC-OPS (TASK-007) |
+| TBD-FEE-07 | Per-operation gas schedules | Open — deferred to SPEC-OPS |
 | TBD-FEE-08 | Minimum `gas_limit` floor | Open |
 | TBD-FEE-09 | Per-sender verify budget window and cap | Open — node policy; Phase 3 calibration |
 | TBD-FEE-10 | V-C per-block cap and `verify_budget_per_block` | Open — node policy; Phase 3 calibration |

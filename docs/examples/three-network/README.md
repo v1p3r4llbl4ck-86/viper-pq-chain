@@ -1,8 +1,8 @@
 # Three-Network Deployment Examples
 
-**Authority:** TASK-219 (essay item 3) — operationalises the
+**Purpose:** operationalises the
 validator-private / VFN / public-RPC three-network split per
-SPEC-P2P-002 §4 and `docs/historical/phase-8-spec.md` §3.
+SPEC-P2P-002 §4.
 
 This directory contains three companion `node.json` examples — one
 per hop in the recommended topology. Operators copy the file
@@ -71,7 +71,7 @@ connections to sentry / VFN nodes, chosen out-of-band:
 Add the bootstrap multiaddrs to `libp2p.bootstrap_peers[]` in
 `validator.node.json`. The libp2p connection manager keeps these
 sticky; if one drops, the validator continues to operate via the
-remaining ≥2 paths while the cold-start retry logic (TASK-234) re-
+remaining ≥2 paths while the cold-start retry logic re-
 dials the dropped peer.
 
 ## Defence-in-depth: pqcd's startup lint
@@ -93,5 +93,4 @@ opt-in and stays silent.
 - `docs/operators/RUNBOOK.md` — operator deployment procedure
 - `specs/p2p-libp2p.md` §4 — wire-protocol spec for the three networks
 - `specs/p2p-messaging.md` §6 — message-class routing per network
-- `docs/historical/phase-8-spec.md` §3 — original three-network rationale
 - ADR-041 / ADR-042 — libp2p adoption + validator identity binding

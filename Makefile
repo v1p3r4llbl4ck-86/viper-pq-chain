@@ -8,7 +8,6 @@
 #   make deploy             # full provision (first time or after infra changes)
 #   make deploy-binary      # rebuild binary on nodes + restart (code changes only)
 #   make deploy-config      # push config + restart, no rebuild
-#   make deploy-frontend    # update explorer/notary static files only
 #   make reset-chain        # wipe block data, restart from genesis
 #   make health             # non-destructive cluster health check
 #   make teardown           # DANGER: remove everything from all nodes
@@ -47,10 +46,6 @@ deploy-binary: build-release
 deploy-config:
 	$(call ansible,deploy-only.yml)
 
-## Update explorer and notary static files only — no binary restart
-.PHONY: deploy-frontend
-deploy-frontend:
-	$(call ansible,deploy-frontend.yml)
 
 ## Wipe on-disk chain data on all nodes and restart from genesis
 .PHONY: reset-chain

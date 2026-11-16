@@ -1,7 +1,7 @@
 # `docs/` — index
 
 The root of the repository holds the canonical documents (README, WHITEPAPER, ARCHITECTURE,
-API, DECISIONS, CONVENTIONS, TESTING, ROADMAP, KNOWN-ISSUES, SECURITY, CONTRIBUTING, AGENTS,
+API, DECISIONS, CONVENTIONS, TESTING, ROADMAP, KNOWN-ISSUES, SECURITY, CONTRIBUTING,
 LICENSE). `specs/` is the normative protocol contract. This directory holds what an operator,
 an integrator or an auditor needs beyond that.
 
@@ -28,7 +28,7 @@ an integrator or an auditor needs beyond that.
 | [multicodec-mapping.md](multicodec-mapping.md) | multicodec / multihash identifiers used on the wire |
 | [openapi.yaml](openapi.yaml) | OpenAPI 3.0 description of the HTTP API (served by the node at `/openapi.yaml`) |
 | [examples/three-network/](examples/three-network/) | worked example of the validator / VFN / public P2P networks |
-| [site/swagger.html](site/swagger.html) | Swagger UI page served by the node at `/docs` (the explorer ships in the Helm chart, `charts/viper-pq-chain/files/frontend`) |
+| [site/swagger.html](site/swagger.html) | Swagger UI page served by the node at `/docs` (not exposed on the public host) |
 
 ## `historical/` — retained for the audit trail
 

@@ -13,7 +13,7 @@
 
 ## 1. Overview and Motivation
 
-The governance module provides a formal on-chain mechanism for updating bounded protocol parameters without a coordinated operator restart or a hard fork. It replaces the minimal single-step `governance_proposal(registry_update)` path implemented in TASK-037, which had no deposit mechanism, no voting, and no quorum requirement.
+The governance module provides a formal on-chain mechanism for updating bounded protocol parameters without a coordinated operator restart or a hard fork. It replaces the minimal single-step `governance_proposal(registry_update)` path implemented , which had no deposit mechanism, no voting, and no quorum requirement.
 
 ### 1.1 What Governance Can Change
 
@@ -626,7 +626,7 @@ The existing `GET /v1/governance/receipts/{proposal_id}` endpoint (serving old `
 
 ## 11. API Endpoints
 
-These endpoints are additive to the existing API. Field names and types are stable per Phase 4 backwards-compatibility rules (AGENTS.md §Phase 4 Rules).
+These endpoints are additive to the existing API. Field names and types are stable per Phase 4 backwards-compatibility rules.
 
 ### 11.1 GET /v1/governance/proposals
 
@@ -796,7 +796,7 @@ All errors are returned as `ApplyError` variants in the Rust apply layer, and as
 
 ## 13. Implementation Checklist
 
-This checklist maps to TASK-098. Each item is an independently testable unit. Items in audit scope (§1.4 of AGENTS.md) are marked `[AUDIT]`.
+Each item is an independently testable unit. Items in audit scope are marked `[AUDIT]`.
 
 ### 13.1 Types (`pqc-types`)
 
@@ -852,7 +852,7 @@ This checklist maps to TASK-098. Each item is an independently testable unit. It
 - [ ] Implement `GET /v1/governance/parameters`
 - [ ] Preserve `GET /v1/governance/receipts/:proposal_id` for old `TxHash`-keyed receipts (TASK-037 compat)
 
-### 13.6 Tests (minimum 8 required by TASK-098)
+### 13.6 Tests (minimum 8 required )
 
 - [ ] `test_proposal_deposit_period_expires_and_burns` — deposit period expires without `min_deposit`; verify burns and state = `DepositBurned`
 - [ ] `test_proposal_advances_to_voting_on_min_deposit` — `total_deposit` crosses `min_deposit`; verify `VotingPeriod` transition and `eligible_voting_weight` snapshot

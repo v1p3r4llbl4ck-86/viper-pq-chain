@@ -44,7 +44,7 @@ This document does not produce ADRs directly. Implementation gaps that require a
 |-|--------|
 | Threat | Attacker resubmits a previously valid signed transaction to double-spend or repeat an operation |
 | Mitigation | Account nonce enforced in `pqc-tx/src/validate.rs` step 8; mempool rejects `nonce < account.nonce` with `NONCE_CONFLICT`; committed state advances nonce on every finalized tx |
-| Status | **Confirmed** — tested in engine and recovery integration tests; `chain_id` enforced at validation step 4 (TASK-024) prevents cross-chain replay |
+| Status | **Confirmed** — tested in engine and recovery integration tests; `chain_id` enforced at validation step 4 prevents cross-chain replay |
 | Residual risk | None for single-chain replay. Cross-chain replay is prevented by `chain_id` binding in the signed envelope. |
 
 #### 3.1.2 Transaction malleability
@@ -53,7 +53,7 @@ This document does not produce ADRs directly. Implementation gaps that require a
 |-|--------|
 | Threat | Attacker modifies non-signed fields to produce a different `tx_hash` for the same semantic content, breaking receipt lookups or double-spending |
 | Mitigation | `tx_hash = SHAKE-256(canonical_cbor_bytes, 32)` over the full envelope including the signature field; non-canonical CBOR encoding rejected at step 1–2 with `ENCODING_NOT_CANONICAL` |
-| Status | **Confirmed** — proptest fuzzing (TASK-046) confirmed no panic on arbitrary bytes; `prop_decode_encode_round_trip_stability` confirms encode(decode(raw)) == raw |
+| Status | **Confirmed** — proptest fuzzing confirmed no panic on arbitrary bytes; `prop_decode_encode_round_trip_stability` confirms encode(decode(raw)) == raw |
 | Residual risk | CBOR library implementation correctness; covered in audit scope (AUDIT-SCOPE-001 §3.2, question 7) |
 
 #### 3.1.3 Signature forgery (classical)
@@ -62,7 +62,7 @@ This document does not produce ADRs directly. Implementation gaps that require a
 |-|--------|
 | Threat | Attacker forges a transaction signature without the sender's private key |
 | Mitigation | ML-DSA-65 (FIPS 204 NIST L3) as default; `MlDsaVerifier` called on every admitted transaction via `admission.rs` |
-| Status | **Confirmed** — `MlDsaVerifier` wired into all live admission paths (TASK-041); product-wedge tests run with real ML-DSA-65 keypairs |
+| Status | **Confirmed** — `MlDsaVerifier` wired into all live admission paths; product-wedge tests run with real ML-DSA-65 keypairs |
 | Residual risk | Implementation correctness of the `ml-dsa` crate (pure-Rust, FIPS 204); covered by cryptographic audit (AUDIT-SCOPE-001 §3.1) |
 
 #### 3.1.4 Signature forgery (quantum)
@@ -80,7 +80,7 @@ This document does not produce ADRs directly. Implementation gaps that require a
 |-|--------|
 | Threat | Attacker submits a transaction using a deprecated or banned algorithm to bypass signature cost or exploit a weakened algorithm |
 | Mitigation | Algorithm lifecycle check at mempool admission step (before signature verification CPU is spent); `deprecated` and `banned` algorithms rejected with `UNSUPPORTED_ALGORITHM` before any crypto work |
-| Status | **Confirmed** — full 4-step deprecation drill (Active→Discouraged→Deprecated→Banned) passed (TASK-055); tx admission blocked at each stage as expected |
+| Status | **Confirmed** — full 4-step deprecation drill (Active→Discouraged→Deprecated→Banned) passed; tx admission blocked at each stage as expected |
 | Residual risk | None — the lifecycle check runs before signature verification and cannot be bypassed without modifying the node |
 
 #### 3.1.6 Multi-algorithm verifier gap
@@ -124,14 +124,14 @@ This document does not produce ADRs directly. Implementation gaps that require a
 | Threat | Two honest chains of equal height form due to a network partition; the node must apply a deterministic fork-choice rule and not accept both |
 | Current state | **Gap** — single producer; no competing tip hashes possible in current architecture; full-node sync has no fork-choice path |
 | Evidence | Documented in `specs/fault-injection-report.md` gap 2 |
-| Path to closure | TASK-065 + ADR-007 HotStuff track (TASK-064) |
+| Path to closure | TASK-065 + ADR-007 HotStuff track |
 
 #### 3.2.4 Long-range attack
 
 | | Detail |
 |-|--------|
 | Threat | Attacker with old validator keys rewrites chain history from a past height |
-| Current state | **Partial** — trusted local checkpoints exist (TASK-020); bootstrap prefers checkpoint over full replay; checkpoint integrity is verified by SHAKE-256 on load |
+| Current state | **Partial** — trusted local checkpoints exist; bootstrap prefers checkpoint over full replay; checkpoint integrity is verified by SHAKE-256 on load |
 | Gap | No social or governance consensus on checkpoint hashes; a node that bootstraps from a snapshot trusts the snapshot source (KEM-authenticated peer, not validator-signed) |
 | Path to closure | Validator-signed snapshot attestation (GAP-03 in AUDIT-SCOPE-001); governance-ratified checkpoint hashes for the mainnet bootstrap set |
 
@@ -155,7 +155,7 @@ This document does not produce ADRs directly. Implementation gaps that require a
 | | Detail |
 |-|--------|
 | Threat | Attacker intercepts block data between peers and substitutes a different block |
-| Mitigation | ML-KEM-768 three-step session handshake before any block data is served (TASK-045); per-request token `SHAKE-256(ss || "block-fetch" || height_be64)` authenticated per fetch |
+| Mitigation | ML-KEM-768 three-step session handshake before any block data is served; per-request token `SHAKE-256(ss || "block-fetch" || height_be64)` authenticated per fetch |
 | Status | **Confirmed** — `p2p_session_required_for_block_fetch` integration test: 401 on unauthenticated fetch, 200 after KEM handshake |
 | Residual risk | Block bytes are authenticated (token-gated) but not encrypted beyond the session token. A passive observer who does not complete the KEM handshake cannot fetch blocks; a peer who does complete the handshake can read block content. For a public chain this is expected. |
 
@@ -182,7 +182,7 @@ This document does not produce ADRs directly. Implementation gaps that require a
 | | Detail |
 |-|--------|
 | Threat | Attacker floods `/internal/p2p/session` with KEM handshake requests to exhaust resources |
-| Current state | **Gap** — no rate limiting on P2P endpoints; per-IP rate limit (TASK-052) applies only to `/v1/txs` |
+| Current state | **Gap** — no rate limiting on P2P endpoints; per-IP rate limit applies only to `/v1/txs` |
 | Impact | The KEM encapsulation + decapsulation cost (~140k decap/s on reference hardware) bounds the attack throughput, but a sustained flood could increase block fetch latency |
 | Path to closure | Phase 4 hardening item; rate limiting on P2P session endpoint |
 
@@ -220,8 +220,8 @@ This document does not produce ADRs directly. Implementation gaps that require a
 | | Detail |
 |-|--------|
 | Threat | Attacker submits many transactions using expensive-to-verify algorithms (especially V-C / SLH-DSA) to exhaust verification CPU |
-| Mitigation | V-C class fee (810,000 fee units, ~57.8× V-B) makes SLH-DSA spam expensive; per-sender admission budget (TASK-053) caps cumulative verify spend per sender per window |
-| Status | **Partial** — V-C fee class calibrated and enforced; per-sender budget implemented (TASK-053). SLH-DSA per-block cap (TBD-FEE-10) not yet implemented as node policy. |
+| Mitigation | V-C class fee (810,000 fee units, ~57.8× V-B) makes SLH-DSA spam expensive; per-sender admission budget caps cumulative verify spend per sender per window |
+| Status | **Partial** — V-C fee class calibrated and enforced; per-sender budget implemented. SLH-DSA per-block cap (TBD-FEE-10) not yet implemented as node policy. |
 | Gap | A burst of SLH-DSA transactions from multiple senders (each within their individual budget) could still saturate verification capacity per block |
 | Path to closure | Implement V-C per-block cap as node configuration parameter (SPEC-FEE-001 §10.2) |
 
@@ -230,7 +230,7 @@ This document does not produce ADRs directly. Implementation gaps that require a
 | | Detail |
 |-|--------|
 | Threat | Attacker submits many maximum-size (1 MiB) transactions to exhaust bandwidth and storage |
-| Mitigation | Payload size cap of 1 MiB (TASK-044); byte fee linear with tx size makes large payloads expensive; per-IP rate limit (TASK-052) |
+| Mitigation | Payload size cap of 1 MiB; byte fee linear with tx size makes large payloads expensive; per-IP rate limit |
 | Status | **Confirmed** — 1 MiB cap enforced in `validate_tx` step 0 before any crypto; byte fee calibrated (`byte_fee = 2`, `sigverify_fee_v_b = 14000` — large txs pay significant byte fee) |
 
 #### 3.5.3 Fee undercutting via discouraged algorithms
@@ -239,14 +239,14 @@ This document does not produce ADRs directly. Implementation gaps that require a
 |-|--------|
 | Threat | Attacker bypasses the governance-raised `min_fee` penalty on discouraged algorithms by paying only the baseline class fee |
 | Mitigation | `effective_sigverify_fee = max(benchmark_class_fee, registry.min_fee)` — governance-raised min_fee always dominates (SPEC-FEE-001 §5.1) |
-| Status | **Confirmed** — governance proposal that raises min_fee for ML-DSA-44 (discouraged step in TASK-055) correctly applied; subsequent transactions required the raised min_fee |
+| Status | **Confirmed** — governance proposal that raises min_fee for ML-DSA-44 (discouraged step ) correctly applied; subsequent transactions required the raised min_fee |
 
 #### 3.5.4 Mempool resource exhaustion
 
 | | Detail |
 |-|--------|
 | Threat | Attacker fills the mempool with low-value transactions to crowd out legitimate transactions |
-| Mitigation | Fee sufficiency gate; per-sender admission budget (TASK-053); replacement policy requires 10% fee bump (SPEC-FEE-001 §11); dynamic mempool pressure floor (TBD-FEE-12, not yet implemented) |
+| Mitigation | Fee sufficiency gate; per-sender admission budget; replacement policy requires 10% fee bump (SPEC-FEE-001 §11); dynamic mempool pressure floor (TBD-FEE-12, not yet implemented) |
 | Status | **Partial** — static admission controls in place; dynamic pressure floor is a future node policy item |
 
 ---
@@ -260,7 +260,7 @@ This document does not produce ADRs directly. Implementation gaps that require a
 | Threat | A signing seed or private key appears in a structured tracing event, log line, or error message, and is exfiltrated by an attacker with log access |
 | Current state | **Review required** — by design, private keys and seeds are not stored in node state; only public keys appear in `Account.keyset`. However, no systematic audit of all tracing call sites has been performed. |
 | Evidence needed | Manual review of all `tracing::info!`, `tracing::debug!`, `tracing::error!`, `warn!`, and `debug!("{:?}", ...)` call sites in `pqc-crypto`, `pqc-state::apply`, and `pqcd::devnet` |
-| Path to closure | Phase 4 security review per AGENTS.md; document findings before engaging external auditor |
+| Path to closure | Phase 4 security review; document findings before engaging external auditor |
 
 #### 3.6.2 KEM seed in process memory
 
@@ -304,12 +304,12 @@ This document does not produce ADRs directly. Implementation gaps that require a
 | Transaction signatures | Forgery (classical) | Confirmed | — |
 | Transaction signatures | Forgery (quantum) | Accepted risk | — |
 | Transaction signatures | Algorithm downgrade | Confirmed | — |
-| Transaction signatures | Multi-algorithm verifier | **Gap** | GAP-01 (TASK-063) |
+| Transaction signatures | Multi-algorithm verifier | **Gap** | GAP-01 |
 | Consensus | Equivocation (single Byzantine) | Confirmed | — |
 | Consensus | Byzantine majority liveness | **Gap** | TASK-065 |
 | Consensus | Fork choice under split-brain | **Gap** | TASK-065 |
 | Consensus | Long-range attack | Partial | GAP-03 |
-| Consensus | Dynamic validator set bypass | **Gap** | GAP-04/05 (TASK-064) |
+| Consensus | Dynamic validator set bypass | **Gap** | GAP-04/05 |
 | P2P transport | MITM on block fetch | Confirmed | — |
 | P2P transport | Harvest-now-decrypt-later | Accepted risk | — |
 | P2P transport | Eclipse / Sybil | Accepted risk (Phase 3) | Phase 4/5 |
@@ -344,10 +344,10 @@ These risks are known, understood, and explicitly accepted for Phase 3. They mus
 
 The following must be resolved or explicitly accepted before Phase 5 (dress rehearsal):
 
-- [ ] GAP-01: multi-algorithm verifier (TASK-063)
-- [ ] GAP-04/05: on-chain validator staking lifecycle (TASK-064); dynamic set membership in commit quorum
+- [ ] GAP-01: multi-algorithm verifier
+- [ ] GAP-04/05: on-chain validator staking lifecycle; dynamic set membership in commit quorum
 - [ ] GAP-07: manual review of all tracing call sites for key material leakage; findings documented
-- [ ] Byzantine majority fault injection (TASK-065); liveness behavior documented
+- [ ] Byzantine majority fault injection; liveness behavior documented
 - [ ] Fork-choice behavior under split-brain: documented and either implemented or accepted with rationale
 - [ ] SLH-DSA per-block admission cap (TBD-FEE-10): implemented or formally deferred with rationale
 - [ ] P2P session endpoint rate limiting: implemented or formally deferred

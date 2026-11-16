@@ -1,24 +1,23 @@
 # Container images
 
 This directory holds the Dockerfiles that produce the OCI images for the
-Viper PQ Chain stack. The CI pipeline (`.gitlab-ci.yml` → `images:*` jobs)
-builds + signs + scans + pushes them to the GitLab Container Registry on
-every commit to `main` and on every git tag.
+Viper PQ Chain stack. The release workflow (`.github/workflows/release.yml`)
+builds, signs, scans and pushes them to `ghcr.io` on every `vX.Y.Z` tag.
 
 ## Images produced
 
 | Image | Source binary | Default port(s) | Healthcheck |
 |---|---|---|---|
-| `ghcr.io/v1p3r4llbl4ck-86/pqcd` | `crates/pqcd` | 26656 (P2P TCP), 26657 (API), 26658 (QUIC) | `GET /v1/status` |
+| `ghcr.io/v1p3r4llbl4ck-86/pqcd` | `crates/pqcd` | 26656 (P2P: UDP QUIC + TCP/TLS), 26657 (API) | `GET /v1/status` |
 | `ghcr.io/v1p3r4llbl4ck-86/viper-archival-sidecar` | `crates/viper-archival-sidecar` | (none — TSA client) | process liveness |
 
-All three are:
+Both are:
 
-- Multi-arch — `linux/amd64` + `linux/arm64` (built via `buildx` + QEMU).
-- Multi-stage — Rust 1.88 builder + debian:12-slim runtime. Final image is ~80-110 MB.
+- Release image `linux/amd64` only (the release Dockerfile is `docker/pqcd-release.Dockerfile`; `docker/pqcd.Dockerfile` is the from-source build).
+- Multi-stage — Rust 1.92.0 builder + debian:12-slim runtime. Final image is ~80-110 MB.
 - Built with `cargo-chef` so dependency compilation is reused across CI runs (~80% cycle-time savings on green Cargo.lock).
 - Non-root: each image has a dedicated system user (uid 10001 pqchain, 10003 archival).
-- Signed via `cosign` keyless (Sigstore Fulcio + Rekor), GitLab OIDC issuer.
+- Signed via `cosign` keyless (Sigstore Fulcio + Rekor), GitHub Actions OIDC issuer (`token.actions.githubusercontent.com`).
 - Scanned by Trivy on every build (HIGH/CRITICAL CVEs gate the pipeline).
 - Shipped with a CycloneDX SBOM attached as an OCI artefact via `cosign attest`.
 
@@ -29,9 +28,7 @@ OCI image labels follow the `org.opencontainers.image.*` spec — `revision`,
 
 | Trigger | Tags applied |
 |---|---|
-| Push to `main` | `:latest`, `:main`, `:main-<short-sha>` |
 | Git tag `vX.Y.Z` | `:X.Y.Z`, `:X.Y`, `:X`, `:latest` |
-| Merge request | `:mr-<id>` (CI only — not pushed to the public mutable tags) |
 
 ## Local build (manual, for testing)
 
@@ -64,6 +61,8 @@ docker buildx build \
 (`--load` does NOT support multi-arch — must `--push` to a registry.)
 
 ## Running
+
+For joining `viper-testnet-4` with the image see the container recipe in [docs/validator-onboarding.md](../docs/validator-onboarding.md) (pin `ghcr.io/v1p3r4llbl4ck-86/pqcd:v0.2.5`).
 
 ```bash
 # pqcd — typically as a StatefulSet via the helm chart, but for a local

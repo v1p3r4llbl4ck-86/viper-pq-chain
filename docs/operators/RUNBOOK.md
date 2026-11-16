@@ -38,8 +38,10 @@ placeholders (`<host>`, `203.0.113.x`).
 
 Hardware for a local devnet or a full node: 2 CPU cores, 4 GiB RAM (the build is
 RAM-hungry), 40 GiB disk. A validator on a real network needs far more disk: at
-500 ms block time every block carries ~3.3 KB of ML-DSA-65 commit signature per
-validator, so even an empty chain grows by several GB a day. Size validator and
+the 500 ms block time of the reference configs every block carries ~3.3 KB of
+ML-DSA-65 commit signature per validator, so even an empty chain grows by several
+GB a day (`viper-testnet-4` uses 6000 ms blocks and one validator: roughly 50 MB
+a day of commit signatures). Size validator and
 archive storage for indefinite retention; full and rpc nodes prune (§15).
 
 Toolchain: Rust as pinned in `rust-toolchain.toml` (1.92.0); `rustup` selects it
@@ -57,8 +59,7 @@ cargo build --release -p pqcd --bin pqcd        # release build — use it for e
 sudo install -m 0755 target/release/pqcd /usr/local/bin/pqcd
 ```
 
-`scripts/install_vm.sh` does the same on a fresh Ubuntu host (packages, rustup,
-release build, copy to `/usr/local/bin/pqcd`, `pqchain` system user).
+A VM install script is not shipped in this repository; create the `pqchain` system user and copy the binary to `/usr/local/bin/pqcd` yourself.
 
 Reproducibility: a release is a git tag; rebuild from the tag with the pinned
 toolchain and compare `sha256sum target/release/pqcd` with the value in the
@@ -128,13 +129,14 @@ Top level:
 | `api.public_tx_submission` | Register `POST /v1/txs`. Default true; `false` on validators and bootnodes (a start-up warning names a mismatch). |
 | `api.expose_token_state` | Register `/v1/accounts/*` and `/v1/fee-market`. `false` on a tokenless chain. |
 | `api.expose_notary_routes` | Register the `/api/credentials/*` and `/api/proofs/*` overlay. |
+| `api.expose_peer_addresses` | Register `GET /v1/peers` (connected peers with IP and transport). Default `false`. Meant for a seed whose API is internal; never expose it publicly (the public ingress blocks it). |
 
 `devnet` object:
 
 | Key | Meaning |
 |---|---|
 | `role` | One of the seven roles in §2. |
-| `block_time_ms` | Block interval; 500 ms in every shipped config. |
+| `block_time_ms` | Block interval. 6000 ms on `viper-testnet-4` (use `genesis/viper-testnet-4/full.json`); the local devnet and `configs/roles/*.json` use 500 ms. |
 | `sync_interval_ms` | Catch-up poll interval for non-validators; 100 ms on a LAN, 500–1000 ms across the internet. |
 | `proposer_address_hex` | Fee recipient / proposer identity. |
 | `validators[]` | Static validator set: `node_id`, `address_hex`, `sig_alg_id` (2 = ML-DSA-65), `public_key_hex`, optional `commit_seed_hex` (local devnet validator only) and `archival_sk_hex`. Same set and order on every node. |
@@ -154,7 +156,7 @@ Top level:
 | `enable` | Master switch. |
 | `validator_listen` / `vfn_listen` / `public_listen` | `"ip:port"` for the network this role joins (§2 table). Only the field matching the role is read; the listener is announced as `/ip4/<ip>/tcp/<port>`. |
 | `bootstrap_peers[]` | Multiaddrs **with** the `/p2p/<PeerId>` suffix, e.g. `/dns4/<host>/tcp/26656/p2p/12D3Koo…`. Redialed every 15 s while disconnected. |
-| `quic_enabled`, `tcp_tls_fallback` | Transport selection; the reference configs run TCP only (`quic_enabled: false`). |
+| `quic_enabled`, `tcp_tls_fallback` | Transport selection. Both default to `true`: QUIC (UDP) is tried first, TCP + TLS 1.3 is the fallback on the same port number. |
 | `max_peers_per_asn` | Anti-eclipse diversity limit (3). |
 | `gossip_mesh_n`, `_low`, `_high` | GossipSub mesh size; leave the defaults. |
 | `validator_peer_ids[]` | Base58 PeerIds whose transaction gossip is admissible on the validator network. Empty = check off (§17.7). |
@@ -251,6 +253,7 @@ scripts/check_api.sh                                  # or by hand:
 curl -s $BASE/v1/status | jq .
 # { "height": 128, "chain_id": "pqchain-devnet-01", "state_root": "…", "tip_hash": "…",
 #   "node_id": "producer", "syncing": false, "base_fee": 500, "epoch_number": 2, "epoch_length_blocks": 60 }
+# these two only work under `pqcd api-serve`; `devnet-serve` does not route them
 curl -s $BASE/v1/network | jq .
 curl -s $BASE/v1/blocks/latest | jq .
 curl -s $BASE/v1/txs/$(printf '%064d' 0)            # 404 for an unknown hash
@@ -432,36 +435,39 @@ This section describes joining `viper-testnet-4`, the public test network
 (`scripts/join-testnet.sh` automates it for a `full` node); the procedure is the
 same for any chain started per §12.
 
-| Purpose | Address (at genesis) |
+| Purpose | Address |
 |---|---|
-| Explorer / status | `https://pqchain.agwswebconsulting.it` |
-| Read API | `pqchain.agwswebconsulting.it/v1/…` (port 26657, `/v1/*`) |
-| P2P seed (bootnode) | `boot1.pqchain.agwswebconsulting.it:26656` |
+| Status page | `https://agwswebconsulting.it/en/viper-pq-chain/network/` |
+| Read API (GET only, rate limited) | `https://pqchain.agwswebconsulting.it/v1/status` |
+| P2P seed | `boot1.pqchain.agwswebconsulting.it:26656` (UDP QUIC primary, TCP/TLS fallback) |
 
 ### 11.1 Choose a role
 
 Start as `full` (or `rpc` to serve reads only, `archive` for the whole history
 plus the RFC 3161 sidecar). Validators are admitted by the operators of the
-network (proof of authority, operator-run validator set): run a full node first,
-then ask.
+network (proof of authority). On `viper-testnet-4` validator admission is not
+open: outside operators run `full`, `rpc` or `archive` nodes.
 
 ### 11.2 Prepare and start the node
 
 ```sh
 sudo install -d -m 0750 -o pqchain -g pqchain /var/lib/pqchain /etc/pqchain
-cp configs/roles/full.json /etc/pqchain/node.json
+cp genesis/viper-testnet-4/full.json /etc/pqchain/node.json   # already carries the genesis constants and both seed multiaddrs
 ```
 
-Fill in, from the network's published genesis bundle:
+For another network, start from `configs/roles/full.json` and copy these from
+that network's published genesis bundle verbatim: `chain_id_hex`,
+`anchor_prev_hash_hex`, `fee_params`, `genesis_accounts`, `devnet.validators`,
+`devnet.block_time_ms`, `devnet.epoch_duration`, `devnet.unbonding_period`.
+Then set:
 
-- `chain_id_hex`, `anchor_prev_hash_hex`, `fee_params`, `genesis_accounts`,
-  `devnet.validators`, `devnet.block_time_ms`, `devnet.epoch_duration`,
-  `devnet.unbonding_period` — copy verbatim.
 - `node_id` — your own label (`full-<org>-1`).
 - `devnet.libp2p_seed_salt_hex` — `openssl rand -hex 32`.
+- `devnet.kem_seed_salt_hex` — `openssl rand -hex 32` (or `pqcd wallet kem-init --node-config /etc/pqchain/node.json`).
 - `libp2p.public_listen` — `"0.0.0.0:26656"`.
-- `libp2p.bootstrap_peers` — the seed(s) published with the genesis, e.g.
-  `/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/<bootnode-peer-id>`.
+- `libp2p.bootstrap_peers` — the seed(s) published with the genesis, i.e. both
+  `/dns4/boot1.pqchain.agwswebconsulting.it/udp/26656/quic-v1/p2p/12D3KooWAf81hHDHnTHdsENKEHY5Q8kP43o69Nt7WCzEtX7L9XMj`
+  and `/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWAf81hHDHnTHdsENKEHY5Q8kP43o69Nt7WCzEtX7L9XMj`.
   A multiaddr without the `/p2p/<PeerId>` suffix is rejected at start-up.
 - `api_listen_addr` — `"0.0.0.0:26657"` if you serve reads, `"127.0.0.1:26657"`
   otherwise.
@@ -481,7 +487,7 @@ curl -s http://127.0.0.1:26657/v1/status | jq '.height, .chain_id'
 curl -s http://127.0.0.1:26657/v1/metrics | grep -E '^pqchain_(chain_height|p2p_peers_connected) '
 ```
 
-Open inbound TCP 26656 to the world (so other nodes can dial you) and 26657 only
+Open inbound 26656/udp and 26656/tcp to the world (so other nodes can dial you) and 26657 only
 to whoever should read your API; put TLS in front of 26657 (nginx, caddy) if you
 expose it publicly.
 
@@ -590,7 +596,7 @@ Metric names are stable (a rename is a breaking change):
 | `pqchain_blocks_imported_total`, `pqchain_p2p_blocks_imported_total` | counter | Blocks applied from peers. |
 | `pqchain_txs_admitted_total`, `pqchain_txs_rejected_total`, `pqchain_txs_rejected_by_reason_total` | counter | Mempool admission. |
 | `pqchain_mempool_depth` | gauge | Pending transactions. |
-| `pqchain_p2p_peers_connected` | gauge | libp2p peers. 0 on a non-validator = partitioned or stale bootstrap list. |
+| `pqchain_p2p_peers_connected` | gauge | libp2p peers (counts peers, not connections, since 0.2.4). 0 on a non-validator = partitioned or stale bootstrap list. |
 | `pqchain_p2p_gossip_peers_healthy`, `_graylisted`, `_below_gossip`, `_below_publish`, `pqchain_p2p_gossip_peer_score_*` | gauge | GossipSub peer scoring. |
 | `pqchain_p2p_block_fetch_{requests_sent,requests_received,responses_received,failures}_total`, `pqchain_p2p_block_gap_total` | counter | Block fetch protocol. |
 | `pqchain_p2p_snapshot_{requests_sent,requests_received,responses_received,failures}_total` | counter | Snapshot cold start (§14). |
@@ -618,9 +624,7 @@ scrape_configs:
 | Allow-list violations | `rate(pqchain_p2p_tx_rejected_unbound_peer_total[5m]) > 0` |
 | Restart | `changes(pqchain_node_start_unix_secs[10m]) > 0` |
 
-`scripts/p2p-health.sh` prints `node role peers status` for every host of an
-Ansible inventory and exits non-zero on `UNREACHABLE` / `DEGRADED`
-(`--watch 30`, `--min 2`).
+A fleet health script (`p2p-health.sh`) is not shipped in this repository; alert on the metrics above.
 
 ---
 
@@ -662,7 +666,7 @@ them without `--force`); `sentry`, `full`, `rpc` and `bootnode` prune.
 
 ```sh
 sudo systemctl stop pqcd
-pqcd snapshot-prune /etc/pqchain/node.json --keep-tail-blocks 1209600   # ≈ 7 days at 500 ms (default)
+pqcd snapshot-prune /etc/pqchain/node.json --keep-tail-blocks 1209600   # ≈ 7 days at 500 ms (default; scale for your block time)
 # prune_completed: blocks_deleted=N hash_index_deleted=N tx_index_deleted=N siblings_deleted=N checkpoints_deleted=N checkpoints_kept=1 keep_tail_blocks=1209600
 sudo systemctl start pqcd
 ```
@@ -802,8 +806,7 @@ coordinate a governance action (`SECURITY.md`).
 
 ### 17.6 libp2p: peers = 0
 
-Probe: `curl -s http://127.0.0.1:26657/v1/metrics | grep pqchain_p2p_peers_connected`
-or `scripts/p2p-health.sh --watch 5`.
+Probe: `curl -s http://127.0.0.1:26657/v1/metrics | grep pqchain_p2p_peers_connected`.
 
 - Stale bootstrap multiaddr: `bootstrap peer redial (periodic)` repeats with dial
   errors. The PeerId is deterministic from `node_id` (+ salt): compare the
@@ -847,6 +850,7 @@ publisher.
 
 | Port | Proto | Role | Purpose | Open to |
 |---|---|---|---|---|
+| 26656 | UDP | full / rpc / archive / bootnode / sentry | QUIC P2P (primary transport) | anyone |
 | 26656 | TCP | validator | `libp2p.validator_listen` | sentries only (private subnet / VPN) |
 | 26656 | TCP | sentry | `libp2p.vfn_listen` | the validator and public peers |
 | 26656 | TCP | full / rpc / archive / bootnode | `libp2p.public_listen` | anyone |

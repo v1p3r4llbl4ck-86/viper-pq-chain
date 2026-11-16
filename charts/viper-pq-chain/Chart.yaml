@@ -3,12 +3,11 @@ name: viper-pq-chain
 description: |
   Production-grade Helm chart for the Viper PQ Chain stack — a post-quantum
   blockchain (FIPS 203/204/205 baseline) with a role-based topology
-  (validator, sentry/VFN, full node, RPC, archive, notary, bootnode).
+  (validator, sentry/VFN, full node, RPC, archive, bootnode).
 
-  Designed for permissioned-consortium deployments (PA / QTSP / regulated
-  sectors) and for k8s-based dev/test clusters. Does NOT manage the
-  upstream live `viper-pq-1` chain (that runs on systemd via Ansible);
-  this chart is for new networks (testnet, partner pilots, audit envs).
+  For Kubernetes dev/test clusters and test networks. It deploys new
+  networks (testnets, pilots, audit environments); the public
+  `viper-testnet-4` is deployed with it.
 type: application
 
 # Chart version — independent from app version, bumped on every chart change.
@@ -26,8 +25,6 @@ sources:
 keywords:
   - blockchain
   - post-quantum
-  - eIDAS
-  - QEAA
   - FIPS-204
   - ML-DSA
   - notarization

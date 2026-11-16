@@ -1,6 +1,6 @@
 # `scripts/k6/` — Notary API abuse + race tests
 
-TASK-220 / L6a — k6 scenarios that exercise the Viper Notary HTTP surface
+k6 scenarios that exercise the Viper Notary HTTP surface
 beyond what the every-5-minute canary cron probes. The cron measures
 nominal-load latency; these scripts measure failure modes under bursty
 load + concurrency races + malformed input + auth-bypass attempts.
@@ -65,10 +65,3 @@ The exported `summary.json` carries:
 Any sustained `burst_5xx > 0`, `malformed_5xx > 0`, or
 `auth_bypass_426_rate < 0.95` is worth a follow-up issue in
 `KNOWN-ISSUES.md`.
-
-## Cross-references
-
-- `docs/security-testing-roadmap.md` — TASK-220 roadmap entry
-- `scripts/canary-tx-soak.sh` — the every-5-min nominal-load canary
-- `scripts/daily-check.sh` — the daily health snapshot
-- `notary/README.md` — backend env vars + service-account setup

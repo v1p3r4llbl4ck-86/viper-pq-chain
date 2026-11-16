@@ -20,8 +20,8 @@ Together these three objects define what it means for a transaction to be validl
 
 This specification does not define:
 
-- operation payload semantics (see SPEC-OPS, TASK-007)
-- validator staking and slashing (see TASK-005)
+- operation payload semantics (see SPEC-OPS)
+- validator staking and slashing ()
 - governance vote mechanics (referenced but not specified here)
 - fee coefficient values (deferred to Phase 2, ADR-015)
 

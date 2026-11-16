@@ -110,7 +110,7 @@ All variables are in `group_vars/all/defaults.yml` (shared) and `group_vars/vali
 | `viper_sync_interval_ms` | `100` | Full node sync poll interval |
 | `viper_p2p_port` | per-host | P2P port (26656 validator, 26666/26676 full nodes) |
 | `viper_api_port` | `26657` | Public API port (validator only) |
-| `viper_fee_params.*` | calibrated values | Fee model (TASK-042 Linux calibration) |
+| `viper_fee_params.*` | calibrated values | Fee model (Linux calibration) |
 
 ---
 
@@ -180,27 +180,6 @@ The build role uses `cargo build --release` which is incremental — unchanged c
 
 ---
 
-## §10 — viper-pq-1 launch ceremony (TASK-205, ADR-053)
+## §10 — Public test network
 
-`viper-pq-1` is the permanent development chain that materialises every Tier-1 / Tier-2 / Tier-3 commitment of ADR-053 in genesis state. It supersedes the prior `viper-devnet-*` lineage and the rc1 cutover framing of TASK-168 — see DECISIONS.md ADR-053 §Consequences. From its launch onwards, breaking changes ship as ADRs with explicit activation heights (Policy P-COMPAT-001 / AGENTS.md "viper-pq-1 mainnet discipline"); there is **no reset path**.
-
-**Files**
-
-| Path | Role |
-|------|------|
-| `playbooks/launch-viper-pq-1.yml` | One-time launch ceremony (Phase 0 prereqs → Phase 6 bootstrap-peer publish). |
-| `files/genesis-viper-pq-1.json` | Genesis artefact. Mirrors the ADR-053 Tier-1/2/3 state and lists every implementation commit under `_audit_provenance`. |
-| `viper-pq-1-roster.json.example` | Operator roster template (`scripts/generate-bootstrap-peers.py` consumer). |
-
-**Run the launch (after prerequisites are satisfied)**
-
-```bash
-# From the repo root:
-make ansible-launch-viper-pq-1
-# Or directly:
-cd deploy/ansible && make launch-viper-pq-1
-```
-
-The playbook header documents every prerequisite (binary SHA-256 pin in `docs/operators/RUNBOOK.md`, key-ceremony pubkeys substituted into `genesis-viper-pq-1.json`, time-sync healthy, roster present at `/etc/pqchain/viper-pq-1-roster.json`).
-
-**Historical note** — the `cutover-devnet-3.yml` / `rollback-devnet-3.yml` playbooks of the 2026-04-24 incident (KNOWN-ISSUES R-09) were removed from the tree on 2026-08-24; they remain in the private repository history and are not invokable from the Makefile.
+The Ansible path deploys a devnet or your own network. To join `viper-testnet-4` use `scripts/join-testnet.sh` or `docs/validator-onboarding.md`. The `viper-pq-1` launch playbook and genesis in this directory belong to a retired network and are kept for reference only.

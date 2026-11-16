@@ -8,8 +8,8 @@
 **Depends on**: ADR-012 (Phase 1 scope), SPEC-TX-001, SPEC-ACCOUNT-001, SPEC-FEE-001, ADR-045 (archival overlay), ADR-053 §T3.5 (verifier_template_id)
 
 > **Revision banner (2026-04-25)**: this spec covers the Phase-1 op families (vault / attestation / governance / key-management). Two newer op families landed in code post-Phase-1 and are not yet documented in the body below — refer to the implementing TASKs for shape until the v0.3 revision lands:
-> - **`0x0700..0x0703` Archival overlay** (M4 / ADR-045 / TASK-160..165, commits `85c8343..f722226`): `ArchivalRecordCreate`, `ArchivalRecordAddAnchor`, `ArchivalRecordRenew`, `ArchivalRecordRevoke`. SLH-DSA-SHAKE-256s required (`allowed_for_archival` predicate, ADR-046 / TASK-162). Schema in `crates/pqc-types/src/archival.rs`.
-> - **`0x0405 ValidatorRegisterArchivalKey`** (M4 / TASK-163, `e8fbe4d`): operator binds an SLH-DSA archival public key to their validator address; required before submitting `ArchivalRecord*` ops on behalf of the chain.
+> - **`0x0700..0x0703` Archival overlay** (M4 / ADR-045..165, commits `85c8343..f722226`): `ArchivalRecordCreate`, `ArchivalRecordAddAnchor`, `ArchivalRecordRenew`, `ArchivalRecordRevoke`. SLH-DSA-SHAKE-256s required (`allowed_for_archival` predicate, ADR-046). Schema in `crates/pqc-types/src/archival.rs`.
+> - **`0x0405 ValidatorRegisterArchivalKey`** (M4, `e8fbe4d`): operator binds an SLH-DSA archival public key to their validator address; required before submitting `ArchivalRecord*` ops on behalf of the chain.
 > 
 > Additionally, ADR-053 §T3.5 introduces a per-account `verifier_template_id` field; at launch only the EOA template (id `0x0001`) is wired, but `ProposalEffect::AddAuthTemplate` reserves the on-chain registry slot for future templates. The op-list framing in this spec assumes the EOA template; the v0.3 revision will document the dispatch surface for non-EOA templates.
 
@@ -32,9 +32,9 @@ There is no generic VM in Phase 1. Every executable action is a built-in type de
 
 This specification does not define:
 
-- governance vote mechanics — deferred to SPEC-GOV (TASK-010)
+- governance vote mechanics — deferred to SPEC-GOV
 - token economics, staking, and reward distribution — deferred to TASK-011
-- API transport encoding for these operations — defined in API.md (TASK-008)
+- API transport encoding for these operations — defined in API.md
 - final gas cost values — TBD Phase 2; gas tiers (L/M/H) are defined here as relative ordering only
 
 ---
@@ -520,7 +520,7 @@ Key management operations execute the state transitions defined in SPEC-ACCOUNT-
 
 ## 8. Governance Family (`0x0300–0x03FF`) — Reserved
 
-The governance operation family is reserved. The `msg_type` range `0x0300–0x03FF` MUST be rejected by nodes in Phase 1 prototype builds until the governance specification (SPEC-GOV, TASK-010) is finalized and activated.
+The governance operation family is reserved. The `msg_type` range `0x0300–0x03FF` MUST be rejected by nodes in Phase 1 prototype builds until the governance specification (SPEC-GOV) is finalized and activated.
 
 The following `msg_type` values are pre-allocated for planning purposes:
 

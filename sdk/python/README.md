@@ -1,8 +1,8 @@
 # viper-pqchain — Python SDK
 
-> **Pre-pivot SDK version (2026-05-15 note)**: this SDK is `0.2.0`, published 2026-04-25 against `viper-pq-1` which has since been archived (height 33,976 on 2026-05-12). The live chain is now `viper-research-1` — a tokenless permissioned PoA research substrate. `POST /v1/txs` is disabled by runtime config on the live nodes, so the VPR-token helpers shown below (`amount_venom=10**18`, `vpr_to_venom`, etc.) are **NOT functional against the live chain**. Read-only helpers (network status, block fetch, validator lookups) still work. A re-published SDK aligned to viper-research-1 is not yet shipped — see the private planning notes.
+> **Status**: version 0.3.0 (published 2026-04-25) targets the retired `viper-pq-1` API and has not been re-tested against `viper-testnet-4`. The chain has no token: the VPR/venom helpers below do not apply, and the public read API serves GET only (no `/v1/accounts`, no `POST /v1/txs`). Read-only helpers (status, blocks, validators) work against https://pqchain.agwswebconsulting.it.
 
-Python SDK for [Viper PQ Chain](https://viper-pqchain.io) — post-quantum trust infrastructure.
+Python SDK for [Viper PQ Chain](https://github.com/v1p3r4llbl4ck-86/viper-pq-chain) — post-quantum trust infrastructure.
 
 Requires **Python 3.9+**. Zero external dependencies (uses only `urllib` from the standard library).
 
@@ -24,7 +24,7 @@ pip install -e .
 ```python
 from viper_pqchain import ViperClient
 
-client = ViperClient("http://localhost:9000")
+client = ViperClient("http://localhost:26657")
 
 # Chain status
 status = client.get_status()
@@ -32,7 +32,7 @@ print(f"Height: {status.height}  chain: {status.chain_id}")
 
 # Fetch an account
 account = client.get_account("01" * 32)
-print(f"Balance: {account.balance} venom  nonce: {account.nonce}")
+print(f"Balance: {account.balance} venom  nonce: {account.nonce}")  # not available on the public host: expose_token_state is off
 
 # Fetch a block
 block = client.get_block(1)
@@ -49,7 +49,7 @@ for v in validators:
 ```python
 from viper_pqchain import ViperClient
 
-client = ViperClient("http://localhost:9000")
+client = ViperClient("http://localhost:26657")
 calc = client.get_fee_calculator()
 
 est = calc.estimate("vault_create", payload_bytes=256)
@@ -121,7 +121,7 @@ pqcd sign-tx --tx-json unsigned_tx.json --key-file my_key.pem > signed_tx.hex
 ```python
 from viper_pqchain import ViperClient
 
-client = ViperClient("http://localhost:9000")
+client = ViperClient("http://localhost:26657")
 cbor_hex = open("signed_tx.hex").read().strip()
 result = client.submit_tx(cbor_hex)
 print(result.status, result.tx_hash)
@@ -141,7 +141,7 @@ print(vpr_to_venom("1.5"))           # 1500000000000000000
 ```python
 from viper_pqchain import ViperClient, ViperError
 
-client = ViperClient("http://localhost:9000")
+client = ViperClient("http://localhost:26657")
 try:
     account = client.get_account("00" * 32)
 except ViperError as e:

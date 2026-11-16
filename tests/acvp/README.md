@@ -1,11 +1,10 @@
-# NIST ACVP Conformance Vectors (TASK-154)
+# NIST ACVP Conformance Vectors
 
 This directory holds a curated subset of NIST ACVP (Automated Cryptographic
 Validation Protocol) test vectors consumed by the Phase 8 audit readiness
 harness in `crates/pqc-crypto/tests/acvp_conformance.rs`.
 
-It is evidence for gap **C8** in `docs/phase-8-audit-readiness.md` §4
-("zero committed NIST test vectors"). A tier-1 crypto auditor
+It is conformance evidence for an external reviewer. A tier-1 crypto auditor
 (Cryspen / Quarkslab) will request FIPS 204 / FIPS 205 conformance evidence
 on day 1 of kickoff; these vectors are that evidence.
 

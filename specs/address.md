@@ -12,7 +12,7 @@
 |---------|------|--------|
 | 0.1 | 2026-04-16 | Initial draft. Single-tag SHAKE-256 derivation with `sig_alg_id` domain separator only. |
 | 0.2 | 2026-04-21 | Editorial polish around §4 (special addresses) and §6 (migration). |
-| 0.3 | 2026-04-25 | **Aligned to viper-pq-1 launch code.** §2.2 rewritten under ADR-053 §T1.3 (chain-id-bound address derivation, TASK-192) and ADR-053 §T2.4 (BIP340 double-tagged hashing, TASK-202). New §2.3 documents `chain_id` cross-chain replay resistance. §2.5 (legacy "sig_alg_id-only domain separation") moved into the new §2.4 BIP340 rationale subsection. §6 rewritten as a historical pre-launch note — no further migration is possible under Policy P-COMPAT-001 / ADR-052. |
+| 0.3 | 2026-04-25 | **Aligned to viper-pq-1 launch code.** §2.2 rewritten under ADR-053 §T1.3 (chain-id-bound address derivation) and ADR-053 §T2.4 (BIP340 double-tagged hashing). New §2.3 documents `chain_id` cross-chain replay resistance. §2.5 (legacy "sig_alg_id-only domain separation") moved into the new §2.4 BIP340 rationale subsection. §6 rewritten as a historical pre-launch note — no further migration is possible under Policy P-COMPAT-001 / ADR-052. |
 
 ---
 

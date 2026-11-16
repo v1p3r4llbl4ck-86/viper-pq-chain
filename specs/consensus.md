@@ -14,7 +14,7 @@
 |---------|------|--------|
 | 0.1 | 2026-Q1 | Initial three-phase Tendermint-like spec with static validator set. |
 | 0.2 | 2026-04-21 | Revised by ADR-042: epoch model, dynamic validator set, RANDAO+VDF proposer selection, churn limits, emergency reconfiguration. |
-| 0.3 | 2026-04-25 | **Aligned to viper-pq-1 launch code.** New §11 documents distributed precommit signing (ADR-051, TASK-167/170/171/172): every active validator signs precommits independently, the proposer waits up to `quorum_wait_ms` for ≥threshold gossiped precommits before sealing. New §12 documents the `ForkDigest` signing-domain prefix (ADR-053 §T1.2, TASK-191) layered into every consensus signing preimage. §5.4 churn-limit rewritten to the stake-weighted formula (ADR-053 §T1.5, TASK-194). §10.4 reframed under the unified `CommitPreimageMode::{Legacy, Distributed { round }}` dispatch. §3 Normative References adds SPEC-LIGHT-CLIENT-001 for the sync-committee complement (ADR-053 §T3.6, TASK-197). Migration §15 retitled "viper-pq-1 launch (historical)".
+| 0.3 | 2026-04-25 | **Aligned to viper-pq-1 launch code.** New §11 documents distributed precommit signing (ADR-051, TASK-167/170/171/172): every active validator signs precommits independently, the proposer waits up to `quorum_wait_ms` for ≥threshold gossiped precommits before sealing. New §12 documents the `ForkDigest` signing-domain prefix (ADR-053 §T1.2) layered into every consensus signing preimage. §5.4 churn-limit rewritten to the stake-weighted formula (ADR-053 §T1.5). §10.4 reframed under the unified `CommitPreimageMode::{Legacy, Distributed { round }}` dispatch. §3 Normative References adds SPEC-LIGHT-CLIENT-001 for the sync-committee complement (ADR-053 §T3.6). Migration §15 retitled "viper-pq-1 launch (historical)".
 
 ---
 
@@ -150,7 +150,7 @@ Governance may adjust these targets ahead of schedule if the network demonstrate
 
 ### 5.4 Stake-weighted churn limit (ADR-053 §T1.5)
 
-> *Previously count-based: pre-launch versions of this spec capped per-epoch activations at `max(4, active_count / 256)`. That formula is superseded by the stake-weighted form below per ADR-053 §T1.5 (TASK-194). The pre-launch count-based form is retained as a historical reference only.*
+> *Previously count-based: pre-launch versions of this spec capped per-epoch activations at `max(4, active_count / 256)`. That formula is superseded by the stake-weighted form below per ADR-053 §T1.5. The pre-launch count-based form is retained as a historical reference only.*
 
 At each epoch boundary, the **per-epoch activation limit** is expressed as a fraction of total active self-bond:
 
@@ -456,7 +456,7 @@ The on-chain `CommitQuorumPolicy` in `pqc-consensus::commit` verifies a vector o
 | Mode | Preimage formula | Activation |
 |------|------------------|------------|
 | `Legacy` | `tagged_hash("PQC-COMMIT-V1", fork_digest[4] || height_be64 || block_hash)` (`commit.rs:221`). Self-contained, round-independent. | Default. Used by single-producer / single-validator paths and by the byte-stable replay path for blocks signed under the legacy preimage. |
-| `Distributed { round }` | `tagged_hash("VIPER-VOTE-V1", fork_digest[4] || height_be64 || round_be32 || step=Precommit || block_hash)` — byte-identical to the §8.4 vote preimage at `step = Precommit`. | Active when `distributed_signing = true` (see §11). The verifier rebuilds the preimage **per CommitSig** using the sig's own `round` field (TASK-171, see §11.1 below), not a single policy-level round, so precommits collected across multiple rounds for the same `block_hash` all verify under §10.1. |
+| `Distributed { round }` | `tagged_hash("VIPER-VOTE-V1", fork_digest[4] || height_be64 || round_be32 || step=Precommit || block_hash)` — byte-identical to the §8.4 vote preimage at `step = Precommit`. | Active when `distributed_signing = true` (see §11). The verifier rebuilds the preimage **per CommitSig** using the sig's own `round` field (see §11.1 below), not a single policy-level round, so precommits collected across multiple rounds for the same `block_hash` all verify under §10.1. |
 
 In Distributed mode, peer-collected precommits gossiped during the §7.4 Precommit step are directly usable as `CommitSig` bytes with zero re-signing — the same bytes the validator broadcast as their `SignedVote(Precommit)` are written into `block.commit_signatures` by the proposer (§11.2). This is the ADR-051 invariant: **producer and verifier build the same bytes**. Five regression-pin tests in `crates/pqc-consensus/src/commit.rs` (`adr_051_preimage_mode_tests`) lock this contract:
 
@@ -464,7 +464,7 @@ In Distributed mode, peer-collected precommits gossiped during the §7.4 Precomm
 - `distributed_mode_matches_vote_preimage_with_precommit_step_zero_round` — Distributed bytes match `vote_preimage(.., 0, Precommit, ..)`.
 - `legacy_and_distributed_produce_different_preimages` — the two modes are byte-distinct (no accidental cross-verification).
 - `signed_vote_precommit_roundtrip_via_distributed_mode` — an ML-DSA signature over the §8.4 Precommit preimage verifies under a Distributed-mode policy.
-- `distributed_mode_accepts_precommits_from_different_rounds` — pins the §10.1 multi-round combine case (TASK-171).
+- `distributed_mode_accepts_precommits_from_different_rounds` — pins the §10.1 multi-round combine case.
 
 The `CommitQuorumPolicy::verify` call covers the §10.1 commit condition without modification under either mode.
 
@@ -485,7 +485,7 @@ Under `distributed_signing = true` (the mode mandated by ADR-051 on every multi-
 5. After the wait, the proposer calls `merge_distributed_precommits_into_block` (`crates/pqcd/src/devnet.rs:4082`) to drain the buffer for `(height, block_hash)` and append every peer's `(validator_address, sig_alg_id, round, signature)` tuple to `block.commit_signatures`. The proposer's own precommit was inserted earlier in the same loop iteration; the merge skips already-attached signers to avoid double-count.
 6. `validate_block_commit_quorum` (`crates/pqcd/src/devnet.rs:` and the verifier in `pqc-consensus`) then enforces ≥threshold precommits per §10.1.
 
-### 11.2 Per-signature round propagation (TASK-171)
+### 11.2 Per-signature round propagation
 
 Each `CommitSig` carries a `round: u32` field naming the round at which the signer actually signed. The verifier rebuilds the §8.4 vote preimage **per signature** using that field, not a single policy-level default (`crates/pqc-consensus/src/commit.rs:303-323`). This honours §10.1's "Precommits from different rounds MAY be combined if they all reference the same `block_hash(B)`": a quorum can mix precommits from rounds `r₀, r₁, r₂, …` provided every signature references the same block.
 
@@ -658,7 +658,7 @@ At genesis committee size 64, naive ML-DSA-65 verification is feasible. At 256 v
 
 ### 15.6 Light-client verification (cross-link to SPEC-LIGHT-CLIENT-001)
 
-A light-client verifier (e.g. a 2046 verifier of a 2026 attestation) does not run the full BFT round protocol. Instead it follows the sync-committee protocol defined in `SPEC-LIGHT-CLIENT-001` (ADR-053 §T3.6, TASK-197): for each epoch, the active sync committee (initial size 16) signs a compact header attestation under a dedicated tagged-hash domain. The light verifier downloads epoch headers + sync-committee attestations and verifies inclusion proofs against the binary-Merkle `state_root` of each header. Sync-committee members are slashable for signing invalid headers (closing the documented Ethereum Altair flaw).
+A light-client verifier (e.g. a 2046 verifier of a 2026 attestation) does not run the full BFT round protocol. Instead it follows the sync-committee protocol defined in `SPEC-LIGHT-CLIENT-001` (ADR-053 §T3.6): for each epoch, the active sync committee (initial size 16) signs a compact header attestation under a dedicated tagged-hash domain. The light verifier downloads epoch headers + sync-committee attestations and verifies inclusion proofs against the binary-Merkle `state_root` of each header. Sync-committee members are slashable for signing invalid headers (closing the documented Ethereum Altair flaw).
 
 Consensus produces both the per-block `commit_sigs` (consumed by full nodes) and the per-epoch sync-committee attestation (consumed by light verifiers). Implementation: `crates/pqc-consensus/src/sync_committee.rs`. See `SPEC-LIGHT-CLIENT-001` for the full protocol.
 
@@ -673,11 +673,11 @@ The pre-launch prototype used a single static producer (`producer_loop` in `pqcd
 | Phase | Description |
 |-------|-------------|
 | A | Spec complete; code uses static `producer_loop`. |
-| B (TASK-083) | Consensus engine implements `ConsensusRound` struct; prevote/precommit state machine; in-memory vote store; proposer rotation. |
-| C (TASK-084) | `consensus_loop` replaces `producer_loop` on validator nodes; full nodes retain `sync_loop` (import finalized blocks). |
-| D (TASK-085) | 3-node devnet uses round-based voting; view change tested; equivocation detection tested. |
-| E (Phase 8 / ADR-051) | Distributed-signing path landed (TASK-167/170/171/172); per-sig round propagation (TASK-171); five `adr_051_preimage_mode_tests` pin the contract. |
-| F (`viper-pq-1` launch / ADR-053) | ForkDigest signing-domain prefix (TASK-191); BIP340 double-tagged outer hash on every preimage (TASK-202); chain-id-bound addresses (TASK-192); stake-weighted churn (TASK-194); sync-committee scaffolding (TASK-197). |
+| B | Consensus engine implements `ConsensusRound` struct; prevote/precommit state machine; in-memory vote store; proposer rotation. |
+| C | `consensus_loop` replaces `producer_loop` on validator nodes; full nodes retain `sync_loop` (import finalized blocks). |
+| D | 3-node devnet uses round-based voting; view change tested; equivocation detection tested. |
+| E (Phase 8 / ADR-051) | Distributed-signing path landed (TASK-167/170/171/172); per-sig round propagation; five `adr_051_preimage_mode_tests` pin the contract. |
+| F (`viper-pq-1` launch / ADR-053) | ForkDigest signing-domain prefix; BIP340 double-tagged outer hash on every preimage; chain-id-bound addresses; stake-weighted churn; sync-committee scaffolding. |
 
 The `producer_loop` is retained as `single_validator_mode` for single-node testing and development environments. It is NOT used in multi-validator deployments.
 
@@ -691,7 +691,7 @@ If `max_rounds_per_height` is reached without a commit, the node enters a **cons
 
 - The node MUST NOT produce or accept new blocks.
 - The node MUST continue serving read APIs (`/v1/status`, `/v1/blocks`, `/v1/accounts`) with data from the last committed height.
-- The node MUST emit a `pqchain_consensus_halt` metric event (Prometheus counter, see TASK-051).
+- The node MUST emit a `pqchain_consensus_halt` metric event (Prometheus counter, ).
 - Recovery requires a governance action: either a parameter change (adjust timeouts), a validator set change (remove a misbehaving validator), or a coordinated restart with new configuration.
 
 The halt condition is distinct from a network partition (where a minority node may not see quorum). A minority node that cannot form quorum SHOULD wait and retry rather than entering a hard halt.
