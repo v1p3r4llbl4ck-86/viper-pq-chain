@@ -149,8 +149,17 @@ pub enum ViperSwarmEvent {
         forwarded_by: PeerId,
         topic: String,
     },
+    /// First connection to `PeerId` established (further parallel
+    /// connections — e.g. QUIC and TCP to the same peer — do not repeat it).
     PeerConnected(PeerId),
+    /// Last connection to `PeerId` closed.
     PeerDisconnected(PeerId),
+    /// Remote address of a connection to `peer` (sent for every connection;
+    /// the latest one wins). Lets the application report where peers are.
+    PeerEndpoint {
+        peer: PeerId,
+        remote: Multiaddr,
+    },
     /// A peer asked us to serve a range of blocks. The application
     /// reads the requested heights from its chain store and replies via
     /// [`SwarmCommand::ReplyBlockFetch`] using the `request_id` carried
@@ -926,13 +935,34 @@ async fn handle_swarm_event(
         SwarmEvent::NewListenAddr { address, .. } => {
             info!("listening on {address}");
         }
-        SwarmEvent::ConnectionEstablished { peer_id, .. } => {
-            let _ = event_tx.send(ViperSwarmEvent::PeerConnected(peer_id)).await;
-        }
-        SwarmEvent::ConnectionClosed { peer_id, .. } => {
+        SwarmEvent::ConnectionEstablished {
+            peer_id,
+            endpoint,
+            num_established,
+            ..
+        } => {
+            // Count peers, not connections: a peer reached over both QUIC
+            // and TCP holds two connections but is one node.
+            if num_established.get() == 1 {
+                let _ = event_tx.send(ViperSwarmEvent::PeerConnected(peer_id)).await;
+            }
             let _ = event_tx
-                .send(ViperSwarmEvent::PeerDisconnected(peer_id))
+                .send(ViperSwarmEvent::PeerEndpoint {
+                    peer: peer_id,
+                    remote: endpoint.get_remote_address().clone(),
+                })
                 .await;
+        }
+        SwarmEvent::ConnectionClosed {
+            peer_id,
+            num_established,
+            ..
+        } => {
+            if num_established == 0 {
+                let _ = event_tx
+                    .send(ViperSwarmEvent::PeerDisconnected(peer_id))
+                    .await;
+            }
         }
         _ => {}
     }

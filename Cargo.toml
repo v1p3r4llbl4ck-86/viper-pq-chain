@@ -18,7 +18,7 @@ members = [
 resolver = "2"
 
 [workspace.package]
-version = "0.2.3"
+version = "0.2.4"
 edition = "2021"
 authors = ["Alberto Galassi <agalassi@agwswebconsulting.it>"]
 license = "Apache-2.0"
@@ -98,8 +98,11 @@ libp2p-quic = { path = "vendor/libp2p-quic-pq" }
 
 [profile.release]
 opt-level = 3
-lto = true
-codegen-units = 1
+# Thin LTO with parallel codegen: about half the build time of fat LTO with
+# codegen-units = 1, for a few percent of runtime speed — fine for a node that
+# produces a block every few seconds. Not consensus-relevant.
+lto = "thin"
+codegen-units = 16
 # Arithmetic overflow = hard panic in release too. Consensus / fee /
 # staking math MUST never silently wrap; an overflow is either a bug or
 # an attacker-crafted input, and both outcomes are preferable-to-crash

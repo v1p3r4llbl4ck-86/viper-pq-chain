@@ -209,6 +209,12 @@ pub struct ApiConfig {
     /// (private repo, not deployed publicly).
     #[serde(default = "default_true")]
     pub expose_notary_routes: bool,
+    /// Expose `GET /v1/peers`: the connected peers with the IP address of
+    /// their connection. Default: `false`. Meant for a seed node whose API
+    /// is reachable only inside the operator's network (the public status
+    /// page turns it into an approximate map); never on a public API.
+    #[serde(default)]
+    pub expose_peer_addresses: bool,
 }
 
 fn default_true() -> bool {
@@ -221,6 +227,7 @@ impl Default for ApiConfig {
             public_tx_submission: true,
             expose_token_state: true,
             expose_notary_routes: true,
+            expose_peer_addresses: false,
         }
     }
 }

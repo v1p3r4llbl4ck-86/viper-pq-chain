@@ -285,6 +285,37 @@ pub fn peers_connected() -> usize {
 /// N=3 quorum=3).
 static CONNECTED_PEER_IDS: std::sync::Mutex<Vec<PeerId>> = std::sync::Mutex::new(Vec::new());
 
+/// Remote address of each connected peer (latest connection wins). Only read
+/// by the `/v1/peers` route, which is off unless `api.expose_peer_addresses`.
+static CONNECTED_PEER_ADDRS: std::sync::LazyLock<
+    std::sync::Mutex<std::collections::HashMap<PeerId, pqc_p2p::Multiaddr>>,
+> = std::sync::LazyLock::new(|| std::sync::Mutex::new(std::collections::HashMap::new()));
+
+/// Connected peers with the IP and transport of their connection.
+pub fn connected_peer_endpoints() -> Vec<(PeerId, Option<std::net::IpAddr>, &'static str)> {
+    use pqc_p2p::Protocol;
+    let g = match CONNECTED_PEER_ADDRS.lock() {
+        Ok(g) => g,
+        Err(_) => return Vec::new(),
+    };
+    g.iter()
+        .map(|(peer, addr)| {
+            let mut ip = None;
+            let mut transport = "unknown";
+            for p in addr.iter() {
+                match p {
+                    Protocol::Ip4(a) => ip = Some(std::net::IpAddr::V4(a)),
+                    Protocol::Ip6(a) => ip = Some(std::net::IpAddr::V6(a)),
+                    Protocol::QuicV1 => transport = "quic",
+                    Protocol::Tcp(_) if transport == "unknown" => transport = "tcp",
+                    _ => {}
+                }
+            }
+            (*peer, ip, transport)
+        })
+        .collect()
+}
+
 /// Snapshot of the currently-connected PeerIds. Returns owned `Vec`, so
 /// the caller can iterate without holding the lock. Empty when the swarm
 /// isn't connected to anything (or libp2p disabled).
@@ -1021,7 +1052,15 @@ fn route_event(
             if let Ok(mut g) = CONNECTED_PEER_IDS.lock() {
                 g.retain(|p| p != pid);
             }
+            if let Ok(mut g) = CONNECTED_PEER_ADDRS.lock() {
+                g.remove(pid);
+            }
             info!(peer = %pid, peers_connected = prev.saturating_sub(1), "libp2p peer disconnected");
+        }
+        pqc_p2p::ViperSwarmEvent::PeerEndpoint { peer, remote } => {
+            if let Ok(mut g) = CONNECTED_PEER_ADDRS.lock() {
+                g.insert(*peer, remote.clone());
+            }
         }
         pqc_p2p::ViperSwarmEvent::Stopped(reason) => {
             P2P_PEERS_CONNECTED.store(0, Ordering::Relaxed);

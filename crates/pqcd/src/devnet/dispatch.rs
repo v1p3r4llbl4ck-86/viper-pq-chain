@@ -1633,7 +1633,9 @@ pub(super) async fn handle_inbound_block_fetch_response(
             }
             Err(e) => {
                 tracing::warn!(
-                    idx, height, error = format!("{e:#}"),
+                    idx,
+                    height,
+                    error = format!("{e:#}"),
                     "libp2p: block-fetch entry ingest failed — aborting batch"
                 );
                 break;

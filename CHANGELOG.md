@@ -8,6 +8,12 @@ KNOWN-ISSUES.md.
 
 ## [Unreleased] — public release preparation (opened 2026-08-24)
 
+### 0.2.4 — peer map data, honest peer counter, faster releases (2026-11-16)
+
+- `pqchain_p2p_peers_connected` counts **peers**, not connections: a node reached over both QUIC and TCP was counted twice. `PeerConnected` now fires on the first connection to a peer and `PeerDisconnected` on the last one closed.
+- New `GET /v1/peers` (connected peers with the IP and transport of their connection), **off by default** behind `api.expose_peer_addresses`. The operator turns it on only on the public seed, whose API is reachable inside the cluster; the public ingress blocks the path anyway. The status page turns it into an approximate map (city level) and never publishes an address.
+- Releases: the `pqcd` container image is now the release binary itself (`docker/pqcd-release.Dockerfile`), so image and tarball are the same bytes — the 0.2.3 feature-set drift cannot recur — and the image job no longer compiles the node a second time. Release profile: thin LTO, 16 codegen units (about half the build time).
+
 ### 0.2.3 — nodes run by others actually sync; signed network files (2026-11-16)
 
 - **Network reset: `viper-testnet-3` → `viper-testnet-4`.** No node outside the operator's cluster could ever join `viper-testnet-3`: its state could not be rebuilt from the published genesis (`STATE_ROOT_MISMATCH` at height 1, also from the height-1000 snapshot). Root cause: the container image was built with the default Cargo features — `token_economics` **on** — while the release binaries are built with `--no-default-features` (tokenless). The two compute different state transitions from the same block. The operator's nodes all ran the image, so they agreed with each other; every node installed from a release tarball diverged at block 1. The image now takes `PQCD_FEATURES` from the release workflow, the same value as the binaries (`RELEASE_FEATURES`), so the network runs tokenless as documented. `viper-testnet-4` is a new genesis; its digest is in [genesis/README.md](genesis/README.md). Joining was verified from a clean Ubuntu 22.04 host before announcing it.

@@ -87,6 +87,8 @@ jobs:
 
   images:
     name: container images → ghcr.io
+    # pqcd is packaged from the release binary instead of being compiled again
+    needs: [binaries]
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -103,11 +105,29 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      - if: matrix.image == 'pqcd'
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: dist
+          path: dist
+      - name: build context
+        id: ctx
+        run: |
+          set -e
+          if [ "${{ matrix.image }}" = pqcd ]; then
+            mkdir -p image-ctx
+            tar -xzf "dist/pqcd-${GITHUB_REF_NAME}-linux-x86_64.tar.gz" -C image-ctx pqcd
+            echo "context=image-ctx" >> "$GITHUB_OUTPUT"
+            echo "file=docker/pqcd-release.Dockerfile" >> "$GITHUB_OUTPUT"
+          else
+            echo "context=." >> "$GITHUB_OUTPUT"
+            echo "file=docker/${{ matrix.image }}.Dockerfile" >> "$GITHUB_OUTPUT"
+          fi
       - id: build
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         with:
-          context: .
-          file: docker/${{ matrix.image }}.Dockerfile
+          context: ${{ steps.ctx.outputs.context }}
+          file: ${{ steps.ctx.outputs.file }}
           # same consensus feature set as the release binaries (see RELEASE_FEATURES)
           build-args: |
             PQCD_FEATURES=${{ env.RELEASE_FEATURES }}

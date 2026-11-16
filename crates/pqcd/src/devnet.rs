@@ -1728,6 +1728,7 @@ async fn start_api_server(
         public_tx_submission = api_cfg.public_tx_submission,
         expose_token_state = api_cfg.expose_token_state,
         expose_notary_routes = api_cfg.expose_notary_routes,
+        expose_peer_addresses = api_cfg.expose_peer_addresses,
         "public api listener ready"
     );
 
@@ -1819,7 +1820,28 @@ fn api_router(state: SharedLiveNodeState, api: crate::node::ApiConfig) -> Router
             .route("/api/proofs/{id}", get(handle_proof_get));
     }
 
+    // Peer addresses: off by default; a seed with a cluster-internal API
+    // turns it on so the public status page can draw an approximate map.
+    if api.expose_peer_addresses {
+        r = r.route("/v1/peers", get(handle_peers));
+    }
+
     r.with_state(state)
+}
+
+/// `GET /v1/peers` — connected peers and the IP of their connection.
+async fn handle_peers() -> axum::Json<serde_json::Value> {
+    let peers: Vec<serde_json::Value> = crate::p2p::connected_peer_endpoints()
+        .into_iter()
+        .map(|(peer, ip, transport)| {
+            serde_json::json!({
+                "peer_id": peer.to_string(),
+                "ip": ip.map(|a| a.to_string()),
+                "transport": transport,
+            })
+        })
+        .collect();
+    axum::Json(serde_json::json!({ "count": peers.len(), "peers": peers }))
 }
 
 mod read_api;
