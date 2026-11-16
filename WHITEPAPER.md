@@ -418,7 +418,7 @@ Governance controls:
 
 Phases 0–5 are complete (Phase 5 closed 2026-04-12, ADR-026). Phase 6 (`viper-mainnet-1` ceremony) executed 2026-04-20 (ADR-040) and was subsequently superseded operationally by the Phase 8 + 8.5 lineage on the same hosts. Phase 7 SDK publication landed in lockstep — current registry pins are 0.2.0 (post-launch). Phase 8 closed 2026-04-23 (audit readiness) → 2026-04-24 (rc1 incident, KNOWN-ISSUES R-09) → Phase 8.5 launch 2026-04-25.
 
-Phase 9+ (post-launch soak): final `block_time_ms` decision, follower prune script, cold-storage rotation, external operator onboarding validation, fee-revenue 30-day window, external cryptographic audit engagement, dress rehearsal with the live validator set. See `TASKS.md` open list for the per-task pointers.
+Phase 9+ (post-launch soak): final `block_time_ms` decision, follower prune script, cold-storage rotation, external operator onboarding validation, external cryptographic audit engagement, dress rehearsal with the live validator set.
 
 ---
 

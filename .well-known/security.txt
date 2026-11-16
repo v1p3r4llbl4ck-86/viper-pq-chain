@@ -2,7 +2,7 @@
 # One-person research project; best-effort response (see Policy).
 
 Contact: https://github.com/v1p3r4llbl4ck-86/viper-pq-chain/security/advisories/new
-Contact: mailto:security@agwswebconsulting.it
+Contact: mailto:agalassi@agwswebconsulting.it
 Policy: https://github.com/v1p3r4llbl4ck-86/viper-pq-chain/security/policy
 Expires: 2027-11-16T00:00:00.000Z
 Preferred-Languages: en, it

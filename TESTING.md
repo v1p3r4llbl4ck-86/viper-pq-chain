@@ -6,7 +6,7 @@ Full suite on the public-release branch:
 
 ```text
 cargo test --workspace --all-features
-# 935 passed, 8 ignored, 0 failed
+# 935 passed, 8 ignored, 0 failed   (2026-08-24, v0.1.x; the count changes with the tree)
 ```
 
 Notes that matter when you run it:
@@ -167,7 +167,7 @@ the clone into reference-count increments. Storage: 10,000 ML-DSA-65
 transactions at ~3,600 B each is ~36 MB of block data; at 100 TPS
 sustained that extrapolates to ~31 GB/day.
 
-Protocol targets (SPEC-TEST-001): §3.3 devnet ≥ 100 TPS — met (129.4);
+Protocol targets (SPEC-TEST-001): §3.3 devnet ≥ 100 TPS — met in the 2026 benchmark above (129.4, retired network, v0.1.x);
 §4.5 ≥ 200 TPS — not met; the next bottleneck is the HashMap clone in
 `StateStore::clone()` (~6 ms per block at 10,000 accounts).
 
@@ -247,7 +247,7 @@ aggregation is a reserved research item (ADR-061).
 | Storage and recovery | persisted restart recovery, trusted checkpoints, snapshot export/import, prune safety |
 | End-to-end trust workflows | attestations, proof anchors, key rotation, algorithm deprecation drills, archival records |
 
-## Quality gates for `viper-testnet-2`
+## Quality gates for the public test network (`viper-testnet-3`)
 
 - deterministic results across repeated runs and multiple nodes
 - key rotation and recovery flows exercised on the public chain

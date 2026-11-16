@@ -1,4 +1,4 @@
-# @viper-pqchain/sdk
+# @v1p3r4llbl4ck/sdk
 
 > **Pre-pivot SDK version (2026-05-15 note)**: this SDK is `0.2.0`, published 2026-04-25 against `viper-pq-1` which has since been archived (height 33,976 on 2026-05-12). The live chain is now `viper-research-1` — a tokenless permissioned PoA research substrate. `POST /v1/txs` is disabled by runtime config on the live nodes, so `buildVaultTransfer` / `vprToVenom` / `venomToVpr` and similar VPR-token helpers below are **NOT functional against the live chain**. Read-only helpers (network status, block fetch, validator lookups) still work. A re-published SDK aligned to viper-research-1 is not yet shipped — see [VIPER_RESEARCH_1_PIVOT_PLAN.md](../../the private planning notes).
 
@@ -7,7 +7,7 @@ TypeScript SDK for [Viper PQ Chain](../../README.md) — post-quantum-native blo
 ## Installation
 
 ```bash
-npm install @viper-pqchain/sdk
+npm install @v1p3r4llbl4ck/sdk
 ```
 
 Requires Node.js 18+ (uses native `fetch`).
@@ -15,7 +15,7 @@ Requires Node.js 18+ (uses native `fetch`).
 ## Quick start
 
 ```typescript
-import { ViperClient, venomToVpr } from "@viper-pqchain/sdk";
+import { ViperClient, venomToVpr } from "@v1p3r4llbl4ck/sdk";
 
 const client = new ViperClient({ baseUrl: "http://localhost:9000" });
 
@@ -101,7 +101,7 @@ console.log(result.tx_hash);
 All methods throw `ViperError` on network failures or non-2xx responses:
 
 ```typescript
-import { ViperError } from "@viper-pqchain/sdk";
+import { ViperError } from "@v1p3r4llbl4ck/sdk";
 
 try {
   const account = await client.getAccount(address);

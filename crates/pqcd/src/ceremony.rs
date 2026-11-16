@@ -396,6 +396,9 @@ fn build_node_json(
         // ADR-069 §2: the API posture follows the role.
         "api": {
             "public_tx_submission": role.serves_public_tx_submission(),
+            // The notary overlay is not part of a tokenless test network:
+            // its write routes stay off on every role (they default to on).
+            "expose_notary_routes": false,
         },
         "devnet": {
             "role": role.as_str(),

@@ -3460,7 +3460,7 @@ dependencies = [
 
 [[package]]
 name = "pqc-consensus"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "ciborium",
  "criterion",
@@ -3479,7 +3479,7 @@ dependencies = [
 
 [[package]]
 name = "pqc-crypto"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "bech32",
  "criterion",
@@ -3498,7 +3498,7 @@ dependencies = [
 
 [[package]]
 name = "pqc-hsm"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "cryptoki",
@@ -3514,7 +3514,7 @@ dependencies = [
 
 [[package]]
 name = "pqc-keystore"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "argon2",
@@ -3535,7 +3535,7 @@ dependencies = [
 
 [[package]]
 name = "pqc-light-client"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "ciborium",
  "hex",
@@ -3544,7 +3544,7 @@ dependencies = [
 
 [[package]]
 name = "pqc-mempool"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "hex",
  "pqc-crypto",
@@ -3557,7 +3557,7 @@ dependencies = [
 
 [[package]]
 name = "pqc-p2p"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "ciborium",
@@ -3577,7 +3577,7 @@ dependencies = [
 
 [[package]]
 name = "pqc-state"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "ciborium",
  "pqc-crypto",
@@ -3589,11 +3589,11 @@ dependencies = [
 
 [[package]]
 name = "pqc-tsa"
-version = "0.2.2"
+version = "0.2.3"
 
 [[package]]
 name = "pqc-tx"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "ciborium",
  "hex",
@@ -3607,7 +3607,7 @@ dependencies = [
 
 [[package]]
 name = "pqc-types"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "ciborium",
  "hex",
@@ -3619,7 +3619,7 @@ dependencies = [
 
 [[package]]
 name = "pqcd"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "argon2",
@@ -5119,7 +5119,7 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "viper-archival-sidecar"
-version = "0.2.2"
+version = "0.2.3"
 dependencies = [
  "anyhow",
  "axum",

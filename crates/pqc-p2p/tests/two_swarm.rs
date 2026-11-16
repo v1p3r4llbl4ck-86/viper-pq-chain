@@ -114,6 +114,7 @@ async fn expect_msg(rx: &mut SwarmEventRx, want: MessageType, tag: &str) -> Goss
                 msg,
                 source: _,
                 topic: _,
+                ..
             } = ev
             {
                 if msg.msg_type == want {
@@ -371,6 +372,7 @@ async fn gossipsub_message_source_is_publisher_peer_id() {
                 msg,
                 source,
                 topic: _,
+                ..
             } = ev
             {
                 if msg.msg_type == MessageType::Transaction {

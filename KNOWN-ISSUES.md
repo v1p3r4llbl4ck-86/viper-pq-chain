@@ -14,9 +14,9 @@ single-validator lab) are retired; §5 records what they taught.
 
 Conventions: `R-nn` accepted risk, `G-nn` gap to close before genesis,
 `D-nn` deferred by design, `V-nn` development-only limitation.
-`TASK-nnn` and `ADR-nnn` refer to `TASKS.md` and `DECISIONS.md`.
-Every row was checked against the tree on 2026-08-24 (Rust 1.92.0,
-`cargo test --workspace --all-features`: 935 passed, 8 ignored).
+`ADR-nnn` refers to `DECISIONS.md`; `TASK-nnn` is an internal tracking number.
+Rows were last checked against the tree on 2026-08-24 (Rust 1.92.0,
+`cargo test --workspace --all-features`: 935 passed, 8 ignored; v0.1.x, the counts have since changed).
 
 ---
 
@@ -47,9 +47,9 @@ and, where one exists, the trigger that turns it into work.
 
 ---
 
-## 2. Known gaps to close before `viper-testnet-2` genesis
+## 2. Known gaps (opened before the `viper-testnet-2` genesis, still tracked)
 
-Exit criteria for the genesis ceremony. None of them is a consensus bug.
+Originally exit criteria for a genesis ceremony. None of them is a consensus bug.
 
 | ID | Gap | State today | Closure |
 |---|---|---|---|
@@ -85,7 +85,7 @@ Other open items that are not genesis blockers: TASK-238 (Quint model: state the
 | V-02 | `vendor/libp2p-tls-pq`, `vendor/libp2p-quic-pq` | Patches of upstream `libp2p-tls` 0.6.2 and `libp2p-quic` 0.13.0 adding a `with_crypto_provider()` seam so `rustls-post-quantum` can be injected for the X25519MLKEM768 handshake (about 80 lines in total, behaviour-preserving). Dropped the day upstream `rust-libp2p#6236` lands. Submitting the diff upstream is an open follow-up. |
 | V-03 | `attack-modes` feature | Compiles the malicious-node behaviours used by `crates/pqcd/tests/malicious_node.rs`. Off by default; release builds must never enable it. |
 | V-04 | Two API routers | `pqcd api-serve` serves a read-only snapshot router (`crates/pqcd/src/api.rs`); the node runtime `pqcd devnet-serve` serves the live router (`crates/pqcd/src/devnet.rs`). The two route sets overlap but are not identical; `API.md` lists which endpoint lives where. Unifying them is a follow-up. |
-| V-05 | SDKs | `@v1p3r4llbl4ck/sdk` 0.2.0 (npm) and `viper-pqchain` 0.2.0 (PyPI) were published against the retired `viper-pq-1` chain; the tree carries 0.3.0 unpublished. Both must be re-aligned with `viper-testnet-2` before republishing. |
+| V-05 | SDKs | `@v1p3r4llbl4ck/sdk` (npm) and `viper-pqchain` (PyPI) 0.3.0 are published (2026-04-25) and target the retired `viper-pq-1` API; they have not been re-tested against `viper-testnet-3`. Both must be re-aligned with `viper-testnet-3` and republished. |
 | V-06 | Ignored tests | 8 tests are `#[ignore]` on purpose: ACVP conformance and timing profiles (`pqc-crypto`, auditor evidence, run with `--ignored`), and two long three-node runs in `crates/pqcd/tests/product_workflows.rs` (gossipsub mesh formation, 20× determinism at 5–7 minutes) meant for explicit soaks. |
 | V-07 | Local devnet file names | `configs/producer.json`, `configs/follower-a.json`, `configs/follower-b.json` keep their historical file names; their `devnet.role` fields use the current vocabulary (`validator`, `full`). |
 

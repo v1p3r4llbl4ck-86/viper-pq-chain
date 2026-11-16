@@ -8,6 +8,18 @@ KNOWN-ISSUES.md.
 
 ## [Unreleased] — public release preparation (opened 2026-08-24)
 
+### 0.2.3 — nodes run by others actually sync; signed network files (2026-11-16)
+
+- **Fix: a node outside the operator's cluster could not catch up.** On a block-height gap (or a missing parent) the node asked the block's *publisher* for the missing range — the validator, which sits behind the public seed and cannot be dialled — so every request failed and a fresh node stayed at height 0. The swarm now surfaces the gossip `propagation_source` as `forwarded_by`; block-fetch goes to that connected peer and falls back to the publisher. Identity checks (SPEC-P2P-002 §4.4) still use the publisher only.
+- **Security: per-node ML-KEM salt.** `join-testnet.sh` (and the container recipe in the onboarding guide) now generate `kem_seed_salt_hex` as well as the libp2p salt; without it a node's ML-KEM identity key was derivable from its public `node_id`.
+- **Signed network files.** Each release carries `viper-testnet-*-genesis.json` and `viper-testnet-*-full.json` inside the signed `SHA256SUMS`; `join-testnet.sh` takes them from the release instead of a branch.
+- `join-testnet.sh`: audit log under the node directory (no more `/var/log/pqchain` permission error for a normal user); with `--systemd` the default directory is `/var/lib/viper-testnet` (the service user cannot enter `/root`).
+- The startup banner describes the test network as it is (one operator, no audit, no token, may be reset).
+- Ceremony: the notary write routes are off on every role.
+- Public status page at <https://pqchain.agwswebconsulting.it/> (`site/`): height, block time, nodes connected to the seed, latest blocks, algorithms, how to join.
+- Contributions: pull requests are now reviewed and merged by the maintainer; commits must be signed off under the new [CLA](CLA.md), enforced by the `contributor-terms` check.
+- Docs: aligned with viper-testnet-3 (current network, endpoints, numbers, SDK status); notary references removed.
+
 ### 0.2.2 — release binaries that run on Ubuntu 22.04 / Debian 12 (2026-11-16)
 
 - The 0.2.1 binaries were built on the current `ubuntu-latest` image and required glibc 2.38 and a GCC 13+ libstdc++: they did not start on Ubuntu 22.04 or Debian 12. The binary job now builds on `ubuntu-22.04` and refuses a binary that needs more than glibc 2.35; `join-testnet.sh` says so upfront on an older system. Container images were not affected.

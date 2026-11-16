@@ -128,9 +128,12 @@ pub enum ViperSwarmEvent {
     /// gossipsub when `MessageAuthenticity::Signed` is in effect. It is
     /// `None` for anonymous or unsigned flooding — those MUST be treated
     /// as untrusted. The peer that *forwarded* us the message
-    /// (`propagation_source`) is intentionally not exposed because
+    /// (`propagation_source`) is surfaced separately as `forwarded_by`:
     /// binding checks (SPEC-P2P-002 §4.4 ValidatorPeerId) apply to the
-    /// publisher, not the relay hop.
+    /// publisher, never to the relay hop, but follow-up requests
+    /// (block-fetch) must go to `forwarded_by` — it is a peer we are
+    /// connected to, while the publisher may be a validator that sits
+    /// behind a sentry and cannot be dialled.
     ///
     /// `topic` is the GossipSub topic string the frame arrived on (the
     /// hash rendered back to its human form, e.g.
@@ -143,6 +146,7 @@ pub enum ViperSwarmEvent {
     Message {
         msg: GossipMessage,
         source: Option<PeerId>,
+        forwarded_by: PeerId,
         topic: String,
     },
     PeerConnected(PeerId),
@@ -850,7 +854,11 @@ async fn handle_swarm_event(
     let _ = swarm; // suppress unused-param warning when arms don't touch it
     match event {
         SwarmEvent::Behaviour(bev) => match bev {
-            ViperBehaviourEvent::Gossipsub(gossipsub::Event::Message { message, .. }) => {
+            ViperBehaviourEvent::Gossipsub(gossipsub::Event::Message {
+                propagation_source,
+                message,
+                ..
+            }) => {
                 // `message.source` is populated iff the publisher signed the
                 // envelope with its libp2p identity (MessageAuthenticity::Signed).
                 // The ValidatorPeerId binding check downstream treats `None`
@@ -870,7 +878,12 @@ async fn handle_swarm_event(
                 match decode_gossip_message(message) {
                     Ok(msg) => {
                         let _ = event_tx
-                            .send(ViperSwarmEvent::Message { msg, source, topic })
+                            .send(ViperSwarmEvent::Message {
+                                msg,
+                                source,
+                                forwarded_by: propagation_source,
+                                topic,
+                            })
                             .await;
                     }
                     Err(e) => warn!("gossip decode: {e}"),

@@ -541,3 +541,35 @@ fn only_the_validator_node_json_carries_signing_seeds() {
         "the validator keeps its seeds"
     );
 }
+
+#[test]
+fn ceremony_turns_notary_routes_off_on_every_role() {
+    let cfg = CeremonyConfig {
+        chain_id: "viper-pq-ceremony-test".into(),
+        validators: 1,
+        block_time_ms: 500,
+        genesis_balance: 1_000_000_000,
+        image_repository: "ghcr.io/v1p3r4llbl4ck-86".into(),
+        image_tag: "main".into(),
+        release_name: "viper-test".into(),
+        namespace: "viper".into(),
+        deploy_token: None,
+        service_accounts: vec![],
+    };
+    let (values, _, _) = generate_ceremony_values(&cfg).unwrap();
+    let roles = values["chainNode"].as_object().unwrap();
+    let mut checked = 0;
+    for (role, entry) in roles {
+        let Some(node_json) = entry["config"]["nodeJson"].as_str() else {
+            continue;
+        };
+        let parsed: serde_json::Value = serde_json::from_str(node_json).unwrap();
+        assert_eq!(
+            parsed["api"]["expose_notary_routes"].as_bool(),
+            Some(false),
+            "{role}: notary routes must be off"
+        );
+        checked += 1;
+    }
+    assert!(checked > 0, "no role carried a nodeJson");
+}

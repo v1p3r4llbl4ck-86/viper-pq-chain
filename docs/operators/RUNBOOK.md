@@ -116,7 +116,7 @@ Top level:
 | Key | Meaning |
 |---|---|
 | `node_id` | Unique name of this node. Feeds the deterministic libp2p PeerId (`pqcd peer-id <node_id>`). `$VIPER_NODE_ID` overrides it at start-up (the chart sets it from the pod name). |
-| `chain_id_hex` | Hex of the chain id string, e.g. `python3 -c "print('viper-testnet-2'.encode().hex())"`. Identical on every node; every transaction must carry it. |
+| `chain_id_hex` | Hex of the chain id string, e.g. `python3 -c "print('viper-testnet-3'.encode().hex())"`. Identical on every node; every transaction must carry it. |
 | `anchor_prev_hash_hex` | 32-byte genesis anchor. `0000…0000` for a fresh genesis; identical on every node. |
 | `data_dir` | Absolute path; the RocksDB store lives in `<data_dir>/rocksdb`. Distinct per node on a shared host. |
 | `fee_params` | `base_fee`, `byte_fee`, `sigverify_fee_v_a/_b/_c`, `exec_fee_per_gas`. Byte-for-byte identical on every node or `state_root` diverges at the first block. |
@@ -401,7 +401,7 @@ new chain is created with `pqcd ceremony`, which generates genesis, validator
 secrets and one `node.json` per role into a values file:
 
 ```sh
-pqcd ceremony --chain-id viper-testnet-2 --validators 3 --block-time-ms 500 \
+pqcd ceremony --chain-id viper-testnet-3 --validators 3 --block-time-ms 500 \
   --namespace viper --release-name viper \
   --image-repository <your-registry>/pqcd --image-tag <tag> \
   --output values-ceremony.json --secrets-output secrets-ceremony.yaml
@@ -901,4 +901,4 @@ Every command that opens the store needs the node stopped. Passphrases come from
 Related: `docs/validator-onboarding.md` (joining as a validator),
 `docs/observability.md` (logs, metrics, audit log), `configs/README.md`,
 `charts/viper-pq-chain/README.md`, `deploy/ansible/README.md`, `docker/README.md`,
-`API.md`, `SECURITY.md` (`security@agwswebconsulting.it`).
+`API.md`, `SECURITY.md` (`agalassi@agwswebconsulting.it`).

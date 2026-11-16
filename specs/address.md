@@ -1,7 +1,7 @@
 # SPEC-ADDRESS-001: Address Derivation
 
 **Status**: Accepted
-**History**: v0.3 revised for the `viper-pq-1` genesis (2026-04-25; that chain is retired, the derivation is unchanged on `viper-testnet-2`).
+**History**: v0.3 revised for the `viper-pq-1` genesis (2026-04-25; that chain is retired, the derivation is unchanged on `viper-testnet-3`).
 **Version**: 0.3
 **Date**: 2026-04-25
 **References**: SPEC-ACCOUNT-001, SPEC-TX-001, SPEC-FEE-002 (burn address), SPEC-SLASH-001 (treasury address), ADR-053
@@ -174,7 +174,7 @@ Transactions with `sender = TREASURY_ADDRESS` MUST be rejected at mempool admiss
 
 ### 4.3 Genesis Accounts
 
-Genesis accounts (genesis validators and operator service accounts, ADR-072) use addresses derived by the standard procedure in §2 with `chain_id` set to the chain's own identifier (`b"viper-pq-1"` on the retired chain; the `viper-testnet-2` identifier is assigned at genesis). Their public keys, algorithm identifiers, and resulting addresses are pinned in the chain's genesis configuration file (historical example: `deploy/ansible/files/genesis-viper-pq-1.json`).
+Genesis accounts (genesis validators and operator service accounts, ADR-072) use addresses derived by the standard procedure in §2 with `chain_id` set to the chain's own identifier (`b"viper-pq-1"` on the retired chain; the `viper-testnet-3` identifier is assigned at genesis). Their public keys, algorithm identifiers, and resulting addresses are pinned in the chain's genesis configuration file (historical example: `deploy/ansible/files/genesis-viper-pq-1.json`).
 
 ---
 

@@ -1625,29 +1625,25 @@ pub async fn start_from_config_path(config_path: &Path) -> Result<DevnetNodeHand
 /// layers, (b) the validator set has reached N≥4 with independent
 /// operators, and (c) HSM / threshold-sig key custody is in place,
 /// the calling site flips this to a single-line "production node up"
-/// message. See `AGENTS.md` "Mainnet-discipline rules — Binding window"
-/// and `docs/security-testing-roadmap.md` for the gating list.
+/// message. See `KNOWN-ISSUES.md` for the gating list.
 pub fn print_demo_chain_banner() {
     let banner = r#"
 ╔════════════════════════════════════════════════════════════════════════╗
-║  ⚠  VIPER-PQ-1 IS A DEMO / DEV CHAIN — NOT AUDITED PRODUCTION L1       ║
+║  ⚠  VIPER PQ CHAIN — RESEARCH TEST NETWORK, NOT A PRODUCTION CHAIN     ║
 ║                                                                        ║
-║   • Single operator (no independent validators yet)                    ║
-║   • N=3 validator set with 3/3 quorum: ZERO Byzantine fault tolerance  ║
+║   • One operator, one validator: no Byzantine fault tolerance yet      ║
 ║   • No external security audit (consensus / crypto / p2p)              ║
-║   • Validator passphrases are dev-grade; keys live on disk, no HSM     ║
-║   • SDK + frontend exist for ergonomics — DO NOT trust receipts as     ║
-║     production-grade attestations until the binding window opens       ║
+║   • Test network: no token, nothing on it has monetary value           ║
+║   • The chain may be reset; do not rely on receipts or attestations    ║
 ║                                                                        ║
-║  See AGENTS.md → "Mainnet-discipline rules — Binding window"           ║
-║  See docs/security-testing-roadmap.md for the gating items             ║
+║  See KNOWN-ISSUES.md and SECURITY.md in the repository                 ║
 ╚════════════════════════════════════════════════════════════════════════╝
 "#;
     eprintln!("{banner}");
     tracing::warn!(
         target: "viper.demo_banner",
-        "viper-pq-1 is a DEMO / single-operator / no-audit chain — not a production L1. \
-         See AGENTS.md 'Binding window' for the gating items."
+        "research test network — single operator, no external audit, no token; \
+         not a production chain (see KNOWN-ISSUES.md)"
     );
 }
 

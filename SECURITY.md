@@ -11,7 +11,7 @@ Please report privately, not in a public issue:
 
 - **GitHub private vulnerability reporting** — "Report a vulnerability" under
   the Security tab of this repository (preferred);
-- or e-mail `security@agwswebconsulting.it`.
+- or e-mail `agalassi@agwswebconsulting.it`.
 
 There is no PGP key. If a report needs encryption, say so in a first short
 message and we will agree a channel.

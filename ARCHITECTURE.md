@@ -1,8 +1,8 @@
 # Architecture
 
-> **Status (2026-08)**: the **as-built** description of the code that will run
-> `viper-testnet-2`, the public chain created at genesis after the first public
-> release. The protocol architecture is ADR-053 (BlockHeader v1, ForkDigest signing
+> **Status (2026-11)**: the **as-built** description of the code that runs
+> `viper-testnet-3`, the current public test network (live since 2026-11-16;
+> `viper-testnet-2` is retired). The protocol architecture is ADR-053 (BlockHeader v1, ForkDigest signing
 > domains, chain-id-bound addresses, hash registry, binary Merkle state tree,
 > sync-committee light client), proven on the private chains that preceded the
 > release and carried forward unchanged. Forward-looking items are marked
@@ -34,7 +34,7 @@ Viper PQ Chain is a post-quantum-native L1 whose product is trust infrastructure
 | Client or wallet | creates signed transactions and manages keys | must be algorithm-aware (`alg_id`, `key_version`) from day one |
 | Gateway or explorer | exposes public read APIs and the chain status page | `rpc` nodes serve the read API; the explorer/status frontend ships in the Helm chart (`charts/viper-pq-chain/files/frontend`); neither takes part in consensus |
 
-The infrastructure and deployment model for these roles — runtime (Linux process, systemd), topology, storage layout, secrets handling, and automation — is defined by the Helm chart (`charts/viper-pq-chain/README.md`) and the per-role notes in `NODES.md` (ADR-016 for the original model). The 3-host `viper-research-1` cluster was decommissioned in 2026-07; the current deployment is a single-node k3s lab pending the `viper-testnet-2` genesis. Routine ops are tracked in `RUNBOOK.txt`.
+The infrastructure and deployment model for these roles — runtime (Linux process, systemd), topology, storage layout, secrets handling, and automation — is defined by the Helm chart (`charts/viper-pq-chain/README.md`) and the per-role notes in `NODES.md` (ADR-016 for the original model). The 3-host `viper-research-1` cluster was decommissioned in 2026-07; the current public deployment is `viper-testnet-3` (one validator). Routine ops are described in `docs/operators/RUNBOOK.md`.
 
 ## Layered Architecture
 
@@ -133,17 +133,17 @@ Fee classes per algorithm — registry baseline (`crates/pqc-crypto/src/registry
 | SLH-DSA-SHAKE-256s | `0x0022` | 29,792 B | ~132 | V-C premium | Archival overlay only (ADR-045) |
 | ML-KEM-768 | `0x0100` | n/a (KEM) | n/a | n/a | P2P key agreement (FIPS 203) |
 
-Reference platform: Ubuntu 22.04 LTS (Linux 6.8.0-107-generic VM), AMD Ryzen 7 7700, pure-Rust crates (`ml-dsa`, `slh-dsa`, `ml-kem`), release build. The 129.4 effective-TPS load test (TESTING.md §Load Test Baseline) is from this same platform. See `specs/fee-model.md §6.3` for the full measured data table.
+Reference platform: Ubuntu 22.04 LTS (Linux 6.8.0-107-generic VM), AMD Ryzen 7 7700, pure-Rust crates (`ml-dsa`, `slh-dsa`, `ml-kem`), release build. The 2026 load-test baseline (TESTING.md §Load Test Baseline, measured on the retired internal network) is from this same platform. See `specs/fee-model.md §6.3` for the full measured data table.
 
 ## Consensus Strategy
 
 Viper PQ Chain runs a BFT design with a constrained validator set so PQ commit material does not overwhelm every block. The chain is **semantic PoA** (PoS-shaped data structures with hardcoded `self_bond = 1` for all validators per the 2026-05-11 pivot, see the private planning notes) — `select_epoch_proposer` is pure RANDAO modulo and unaffected by stake; on-chain validator-staking lifecycle stays compiled under the `token_economics` feature and is reactivatable if a future genesis re-introduces a token. The first implementation is Tendermint/CometBFT-like (Prevote → Precommit → Commit), normatively specified in `specs/consensus.md` (SPEC-CONSENSUS-001, ADR-027); a HotStuff-like linear-communication evolution remains the documented later optimization path (ADR-007).
 
-Validator set sizing — the launch posture of `viper-testnet-2` and the forward growth path (ADR-013, retained for protocol-redesign discipline):
+Validator set sizing — the launch posture of `viper-testnet-3` and the forward growth path (ADR-013, retained for protocol-redesign discipline):
 
 | Topology | Validator count | Quorum (2/3+1) | ML-DSA-65 commit | SLH-DSA-SHAKE-192s commit |
 |-------|----------------|----------------|-----------------|---------------|
-| `viper-testnet-2` at genesis, 2026-08-25 (author's validator; operators admitted afterwards) | 1 | 1 | ~3.3 KB | ~16 KB |
+| `viper-testnet-3` at genesis, 2026-11-16 (author's validator; operators admitted afterwards) | 1 | 1 | ~3.3 KB | ~16 KB |
 | private chains 2026-04 → 2026-08 (retired) | 3 | 3 | ~10 KB | ~49 KB |
 | Forward: controlled growth | 24 | ~17 | ~56 KB | ~276 KB |
 | Forward: stress ceiling | 50 | ~34 | ~110 KB | ~552 KB |

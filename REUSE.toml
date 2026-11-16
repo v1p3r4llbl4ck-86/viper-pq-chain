@@ -1,6 +1,6 @@
 version = 1
 SPDX-PackageName = "viper-pq-chain"
-SPDX-PackageSupplier = "Alberto Galassi <279985960+v1p3r4llbl4ck-86@users.noreply.github.com>"
+SPDX-PackageSupplier = "Alberto Galassi <agalassi@agwswebconsulting.it>"
 
 # Files without an SPDX header are covered here (REUSE 3.2). Rust sources carry
 # their own `// SPDX-License-Identifier:` line; scripts/check-licenses.sh checks both.
@@ -22,12 +22,6 @@ path = ["crates/**", "fuzz/**", "charts/**", "deploy/**", "docker/**", "scripts/
 precedence = "closest"
 SPDX-FileCopyrightText = "2026 Alberto Galassi"
 SPDX-License-Identifier = "BUSL-1.1"
-
-[[annotations]]
-path = ["notary/**"]
-precedence = "closest"
-SPDX-FileCopyrightText = "2026 Alberto Galassi"
-SPDX-License-Identifier = "LicenseRef-Proprietary"
 
 [[annotations]]
 path = ["vendor/libp2p-tls-pq/**", "vendor/libp2p-quic-pq/**"]

@@ -19,7 +19,8 @@ chain can retire an algorithm without retiring its accounts.
 ## Status — public TEST network
 
 > **`viper-testnet-3` is a test network.** No token, nothing of value, no guarantees: it can be
-> reset at any time (a reset is a new chain id and a new genesis). Run a node, break it, open issues.
+> reset at any time (a reset is a new chain id and a new genesis). Genesis balances are units of
+> account on a test network and have no monetary value. Run a node, break it, open issues.
 
 **Try it — one command, Linux x86_64 with glibc ≥ 2.35 (Ubuntu 22.04+, Debian 12+):**
 
@@ -27,14 +28,16 @@ chain can retire an algorithm without retiring its accounts.
 curl -fsSL https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/main/scripts/join-testnet.sh | bash
 ```
 
-It needs [`cosign`](https://docs.sigstore.dev/cosign/system_config/installation/): it downloads the latest release, verifies the Sigstore signature that this repository's release workflow put on `SHA256SUMS`, checks the tarball against it, fetches the genesis and a ready
-`full` node config from [`genesis/viper-testnet-3/`](genesis/README.md), checks the genesis digest
-and prints the start command (`--systemd` installs a unit instead). Read the script first — it is
-150 lines. Other ways in (container image, build from source, other roles) are in
+It needs [`cosign`](https://docs.sigstore.dev/cosign/system_config/installation/): it downloads the latest release, verifies the Sigstore signature that this repository's release workflow put on `SHA256SUMS`, checks the tarball, the genesis and a ready `full` node config
+against it (copies of [`genesis/viper-testnet-3/`](genesis/README.md)), generates the node's
+secret identity salts and prints the start command (`--systemd` installs a unit instead). Read the
+script first — it is about 200 lines. Your node then shows up in the counter on the
+[status page](https://pqchain.agwswebconsulting.it/). Other ways in (container image, build from source, other roles) are in
 [docs/validator-onboarding.md](docs/validator-onboarding.md).
 
 | What | Where |
 |---|---|
+| **live status page** (height, block time, nodes, latest blocks) | <https://pqchain.agwswebconsulting.it/> |
 | chain status, read API | `https://pqchain.agwswebconsulting.it/v1/status` |
 | P2P seed — **QUIC** (primary) | `/dns4/boot1.pqchain.agwswebconsulting.it/udp/26656/quic-v1/p2p/12D3KooWS2a6495jsyZ91izS5zbEgXv9oE52TUst4L3QhpVN9pxb` |
 | P2P seed — TCP/TLS 1.3 (fallback) | `/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWS2a6495jsyZ91izS5zbEgXv9oE52TUst4L3QhpVN9pxb` |
@@ -61,10 +64,10 @@ Earlier networks — `viper-pq-1`, `viper-research-1`, an internal lab, `viper-t
 | `crates/pqc-consensus`, `pqc-state`, `pqc-mempool`, `pqc-p2p` | BFT consensus, Merkle state, admission, libp2p transport with ML-KEM-768 sessions | BUSL-1.1 |
 | `crates/pqcd` | the node binary: `devnet-serve`, `ceremony`, snapshots, cold storage, wallet | BUSL-1.1 |
 | `crates/pqc-hsm`, `viper-archival-sidecar` | signer backends (SoftHSM); RFC 3161 archival overlay | BUSL-1.1 |
-| `specs/` | the normative protocol contract (28 specifications) | CC BY 4.0 |
+| `specs/` | the normative protocol contract | CC BY 4.0 |
 | `charts/viper-pq-chain`, `deploy/ansible`, `docker/` | Kubernetes chart (one StatefulSet per role), systemd path, images | BUSL-1.1 |
 | `configs/` | reference `node.json` per role and the local devnet set | BUSL-1.1 |
-| `sdk/typescript`, `sdk/python` | client SDKs (0.2.0 published on npm / PyPI; the tree is at 0.3.0, to be re-aligned to `viper-testnet-3` before republishing) | Apache-2.0 |
+| `sdk/typescript`, `sdk/python` | client SDKs (0.3.0 is published on npm / PyPI, 2026-04-25, and targets the retired `viper-pq-1` API; not yet re-tested against `viper-testnet-3`) | Apache-2.0 |
 | `tests/acvp`, `fuzz/` | ACVP conformance vectors; cargo-fuzz targets | Apache-2.0 / BUSL-1.1 |
 | `vendor/` | patched `libp2p-tls`, `libp2p-quic` (post-quantum handshake), `slh-dsa` | upstream |
 
@@ -114,7 +117,7 @@ Verify without a node: `pqc-light-client` checks headers against the sync commit
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo deny check
-cargo test --workspace --all-features        # 935 passed, 8 ignored (2026-08-24)
+cargo test --workspace --all-features        # the full workspace suite
 scripts/check-licenses.sh
 ```
 
@@ -132,8 +135,8 @@ test map, load-test baselines and fuzz harnesses.
 | [API.md](API.md) | HTTP read API, transaction submission, service endpoints |
 | [DECISIONS.md](DECISIONS.md) | every architecture decision (ADR-001 …), superseded ones marked |
 | [docs/operators/RUNBOOK.md](docs/operators/RUNBOOK.md), [docs/validator-onboarding.md](docs/validator-onboarding.md) | run and join |
-| [KNOWN-ISSUES.md](KNOWN-ISSUES.md), [ROADMAP.md](ROADMAP.md), TASKS.md | what is open, what is next |
-| [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md), AGENTS.md | disclosure, contributions, repository rules |
+| [KNOWN-ISSUES.md](KNOWN-ISSUES.md), [ROADMAP.md](ROADMAP.md) | what is open, what is next |
+| [SECURITY.md](SECURITY.md), [CONTRIBUTING.md](CONTRIBUTING.md) | disclosure, contributions |
 | [docs/INDEX.md](docs/INDEX.md) | the full map of `docs/` |
 
 ## Security

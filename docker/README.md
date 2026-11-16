@@ -17,7 +17,7 @@ All three are:
 - Multi-arch — `linux/amd64` + `linux/arm64` (built via `buildx` + QEMU).
 - Multi-stage — Rust 1.88 builder + debian:12-slim runtime. Final image is ~80-110 MB.
 - Built with `cargo-chef` so dependency compilation is reused across CI runs (~80% cycle-time savings on green Cargo.lock).
-- Non-root: each image has a dedicated system user (uid 10001 pqchain, 10002 viper-notary, 10003 archival).
+- Non-root: each image has a dedicated system user (uid 10001 pqchain, 10003 archival).
 - Signed via `cosign` keyless (Sigstore Fulcio + Rekor), GitLab OIDC issuer.
 - Scanned by Trivy on every build (HIGH/CRITICAL CVEs gate the pipeline).
 - Shipped with a CycloneDX SBOM attached as an OCI artefact via `cosign attest`.
@@ -76,13 +76,6 @@ docker run --rm \
     ghcr.io/v1p3r4llbl4ck-86/pqcd:latest \
     devnet-serve /etc/pqchain/node.json
 
-# viper-notary
-docker run --rm \
-    -e NOTARY_LISTEN_ADDR=0.0.0.0:3000 \
-    -e NOTARY_NODE_URL=http://pqcd:26657 \
-    -e NOTARY_CHAIN_ID=viper-pq-1 \
-    -p 3000:3000 \
-
 # viper-archival-sidecar (mount config)
 docker run --rm \
     -v $(pwd)/sidecar.toml:/etc/viper-archival-sidecar/sidecar.toml:ro \
@@ -108,7 +101,7 @@ cosign download attestation \
 ## Why debian:12-slim and not distroless?
 
 Debian-slim ships a shell, `apt`, `getent`, etc., which makes runtime
-debugging tractable for an institutional buyer's audit team. The size
+debugging tractable for anyone auditing the image. The size
 penalty (~80 MB vs ~30 MB distroless) is acceptable; the hardening gain
 of distroless is partially defeated anyway by RocksDB's libstdc++ /
 libgcc dependency. We can revisit when the chain matures and we have a

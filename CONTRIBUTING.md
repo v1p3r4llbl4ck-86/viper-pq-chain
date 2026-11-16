@@ -2,10 +2,15 @@
 
 Thank you for looking at Viper PQ Chain closely enough to want to change it.
 
-> **This repository is a read-only mirror** of the author's development repository: pull
-> requests are not merged here. Please open an **issue** for a bug, a specification question,
-> a documentation error or a problem joining the test network; report vulnerabilities
-> privately ([SECURITY.md](SECURITY.md)). What follows is how changes are made upstream.
+> **Pull requests are welcome.** Every pull request is reviewed and merged by the maintainer;
+> nothing lands without that approval and a green CI. Each commit must carry a
+> `Signed-off-by:` line (`git commit -s`), which means you accept the
+> [Contributor Licence Agreement](CLA.md); a check on the pull request enforces it. For a
+> bug, a specification question or a problem joining the test network, an **issue** is often
+> quicker. Report vulnerabilities privately ([SECURITY.md](SECURITY.md)).
+>
+> The public repository is published from the maintainer's development tree: once your pull
+> request is merged it is imported there, so later releases keep it.
 
 ## Ground rules
 
@@ -16,14 +21,14 @@ Thank you for looking at Viper PQ Chain closely enough to want to change it.
   block encoding, the fee model, an algorithm's status or a public interface needs an entry
   in [DECISIONS.md](DECISIONS.md) (ADR) with the status vocabulary from
   [CONVENTIONS.md](CONVENTIONS.md), plus a CHANGELOG entry and an update of the affected spec.
-- **No resets, no forks of history.** Compatibility rules (Policy P-COMPAT-001, ADR-052)
-  apply to every change that lands after `viper-testnet-2` genesis: activation heights,
-  dual-path decoders, explicit migrations.
+- **Compatibility.** `viper-testnet-3` is a test network and may be reset with a new
+  genesis. Changes to consensus material still follow the compatibility rules (Policy
+  P-COMPAT-001, ADR-052) — activation heights, dual-path decoders, explicit migrations — so
+  that a later network can keep its history.
 - **Licences follow the file.** Contributions to Apache-2.0 files are accepted under
   Apache-2.0; contributions to BUSL-1.1 files under BUSL-1.1 with the parameters in
-  [LICENSE.md](LICENSE.md); contributions to `specs/` and `docs/` under CC BY 4.0. By opening
-  a pull request you state that you have the right to contribute the change under that
-  licence. Every new Rust file starts with the `// SPDX-License-Identifier:` line of its crate
+  [LICENSE.md](LICENSE.md); contributions to `specs/` and `docs/` under CC BY 4.0. Signing off
+  your commits also grants the licensor the rights in [CLA.md](CLA.md). Every new Rust file starts with the `// SPDX-License-Identifier:` line of its crate
   (`scripts/check-licenses.sh` checks it).
 - Public-facing prose is in English and free of hype.
 

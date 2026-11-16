@@ -60,7 +60,7 @@ notary_schema_id_hex: "bf8312ff974b5343b9475b4a6bb9f71c7c196e9d59df952c052b24cfd
 notary_domain: "pqchain.agwswebconsulting.it"
 
 # Public domain for the block explorer (static files + /v1/ proxy to viper_api_port).
-explorer_domain: "pqchain-status.agwswebconsulting.it"
+explorer_domain: "pqchain.agwswebconsulting.it"
 
 # Email address for Let's Encrypt registration (required by certbot).
 certbot_email: "admin@agwswebconsulting.it"

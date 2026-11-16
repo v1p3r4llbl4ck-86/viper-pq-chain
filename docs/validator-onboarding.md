@@ -20,9 +20,11 @@ curl -fsSL https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/mai
 mkdir -p ~/viper && cd ~/viper
 curl -fsSLO https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/main/genesis/viper-testnet-3/full.json
 sed -i "s/\"node_id\": \"[^\"]*\"/\"node_id\": \"full-$(hostname -s)-$RANDOM\"/" full.json
-# per-node libp2p salt (what `pqcd wallet libp2p-init` does on a host install)
-sed -i "s/\"role\": \"full\",/\"role\": \"full\", \"libp2p_seed_salt_hex\": \"$(openssl rand -hex 32)\",/" full.json
-IMG=ghcr.io/v1p3r4llbl4ck-86/pqcd:latest
+# per-node secret salts (what `pqcd wallet libp2p-init` / `kem-init` do on a host install):
+# without them the node's libp2p and ML-KEM keys would be derivable from its public node_id
+sed -i "s/\"role\": \"full\",/\"role\": \"full\", \"libp2p_seed_salt_hex\": \"$(openssl rand -hex 32)\", \"kem_seed_salt_hex\": \"$(openssl rand -hex 32)\",/" full.json
+chmod 600 full.json
+IMG=ghcr.io/v1p3r4llbl4ck-86/pqcd:v0.2.3
 docker run -d --name viper-testnet --restart unless-stopped \
   -p 26656:26656/udp -p 26656:26656/tcp -p 127.0.0.1:26657:26657 \
   -v "$PWD/full.json:/etc/pqchain/node.json:ro" -v viper-data:/var/lib/pqchain/data \

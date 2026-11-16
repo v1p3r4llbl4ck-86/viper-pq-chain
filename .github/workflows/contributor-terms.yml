@@ -1,0 +1,32 @@
+# Every commit of a pull request must be signed off (CLA.md). Runs on the
+# untrusted pull_request event with a read-only token and no secrets.
+name: contributor-terms
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+permissions:
+  contents: read
+jobs:
+  sign-off:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: every commit carries Signed-off-by from its author
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          fail=0
+          for c in $(git rev-list --no-merges "$BASE..$HEAD"); do
+            author=$(git log -1 --format='%ae' "$c")
+            if ! git log -1 --format='%B' "$c" | grep -qiF "Signed-off-by:" ; then
+              echo "::error::commit $c has no Signed-off-by line (git commit -s; see CLA.md)"; fail=1
+            elif ! git log -1 --format='%B' "$c" | grep -i "^Signed-off-by:" | grep -qiF "<$author>"; then
+              echo "::error::commit $c: Signed-off-by does not match the author e-mail <$author>"; fail=1
+            fi
+          done
+          exit $fail

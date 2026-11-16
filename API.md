@@ -503,7 +503,7 @@ Returns network metadata and public health signal. Serves as the minimal status 
 
 ```json
 {
-  "network_id": "viper-testnet-2",
+  "network_id": "viper-testnet-3",
   "chain_id_hex": "76697065722d72657365617263682d31",
   "status": "live",
   "syncing": false,

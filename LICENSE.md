@@ -11,7 +11,6 @@ have no header. `scripts/check-licenses.sh` verifies all of it.
 | **The node** — `crates/pqc-consensus`, `pqc-state`, `pqc-mempool`, `pqc-p2p`, `pqc-hsm`, `pqcd`, `viper-archival-sidecar`; `fuzz/`; `charts/`, `deploy/`, `docker/`, `scripts/` | [BUSL-1.1](LICENSES/BUSL-1.1.txt) — see parameters below | `LICENSES/BUSL-1.1.txt` |
 | **Specifications and prose** — `specs/`, `docs/`, `WHITEPAPER.md`, `ARCHITECTURE.md`, `ROADMAP.md`, `API.md`, `DECISIONS.md` and the other root documents | [CC BY 4.0](LICENSES/CC-BY-4.0.txt) | `LICENSES/CC-BY-4.0.txt` |
 | **Vendored third-party code** — `vendor/` | upstream licences, unchanged (MIT; Apache-2.0 OR MIT) | `vendor/*/LICENSE*`, [NOTICE](NOTICE) |
-| Product code that is not part of the public release (`notary/`) | proprietary, private repository only | `LICENSES/LicenseRef-Proprietary.txt` |
 
 ## Business Source License 1.1 — parameters
 

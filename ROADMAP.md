@@ -8,7 +8,7 @@ chains, what this public release is, and what the first public network
 needs. Dates appear only where they are facts; there is no token and
 nothing for sale.
 
-`TASK-nnn` and `ADR-nnn` refer to `TASKS.md` and `DECISIONS.md`.
+`ADR-nnn` refers to `DECISIONS.md`; `TASK-nnn` is an internal tracking number.
 
 ---
 
@@ -167,7 +167,7 @@ Open items with a reference; none is scheduled.
 - **Validator set growth** (ADR-065: 3 → 64 → 256 → 1024) and the
   **permissionless entry plan** (ADR-066), each gated on measured
   behaviour of the previous step.
-- **Long horizon** (`docs/long-horizon-roadmap.md`): STARK signature
+- **Long horizon**: STARK signature
   aggregation (ADR-061), PQ-VRF migration (ADR-062), a third signature
   family from the NIST on-ramp (ADR-063), operator diversity targets.
   Each carries a trigger condition rather than a date.

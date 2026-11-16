@@ -53,7 +53,16 @@ jobs:
             # refuse a binary that the documented baseline cannot run
             [ "$(printf '%s\nGLIBC_2.35\n' "$need" | sort -V | tail -1)" = "GLIBC_2.35" ] || { echo "$b requires $need > GLIBC_2.35" >&2; exit 1; }
           done
-          (cd dist && sha256sum *.tar.gz > SHA256SUMS)
+          # The live network's genesis and node template travel with the release,
+          # covered by the signed SHA256SUMS: join-testnet.sh then trusts nothing
+          # fetched from a branch.
+          for d in genesis/viper-testnet-*/; do
+            n=$(basename "$d")
+            [ -f "$d/genesis.json" ] && [ -f "$d/full.json" ] || continue
+            cp "$d/genesis.json" "dist/${n}-genesis.json"
+            cp "$d/full.json" "dist/${n}-full.json"
+          done
+          (cd dist && sha256sum *.tar.gz viper-testnet-*-genesis.json viper-testnet-*-full.json > SHA256SUMS)
       - uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
       - name: sign SHA256SUMS and the tarballs (keyless, Sigstore)
         # `scripts/join-testnet.sh` is meant to be piped from curl: it verifies

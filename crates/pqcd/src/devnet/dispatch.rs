@@ -1421,8 +1421,12 @@ pub(super) async fn handle_inbound_block(
                     );
                 }
                 Ok(ImportOutcome::OrphanedNeedsParent { parent_hash }) => {
-                    dispatch_orphan_parent_fetch(inbound.source, handle_for_fetch, parent_hash)
-                        .await;
+                    dispatch_orphan_parent_fetch(
+                        inbound.forwarded_by.or(inbound.source),
+                        handle_for_fetch,
+                        parent_hash,
+                    )
+                    .await;
                 }
                 Err(e) => tracing::warn!(
                     error = %e,
@@ -1453,7 +1457,10 @@ pub(super) async fn handle_inbound_block(
             //   * the range would exceed MAX_BLOCKS_PER_REQUEST (we
             //     issue a single first-pass request; the next inbound
             //     block triggers a follow-up once we've ingested).
-            if let (Some(peer), Some(handle)) = (inbound.source, p2p_handle) {
+            // Ask the peer that relayed the block (connected by
+            // definition), falling back to the publisher.
+            let fetch_peer = inbound.forwarded_by.or(inbound.source);
+            if let (Some(peer), Some(handle)) = (fetch_peer, p2p_handle) {
                 let from = local_tip + 1;
                 let cap = pqc_p2p::MAX_BLOCKS_PER_REQUEST;
                 let to = received.saturating_sub(1).min(from + cap - 1);
@@ -1626,7 +1633,7 @@ pub(super) async fn handle_inbound_block_fetch_response(
             }
             Err(e) => {
                 tracing::warn!(
-                    idx, height, error = %e,
+                    idx, height, error = format!("{e:#}"),
                     "libp2p: block-fetch entry ingest failed — aborting batch"
                 );
                 break;

@@ -3,7 +3,7 @@
 Concrete use cases for Viper PQ Chain as digital-trust infrastructure,
 ordered by distance from a working deployment. This is a description of
 what the chain is designed to certify; it is not a commercial offer.
-`viper-testnet-2` has no native token and nothing is sold on it.
+`viper-testnet-3` (the current test network) has no native token and nothing is sold on it.
 
 Originally written 2026-04-17; revised for the public release.
 
@@ -225,5 +225,5 @@ the hash will not match the sensor's own independent log.
 | Independent verification | any `full`, `rpc` or `archive` node serves the read API; the light-client verifier (`crates/pqc-light-client`, Apache-2.0) checks proofs without a full node |
 | Attributable issuance | attestations are signed with the issuer's registered key set (`specs/account-keyset-registry.md`) |
 
-Prioritisation, pricing and go-to-market considerations are business
-material and are kept out of the public technical documentation.
+Prioritisation and any commercial considerations are outside the scope of
+this research documentation.

@@ -43,7 +43,11 @@ use crate::node::NodeConfig;
 /// malformed payloads, and so the shared-state lock held by the consumer
 /// is not poisoned by CBOR parsing CPU work.
 pub struct InboundBlock {
+    /// Original publisher (signed gossip). Used for identity checks only.
     pub source: Option<PeerId>,
+    /// The connected peer that relayed the envelope to us — the one to
+    /// ask for missing blocks (the publisher may not be dialable).
+    pub forwarded_by: Option<PeerId>,
     pub block: StoredBlock,
 }
 
@@ -842,6 +846,7 @@ fn route_event(
         pqc_p2p::ViperSwarmEvent::Message {
             msg: m,
             source,
+            forwarded_by,
             topic,
         } => {
             // SPEC-P2P-002 §4.2 envelope↔topic binding (TASK-179).
@@ -950,6 +955,7 @@ fn route_event(
                         );
                         let inbound = InboundBlock {
                             source: *source,
+                            forwarded_by: Some(*forwarded_by),
                             block,
                         };
                         // Receiver is dropped only on shutdown, at which

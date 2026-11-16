@@ -184,7 +184,7 @@ Operator manual path: `pqcd snapshot-export <config> <output-file>` and `pqcd sn
 
 ### Known provisional behaviors (Phase 3)
 
-- **Fee distribution**: 100% of collected fees go to the block proposer. Validator pool split is deferred (ADR-019). See `specs/token-utility.md §5` for the formal Phase 3 exception.
+- **Fee distribution**: 100% of collected fees go to the block proposer. Validator pool split is deferred (ADR-019). The token-dependent fee distribution is reserved and not active on the public network.
 - **Validator lifecycle**: static config only; no on-chain staking or bonding.
 - **`pqcd validate-tx`**: debug diagnostic tool; uses stub verifier. Not a production admission check.
 

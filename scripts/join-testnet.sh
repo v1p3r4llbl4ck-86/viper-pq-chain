@@ -19,7 +19,8 @@
 # any time (a reset means a new chain id and a new genesis — re-run this script).
 #
 # Options:
-#   --dir DIR        where config, data and the binary go (default: ~/.viper-testnet)
+#   --dir DIR        where config, data and the binary go (default: ~/.viper-testnet,
+#                    or /var/lib/viper-testnet with --systemd)
 #   --network NAME   network to join (default: viper-testnet-3)
 #   --version vX.Y.Z release to download (default: latest)
 #   --systemd        install and start a systemd unit (root only)
@@ -30,7 +31,7 @@ set -euo pipefail
 
 REPO="v1p3r4llbl4ck-86/viper-pq-chain"
 NETWORK="viper-testnet-3"
-DIR="${HOME}/.viper-testnet"
+DIR=""
 VERSION="latest"
 SYSTEMD=0
 API_BIND="127.0.0.1"
@@ -44,10 +45,15 @@ while [ $# -gt 0 ]; do
     --systemd) SYSTEMD=1; shift ;;
     --api-public) API_BIND="0.0.0.0"; shift ;;
     --skip-signature) SKIP_SIG=1; shift ;;
-    -h|--help) sed -n '3,28p' "$0"; exit 0 ;;
+    -h|--help) sed -n '3,29p' "$0"; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
 done
+# A systemd service runs as the unprivileged `pqchain` user, which cannot enter
+# /root: default to /var/lib there, to the caller's home otherwise.
+if [ -z "$DIR" ]; then
+  if [ "$SYSTEMD" = 1 ]; then DIR=/var/lib/viper-testnet; else DIR="${HOME}/.viper-testnet"; fi
+fi
 
 say() { printf '\033[1;36m==>\033[0m %s\n' "$*"; }
 die() { printf '\033[1;31merror:\033[0m %s\n' "$*" >&2; exit 1; }
@@ -98,15 +104,30 @@ fi
   || die "checksum mismatch for $TARBALL — do not run it"
 tar -xzf "$TMP/$TARBALL" -C "$TMP"
 install -m 0755 "$(find "$TMP" -type f -name pqcd | head -1)" "$DIR/bin/pqcd"
-"$DIR/bin/pqcd" version | head -1
+VIPER_AUDIT_LOG_DIR="$DIR/audit" "$DIR/bin/pqcd" version | head -1
 
 say "${NETWORK}: genesis and node config"
-curl -fsSL -o "$DIR/genesis.json" "$RAW/genesis.json"
-curl -fsSL -o "$TMP/genesis.sha256" "$RAW/genesis.sha256"
-want=$(awk '{print $1}' "$TMP/genesis.sha256")
-got=$(sha256sum "$DIR/genesis.json" | awk '{print $1}')
-[ "$want" = "$got" ] || die "genesis digest mismatch (want $want, got $got)"
-echo "genesis sha256 $got"
+# Releases from v0.2.3 carry the network files inside the signed SHA256SUMS;
+# older ones fall back to the repository branch (digest file only).
+if grep -q " ${NETWORK}-genesis.json\$" "$TMP/SHA256SUMS"; then
+  curl -fsSL -o "$TMP/${NETWORK}-genesis.json" "$REL/${NETWORK}-genesis.json"
+  curl -fsSL -o "$TMP/${NETWORK}-full.json" "$REL/${NETWORK}-full.json"
+  ( cd "$TMP" && grep -E " ${NETWORK}-(genesis|full)\.json\$" SHA256SUMS | sha256sum -c --status ) \
+    || die "genesis or node template does not match the signed SHA256SUMS"
+  cp "$TMP/${NETWORK}-genesis.json" "$DIR/genesis.json"
+  FULL_TEMPLATE="$TMP/${NETWORK}-full.json"
+  echo "genesis and node template covered by the release signature"
+else
+  curl -fsSL -o "$DIR/genesis.json" "$RAW/genesis.json"
+  curl -fsSL -o "$TMP/genesis.sha256" "$RAW/genesis.sha256"
+  want=$(awk '{print $1}' "$TMP/genesis.sha256")
+  got=$(sha256sum "$DIR/genesis.json" | awk '{print $1}')
+  [ "$want" = "$got" ] || die "genesis digest mismatch (want $want, got $got)"
+  curl -fsSL -o "$TMP/full.json" "$RAW/full.json"
+  FULL_TEMPLATE="$TMP/full.json"
+  echo "WARNING: release ${VERSION} predates signed network files; genesis checked against the repository digest only"
+fi
+echo "genesis sha256 $(sha256sum "$DIR/genesis.json" | awk '{print $1}')"
 
 if [ -f "$DIR/node.json" ] && python3 - "$DIR/node.json" "$NETWORK" <<'EOF'
 import json, sys
@@ -120,7 +141,7 @@ else
     say "the data directory belongs to another chain: moving it aside"
     mv "$DIR/data" "$DIR/data.old-$(date +%Y%m%d%H%M%S)"; mkdir -p "$DIR/data"
   fi
-  curl -fsSL -o "$DIR/node.json" "$RAW/full.json"
+  cp "$FULL_TEMPLATE" "$DIR/node.json"
   NODE_ID="full-$(hostname -s | tr -cd 'a-zA-Z0-9-' | cut -c1-20)-$(head -c3 /dev/urandom | od -An -tx1 | tr -d ' \n')"
   python3 - "$DIR/node.json" "$NODE_ID" "$DIR/data" "$API_BIND" <<'EOF'
 import json, sys
@@ -131,7 +152,10 @@ c["data_dir"] = data
 c["api_listen_addr"] = f"{api}:26657"
 json.dump(c, open(p, "w"), indent=2)
 EOF
-  "$DIR/bin/pqcd" wallet libp2p-init --node-config "$DIR/node.json" >/dev/null
+  VIPER_AUDIT_LOG_DIR="$DIR/audit" "$DIR/bin/pqcd" wallet libp2p-init --node-config "$DIR/node.json" >/dev/null
+  # Both identity salts are secret and per node: without them the libp2p and
+  # ML-KEM identity keys would be derivable from the (public) node_id.
+  VIPER_AUDIT_LOG_DIR="$DIR/audit" "$DIR/bin/pqcd" wallet kem-init --node-config "$DIR/node.json" >/dev/null
   chmod 0600 "$DIR/node.json"
   echo "node_id $NODE_ID"
 fi
@@ -152,6 +176,7 @@ Wants=network-online.target
 
 [Service]
 User=pqchain
+Environment=VIPER_AUDIT_LOG_DIR=${DIR}/audit
 ExecStart=${DIR}/bin/pqcd devnet-serve ${DIR}/node.json
 Restart=on-failure
 RestartSec=5
@@ -170,7 +195,7 @@ EOF
   say "started — logs: journalctl -u viper-testnet -f"
 else
   say "ready. Start the node with:"
-  echo "    $DIR/bin/pqcd devnet-serve $DIR/node.json"
+  echo "    VIPER_AUDIT_LOG_DIR=$DIR/audit $DIR/bin/pqcd devnet-serve $DIR/node.json"
 fi
 cat <<EOF
 

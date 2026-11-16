@@ -2,7 +2,7 @@
 
 ## Repository Posture
 
-This repository pairs **specs + code**: the `specs/` corpus is the normative protocol contract, the Rust workspace under `crates/` is the implementation, and the root-level docs (`ARCHITECTURE.md`, `docs/operators/RUNBOOK.md`, etc.) are the system-level orientation. Documentation and code MUST stay in sync — `AGENTS.md` §"Mandatory Updates After Every Change" enumerates what to touch on each kind of change.
+This repository pairs **specs + code**: the `specs/` corpus is the normative protocol contract, the Rust workspace under `crates/` is the implementation, and the root-level docs (`ARCHITECTURE.md`, `docs/operators/RUNBOOK.md`, etc.) are the system-level orientation. Documentation and code MUST stay in sync — update the affected spec, ADR, CHANGELOG and orientation docs on each kind of change.
 
 ## Language And Tone
 
@@ -84,5 +84,4 @@ This is the locked stack (ADR-053), carried unchanged through the private chains
 
 - use conventional commit prefixes such as `docs:`, `feat:`, `fix:`, `refactor:`, and `chore:`
 - update [CHANGELOG.md](./CHANGELOG.md) for meaningful repository-level changes
-- update TASKS.md when a foundation item is completed or newly opened
 - do not collapse working assumptions into accepted facts without recording the change in [DECISIONS.md](./DECISIONS.md)

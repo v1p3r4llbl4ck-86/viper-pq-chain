@@ -9,3 +9,4 @@
 - [ ] `CHANGELOG.md` entry under *Unreleased*
 - [ ] new Rust files start with the SPDX header of their crate
 - [ ] no host names, addresses or credentials
+- [ ] every commit is signed off (`git commit -s`): I accept the Contributor Licence Agreement (`CLA.md`)
