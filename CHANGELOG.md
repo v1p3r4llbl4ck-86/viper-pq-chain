@@ -8,6 +8,11 @@ KNOWN-ISSUES.md.
 
 ## [Unreleased] — public release preparation (opened 2026-08-24)
 
+### 0.2.1 — dependency security updates (2026-11-16)
+
+- **Dependencies:** `quinn-proto` 0.11.19 / `quinn-udp` 0.5.16 (six advisories on the QUIC transport, among them remote panics), `rustls` 0.23.46 (among others RUSTSEC-2026-0349, an unauthenticated ServerHello could downgrade later connections to classical key exchange), `rustls-webpki`, `webpki-roots`, `libp2p-gossipsub` 0.49.5, `tokio` 1.54.1, `zstd`, `cryptoki`, `ctutils`, `aws-lc-rs`. `cargo deny check` is green; the advisories with no fix on the libp2p 0.56 line are listed with their reachability in `deny.toml` and KNOWN-ISSUES R-17.
+- **CI / release:** GitHub-hosted runners build RocksDB 8.10 with `CXXFLAGS=-include cstdint` (newer GCC). The `v0.2.0` tag has container images but no binaries and no GitHub Release (the binary job failed on exactly this); use `v0.2.1`.
+
 ### 0.2.0 — `viper-testnet-3`, QUIC on the wire (2026-11-16)
 
 - **QUIC is now actually the primary transport.** ADR-041 said "QUIC primary, TCP/TLS 1.3 fallback" and the swarm was built with both transports, but `listen_addr_for_role` only ever produced a `/tcp/` multiaddr and `quic_enabled` / `tcp_tls_fallback` were read from `node.json` and then ignored — no node ever listened on UDP. The swarm now listens on `/ip4|ip6/<addr>/udp/<port>/quic-v1` when `quic_enabled` and on `/tcp/<port>` when `tcp_tls_fallback` (both on by default, same port number), and refuses a config with both off. Both handshakes negotiate X25519MLKEM768 with `hybrid-kem-tls`. New test `two_swarms_connect_and_gossip_over_quic_only` (TCP switched off) next to the existing TCP one; end-to-end, a validator and a full node with TCP disabled sync over QUIC alone.

@@ -15,6 +15,9 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  # librocksdb-sys 0.16 (RocksDB 8.10) misses <cstdint> under the GCC of the
+  # current GitHub-hosted images.
+  CXXFLAGS: "-include cstdint"
   CARGO_INCREMENTAL: 0
 
 # Every job runs on GitHub-hosted runners, fixed: no self-hosted runner is
