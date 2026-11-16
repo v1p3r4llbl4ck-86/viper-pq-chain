@@ -5,7 +5,7 @@ author knows to be **incomplete**, **deferred**, or **accepted as risk**
 in this repository at the time of the public release. It is written for
 an external reviewer: if a limitation is not here, it is not known.
 
-Status of the network: **`viper-testnet-3` is live since 2026-11-16 — a TEST network**
+Status of the network: **`viper-testnet-4` is live since 2026-11-16 — a TEST network**
 (no token, may be reset): a single validator run by the author, one public seed
 (QUIC + TCP/TLS) and a full node serving the read API, on one cluster
 (`genesis/README.md` has the digest). §2 lists what was closed before genesis and what
@@ -85,7 +85,7 @@ Other open items that are not genesis blockers: TASK-238 (Quint model: state the
 | V-02 | `vendor/libp2p-tls-pq`, `vendor/libp2p-quic-pq` | Patches of upstream `libp2p-tls` 0.6.2 and `libp2p-quic` 0.13.0 adding a `with_crypto_provider()` seam so `rustls-post-quantum` can be injected for the X25519MLKEM768 handshake (about 80 lines in total, behaviour-preserving). Dropped the day upstream `rust-libp2p#6236` lands. Submitting the diff upstream is an open follow-up. |
 | V-03 | `attack-modes` feature | Compiles the malicious-node behaviours used by `crates/pqcd/tests/malicious_node.rs`. Off by default; release builds must never enable it. |
 | V-04 | Two API routers | `pqcd api-serve` serves a read-only snapshot router (`crates/pqcd/src/api.rs`); the node runtime `pqcd devnet-serve` serves the live router (`crates/pqcd/src/devnet.rs`). The two route sets overlap but are not identical; `API.md` lists which endpoint lives where. Unifying them is a follow-up. |
-| V-05 | SDKs | `@v1p3r4llbl4ck/sdk` (npm) and `viper-pqchain` (PyPI) 0.3.0 are published (2026-04-25) and target the retired `viper-pq-1` API; they have not been re-tested against `viper-testnet-3`. Both must be re-aligned with `viper-testnet-3` and republished. |
+| V-05 | SDKs | `@v1p3r4llbl4ck/sdk` (npm) and `viper-pqchain` (PyPI) 0.3.0 are published (2026-04-25) and target the retired `viper-pq-1` API; they have not been re-tested against `viper-testnet-4`. Both must be re-aligned with `viper-testnet-4` and republished. |
 | V-06 | Ignored tests | 8 tests are `#[ignore]` on purpose: ACVP conformance and timing profiles (`pqc-crypto`, auditor evidence, run with `--ignored`), and two long three-node runs in `crates/pqcd/tests/product_workflows.rs` (gossipsub mesh formation, 20× determinism at 5–7 minutes) meant for explicit soaks. |
 | V-07 | Local devnet file names | `configs/producer.json`, `configs/follower-a.json`, `configs/follower-b.json` keep their historical file names; their `devnet.role` fields use the current vocabulary (`validator`, `full`). |
 

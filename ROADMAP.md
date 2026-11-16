@@ -76,7 +76,7 @@ release itself:
 
 ---
 
-## Now — `viper-testnet-3` (live since 2026-11-16, TEST network)
+## Now — `viper-testnet-4` (live since 2026-11-16, TEST network)
 
 One validator run by the author, one public seed reachable over **QUIC** (primary) and
 TCP/TLS 1.3, both with X25519MLKEM768; a full node serving the read API. Anyone can join

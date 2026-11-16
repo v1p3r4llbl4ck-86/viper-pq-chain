@@ -26,10 +26,16 @@ WORKDIR /workspace
 # `--mount=type=cache` for /usr/local/cargo/registry and target/, plus the
 # CI's registry-based buildcache (.gitlab-ci.yml `images:build` job).
 COPY . .
+# Cargo feature set of the node. It is consensus-relevant: `token_economics`
+# changes the state transition, so every node of one network must be built
+# with the same set. The public release workflow passes the same value it uses
+# for the release binaries (RELEASE_FEATURES); the default keeps older private
+# builds unchanged.
+ARG PQCD_FEATURES="--features hybrid-kem-tls"
 RUN --mount=type=cache,target=/usr/local/cargo/registry,id=cargo-registry \
     --mount=type=cache,target=/usr/local/cargo/git,id=cargo-git \
     --mount=type=cache,target=/workspace/target,id=target-pqcd \
-    cargo build --release --bin pqcd --features hybrid-kem-tls \
+    cargo build --release --bin pqcd $PQCD_FEATURES \
     && cp /workspace/target/release/pqcd /workspace/pqcd \
     && strip /workspace/pqcd
 

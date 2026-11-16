@@ -14,7 +14,7 @@ serves two HTTP routers on port 26657:
   data directory. It overlaps with the runtime router but is not
   identical.
 
-On the public test network `viper-testnet-3` the read API of the author's full node is
+On the public test network `viper-testnet-4` the read API of the author's full node is
 served at `https://pqchain.agwswebconsulting.it/v1/` (GET only; rate-limited). To submit
 transactions, run your own node (`scripts/join-testnet.sh`).
 
@@ -503,7 +503,7 @@ Returns network metadata and public health signal. Serves as the minimal status 
 
 ```json
 {
-  "network_id": "viper-testnet-3",
+  "network_id": "viper-testnet-4",
   "chain_id_hex": "76697065722d72657365617263682d31",
   "status": "live",
   "syncing": false,

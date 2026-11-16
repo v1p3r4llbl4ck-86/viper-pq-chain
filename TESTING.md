@@ -247,7 +247,7 @@ aggregation is a reserved research item (ADR-061).
 | Storage and recovery | persisted restart recovery, trusted checkpoints, snapshot export/import, prune safety |
 | End-to-end trust workflows | attestations, proof anchors, key rotation, algorithm deprecation drills, archival records |
 
-## Quality gates for the public test network (`viper-testnet-3`)
+## Quality gates for the public test network (`viper-testnet-4`)
 
 - deterministic results across repeated runs and multiple nodes
 - key rotation and recovery flows exercised on the public chain

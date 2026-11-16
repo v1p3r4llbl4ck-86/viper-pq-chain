@@ -4,20 +4,20 @@ info:
   version: "0.2.0"
   description: >
     API for interacting with Viper PQ Chain — a post-quantum digital trust
-    L1. The current public network is `viper-testnet-3` (live since
+    L1. The current public network is `viper-testnet-4` (live since
     2026-11-16; a test network that may be reset, no token, nothing has
     monetary value). `chain_id_hex` is the hex of the ASCII chain id, e.g.
-    `76697065722d746573746e65742d33`. Routes marked "specified, not implemented"
+    `76697065722d746573746e65742d34`. Routes marked "specified, not implemented"
     are documented for SDK alignment but are not served by `pqcd`. Use these
     endpoints to query chain state, submit transactions, look up
     attestations / proofs / governance receipts, manage verifiable
     credentials, and anchor proofs.
     The published SDK 0.3.0 (TS + Python) targets the retired `viper-pq-1`
-    API and has not been re-tested against `viper-testnet-3`.
+    API and has not been re-tested against `viper-testnet-4`.
 
 servers:
   - url: https://pqchain.agwswebconsulting.it
-    description: Public read-only API of viper-testnet-3 (live since 2026-11-16)
+    description: Public read-only API of viper-testnet-4 (live since 2026-11-16)
   - url: http://localhost:26657
     description: Local devnet node (default API port)
 
@@ -90,7 +90,7 @@ paths:
                 $ref: "#/components/schemas/StatusResponse"
               example:
                 node_id: "validator-1"
-                chain_id: "viper-testnet-3"
+                chain_id: "viper-testnet-4"
                 height: 3462
                 tip_hash: "1c730e583768424c66b1312c70a062fadc41bf83670f94ca3f5604c236861a67"
                 state_root: "c69dce3dd8023da4a761e9cb1c5585910abbe906217e20ff070b0be62d2f80ea"
@@ -1069,7 +1069,7 @@ components:
       type: object
       description: >
         Returned by GET /v1/network. `chain_id` is the hex-encoded chain id
-        bytes (e.g. `viper-testnet-3` is `76697065722d746573746e65742d33`).
+        bytes (e.g. `viper-testnet-4` is `76697065722d746573746e65742d34`).
       properties:
         chain_id:
           type: string
@@ -1093,7 +1093,7 @@ components:
           type: string
         chain_id:
           type: string
-          description: Plain chain id string (e.g. `viper-testnet-3`)
+          description: Plain chain id string (e.g. `viper-testnet-4`)
         height:
           type: integer
           format: int64
@@ -1264,7 +1264,7 @@ components:
           enum: [candidate, active, jailed, unbonding, exited]
         self_bond:
           type: string
-          description: Reserved (token economics, not active on the public chain); always "0" on viper-testnet-3
+          description: Reserved (token economics, not active on the public chain); always "0" on viper-testnet-4
         registered_height:
           type: integer
           format: int64

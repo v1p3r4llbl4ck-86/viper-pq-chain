@@ -22,7 +22,7 @@ an integrator or an auditor needs beyond that.
 |---|---|
 | [operators/RUNBOOK.md](operators/RUNBOOK.md) | build, configure, run, join, troubleshoot a node; `pqcd` command reference |
 | [operators/GENESIS.md](operators/GENESIS.md) | how a network is born: ceremony, install, verification, publication, first external node |
-| [validator-onboarding.md](validator-onboarding.md) | joining `viper-testnet-3` as a full/rpc/archive node; how validators are admitted |
+| [validator-onboarding.md](validator-onboarding.md) | joining `viper-testnet-4` as a full/rpc/archive node; how validators are admitted |
 | [observability.md](observability.md) | metrics, logs, tracing, alert expressions |
 | [use-cases.md](use-cases.md) | what the chain is for: attestations, anchors, key-rotation records |
 | [multicodec-mapping.md](multicodec-mapping.md) | multicodec / multihash identifiers used on the wire |

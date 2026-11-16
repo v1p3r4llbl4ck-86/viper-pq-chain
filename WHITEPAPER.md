@@ -5,7 +5,7 @@ cryptographic architecture, account model, transaction format, consensus and fee
 the design as built. Two sections are framed differently from the original: §12 — the validator set
 is operator-run proof of authority with no stake; §13 — the token utility is a **reserve** design
 behind the dormant `token_economics` feature, not a live mechanism and not an offer. The public
-**test** network is `viper-testnet-3` (2026-11-16): one validator, no token, may be reset at any time;
+**test** network is `viper-testnet-4` (2026-11-16): one validator, no token, may be reset at any time;
 `viper-testnet-2` ran from 2026-08-25 to 2026-09-23.
 
 **Version**: 0.3 framing / 0.2 text
@@ -226,7 +226,7 @@ HotStuff-like linear communication complexity (`O(n)` vs. `O(n²)` for Tendermin
 
 | Topology | Validator count | Quorum (2/3+1) | ML-DSA-65 commit | SLH-DSA-SHAKE-192s commit |
 |-------|----------------|----------------|-----------------|---------------|
-| `viper-testnet-3` at genesis (2026-11-16) | 1 | 1 | ~3.3 KB | ~16 KB |
+| `viper-testnet-4` at genesis (2026-11-16) | 1 | 1 | ~3.3 KB | ~16 KB |
 | Forward: controlled growth (ADR-013) | 24 | ~17 | ~56 KB | ~276 KB |
 | Forward: stress ceiling | 50 | ~34 | ~110 KB | ~552 KB |
 
@@ -330,7 +330,7 @@ Explicitly excluded from Phase 1: native RWA tokenization (issuance, transfer re
 
 ## 12. Validator Model
 
-> **As deployed**: the validator set of `viper-testnet-3` is operator-run (proof of authority):
+> **As deployed**: the validator set of `viper-testnet-4` is operator-run (proof of authority):
 > validators are admitted by the existing set, there is no stake, no bond and no token. The
 > staking, churn and slashing mechanics below are the reserve design behind the `token_economics`
 > feature (see §13) and are compiled out.
@@ -341,7 +341,7 @@ Explicitly excluded from Phase 1: native RWA tokenization (issuance, transfer re
 - maintain full node state and storage
 - co-sign every commit under ADR-051 distributed BFT signing
 
-### 12.2 Parameters (`viper-testnet-3`)
+### 12.2 Parameters (`viper-testnet-4`)
 
 - admission: by the existing validator set (proof of authority); no stake, no bond, no rewards
 - block time: 6 s; epoch: 60 blocks; unbonding period: 120 blocks (validator exit bookkeeping only)
@@ -364,12 +364,12 @@ Cargo feature (`token_economics`) and is not part of the public documentation.
 
 ### 13.1 Genesis Block
 
-- Chain ID: `viper-testnet-3`, assigned at the genesis ceremony (`pqcd ceremony`, ADR-053 chain-id-bound derivation); the retired private chains used `viper-pq-1` and `viper-research-1`
+- Chain ID: `viper-testnet-4`, assigned at the genesis ceremony (`pqcd ceremony`, ADR-053 chain-id-bound derivation); the retired private chains used `viper-pq-1` and `viper-research-1`
 - Deployment: Kubernetes (Helm chart, one StatefulSet per role) or systemd hosts (Ansible); see `docs/operators/RUNBOOK.md`
 - Genesis hash derivation (BIP340 double-tagged, ADR-053 §T2.4): `tagged_hash("VIPER-GENESIS-V1", chain_id_bytes || state_root || timestamp_ns_be64)` where `tagged_hash(t, d) = SHAKE-256(SHAKE-256(t) || SHAKE-256(t) || d)`
 - Tier-1 genesis fields: `header_version: u16` (initial 1), `extension_root: [u8;32]` empty-extension sentinel reserving CBOR keys `exec_payload_root` + `builder_bid_commitment` (ADR-053 §T3.4), `hash_id` initial `0x01` SHAKE-256 (ADR-053 §T1.4), `auth_template_registry` seeded `{0x0001: EOA}` (ADR-053 §T3.5), 4-dim `fee_market` (ADR-053 §T2.1), `storage_fund` (ADR-053 §T2.2), `light_client` size=16 quorum=11 (ADR-053 §T3.6 / SPEC-LIGHT-CLIENT-001), `uint64` ns timestamps
 - Full specification: [specs/genesis-spec.md](specs/genesis-spec.md) (SPEC-GENESIS-001 + ADR-025 + ADR-053)
-- Genesis artefact: `genesis/viper-testnet-3/genesis.json` with its SHA-256 in `genesis/README.md`
+- Genesis artefact: `genesis/viper-testnet-4/genesis.json` with its SHA-256 in `genesis/README.md`
 - Historical: original `viper-mainnet-1` ceremony (ADR-040, 2026-04-20) and `viper-devnet-2` lineage are preserved as audit trail in CHANGELOG / DECISIONS / KNOWN-ISSUES; they are no longer the operational target
 
 ---
@@ -422,4 +422,4 @@ Phase 9+ (post-launch soak): final `block_time_ms` decision, follower prune scri
 
 ---
 
-*This document is the vision-and-overview reference for the design as built; `viper-testnet-3` (a test network, single validator) is live since 2026-11-16. Section-level normative detail lives in the `specs/` corpus referenced inline. Forward-looking items are tagged "Forward:" or marked with a referenced ADR; sections with no such tag describe the as-built protocol.*
+*This document is the vision-and-overview reference for the design as built; `viper-testnet-4` (a test network, single validator) is live since 2026-11-16. Section-level normative detail lives in the `specs/` corpus referenced inline. Forward-looking items are tagged "Forward:" or marked with a referenced ADR; sections with no such tag describe the as-built protocol.*

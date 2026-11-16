@@ -21,7 +21,7 @@
 # Options:
 #   --dir DIR        where config, data and the binary go (default: ~/.viper-testnet,
 #                    or /var/lib/viper-testnet with --systemd)
-#   --network NAME   network to join (default: viper-testnet-3)
+#   --network NAME   network to join (default: viper-testnet-4)
 #   --version vX.Y.Z release to download (default: latest)
 #   --systemd        install and start a systemd unit (root only)
 #   --api-public     bind the read API on 0.0.0.0 instead of 127.0.0.1
@@ -30,7 +30,7 @@
 set -euo pipefail
 
 REPO="v1p3r4llbl4ck-86/viper-pq-chain"
-NETWORK="viper-testnet-3"
+NETWORK="viper-testnet-4"
 DIR=""
 VERSION="latest"
 SYSTEMD=0

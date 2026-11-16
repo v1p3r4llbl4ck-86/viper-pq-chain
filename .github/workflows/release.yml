@@ -108,6 +108,9 @@ jobs:
         with:
           context: .
           file: docker/${{ matrix.image }}.Dockerfile
+          # same consensus feature set as the release binaries (see RELEASE_FEATURES)
+          build-args: |
+            PQCD_FEATURES=${{ env.RELEASE_FEATURES }}
           push: true
           tags: |
             ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ github.ref_name }}

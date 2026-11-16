@@ -1,8 +1,8 @@
-# Node and Validator Onboarding — `viper-testnet-3`
+# Node and Validator Onboarding — `viper-testnet-4`
 
 **Audience.** Operators who want to run a node of the public chain
-`viper-testnet-3`, and operators who want to be admitted as validators.
-**Status.** Live. `viper-testnet-3` is a **test network**: no token,
+`viper-testnet-4`, and operators who want to be admitted as validators.
+**Status.** Live. `viper-testnet-4` is a **test network**: no token,
 nothing of value, and it may be reset (new chain id, new genesis) at any
 time — the join script handles a reset by moving the old data aside.
 
@@ -18,7 +18,7 @@ curl -fsSL https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/mai
 
 ```bash
 mkdir -p ~/viper && cd ~/viper
-curl -fsSLO https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/main/genesis/viper-testnet-3/full.json
+curl -fsSLO https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/main/genesis/viper-testnet-4/full.json
 sed -i "s/\"node_id\": \"[^\"]*\"/\"node_id\": \"full-$(hostname -s)-$RANDOM\"/" full.json
 # per-node secret salts (what `pqcd wallet libp2p-init` / `kem-init` do on a host install):
 # without them the node's libp2p and ML-KEM keys would be derivable from its public node_id
@@ -44,7 +44,7 @@ operations), `docs/observability.md` (logs, metrics, audit log),
 
 ## 1. Who can run what
 
-`viper-testnet-3` is a proof-of-authority network with **no native
+`viper-testnet-4` is a proof-of-authority network with **no native
 token**: nothing is staked, nothing is earned, nothing is bought. The
 `token_economics` feature is compiled out of the public binary and its
 specifications are `Reserved`.
@@ -108,8 +108,8 @@ pqcd version
    `crates/pqcd/src/node/tests.rs::configs_roles_examples_match_their_role`
    keeps them consistent with the binary.
 2. **Fill the chain constants from the published genesis.** The genesis
-   publication for `viper-testnet-3` gives you `chain_id_hex`
-   (`76697065722d746573746e65742d33`, the hex of the ASCII chain id),
+   publication for `viper-testnet-4` gives you `chain_id_hex`
+   (`76697065722d746573746e65742d34`, the hex of the ASCII chain id),
    `anchor_prev_hash_hex`, `fee_params`, `devnet.block_time_ms`,
    `devnet.epoch_duration`, `devnet.unbonding_period` and the
    `devnet.validators[]` list (the genesis validator set: `node_id`,
@@ -134,8 +134,8 @@ pqcd version
 
    ```json
    "bootstrap_peers": [
-     "/dns4/boot1.pqchain.agwswebconsulting.it/udp/26656/quic-v1/p2p/12D3KooWS2a6495jsyZ91izS5zbEgXv9oE52TUst4L3QhpVN9pxb",
-     "/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWS2a6495jsyZ91izS5zbEgXv9oE52TUst4L3QhpVN9pxb"
+     "/dns4/boot1.pqchain.agwswebconsulting.it/udp/26656/quic-v1/p2p/12D3KooWAf81hHDHnTHdsENKEHY5Q8kP43o69Nt7WCzEtX7L9XMj",
+     "/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWAf81hHDHnTHdsENKEHY5Q8kP43o69Nt7WCzEtX7L9XMj"
    ]
    ```
 
@@ -172,7 +172,7 @@ this key.
 mkdir -p /etc/pqchain && chmod 0750 /etc/pqchain
 VIPER_PASSPHRASE='<strong passphrase>' \
   pqcd wallet create --alg ml-dsa-65 \
-    --chain-id 76697065722d746573746e65742d33 \
+    --chain-id 76697065722d746573746e65742d34 \
     --output /etc/pqchain/operator-keystore.json
 pqcd wallet address    /etc/pqchain/operator-keystore.json   # hex + bech32m (vpt1… on testnets)
 pqcd wallet public-key /etc/pqchain/operator-keystore.json
@@ -226,8 +226,8 @@ controlled deployments.
 You can also seed the store by hand from a snapshot you trust:
 
 ```bash
-pqcd snapshot-export /etc/pqchain/node.json /var/tmp/viper-testnet-3.snap   # on a synced node
-pqcd snapshot-import /etc/pqchain/node.json /var/tmp/viper-testnet-3.snap   # on the new node, stopped
+pqcd snapshot-export /etc/pqchain/node.json /var/tmp/viper-testnet-4.snap   # on a synced node
+pqcd snapshot-import /etc/pqchain/node.json /var/tmp/viper-testnet-4.snap   # on the new node, stopped
 ```
 
 Importing means trusting the snapshot source. Before recovery the node

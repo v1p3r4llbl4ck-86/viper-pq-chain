@@ -1,6 +1,6 @@
 # Security Policy
 
-Viper PQ Chain is a research project run by one person. `viper-testnet-3` is a
+Viper PQ Chain is a research project run by one person. `viper-testnet-4` is a
 **test network**: no token, nothing of value, and it may be reset at any time.
 No external security audit has been completed. Do not use this software to
 protect anything of value.

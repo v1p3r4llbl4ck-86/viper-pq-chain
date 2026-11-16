@@ -21,7 +21,7 @@ Thank you for looking at Viper PQ Chain closely enough to want to change it.
   block encoding, the fee model, an algorithm's status or a public interface needs an entry
   in [DECISIONS.md](DECISIONS.md) (ADR) with the status vocabulary from
   [CONVENTIONS.md](CONVENTIONS.md), plus a CHANGELOG entry and an update of the affected spec.
-- **Compatibility.** `viper-testnet-3` is a test network and may be reset with a new
+- **Compatibility.** `viper-testnet-4` is a test network and may be reset with a new
   genesis. Changes to consensus material still follow the compatibility rules (Policy
   P-COMPAT-001, ADR-052) — activation heights, dual-path decoders, explicit migrations — so
   that a later network can keep its history.

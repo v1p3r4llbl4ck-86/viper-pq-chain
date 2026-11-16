@@ -18,7 +18,7 @@ chain can retire an algorithm without retiring its accounts.
 
 ## Status — public TEST network
 
-> **`viper-testnet-3` is a test network.** No token, nothing of value, no guarantees: it can be
+> **`viper-testnet-4` is a test network.** No token, nothing of value, no guarantees: it can be
 > reset at any time (a reset is a new chain id and a new genesis). Genesis balances are units of
 > account on a test network and have no monetary value. Run a node, break it, open issues.
 
@@ -29,7 +29,7 @@ curl -fsSL https://raw.githubusercontent.com/v1p3r4llbl4ck-86/viper-pq-chain/mai
 ```
 
 It needs [`cosign`](https://docs.sigstore.dev/cosign/system_config/installation/): it downloads the latest release, verifies the Sigstore signature that this repository's release workflow put on `SHA256SUMS`, checks the tarball, the genesis and a ready `full` node config
-against it (copies of [`genesis/viper-testnet-3/`](genesis/README.md)), generates the node's
+against it (copies of [`genesis/viper-testnet-4/`](genesis/README.md)), generates the node's
 secret identity salts and prints the start command (`--systemd` installs a unit instead). Read the
 script first — it is about 200 lines. Your node then shows up in the counter on the
 [status page](https://pqchain.agwswebconsulting.it/). Other ways in (container image, build from source, other roles) are in
@@ -39,8 +39,8 @@ script first — it is about 200 lines. Your node then shows up in the counter o
 |---|---|
 | **live status page** (height, block time, nodes, latest blocks) | <https://pqchain.agwswebconsulting.it/> |
 | chain status, read API | `https://pqchain.agwswebconsulting.it/v1/status` |
-| P2P seed — **QUIC** (primary) | `/dns4/boot1.pqchain.agwswebconsulting.it/udp/26656/quic-v1/p2p/12D3KooWS2a6495jsyZ91izS5zbEgXv9oE52TUst4L3QhpVN9pxb` |
-| P2P seed — TCP/TLS 1.3 (fallback) | `/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWS2a6495jsyZ91izS5zbEgXv9oE52TUst4L3QhpVN9pxb` |
+| P2P seed — **QUIC** (primary) | `/dns4/boot1.pqchain.agwswebconsulting.it/udp/26656/quic-v1/p2p/12D3KooWAf81hHDHnTHdsENKEHY5Q8kP43o69Nt7WCzEtX7L9XMj` |
+| P2P seed — TCP/TLS 1.3 (fallback) | `/dns4/boot1.pqchain.agwswebconsulting.it/tcp/26656/p2p/12D3KooWAf81hHDHnTHdsENKEHY5Q8kP43o69Nt7WCzEtX7L9XMj` |
 
 The PeerId and the genesis digest are in [genesis/README.md](genesis/README.md). Both transports
 negotiate **X25519MLKEM768** (hybrid ML-KEM-768 + X25519, FIPS 203) on every handshake when the
@@ -50,7 +50,9 @@ The author runs the validator and the public seed. Anyone can run a `full`, `rpc
 node without asking; validators are admitted by the existing set (§7 of the onboarding guide).
 
 Earlier networks — `viper-pq-1`, `viper-research-1`, an internal lab, `viper-testnet-1` and
-`viper-testnet-2` (2026-08-25 → 2026-09-23) — are retired; what they taught is in
+`viper-testnet-2` (2026-08-25 → 2026-09-23), and `viper-testnet-3` (2026-11-16, reset the
+same day: its state could not be rebuilt from the published genesis, so no outside node could
+join — see CHANGELOG 0.2.3) — are retired; what they taught is in
 [KNOWN-ISSUES.md](KNOWN-ISSUES.md) and [ROADMAP.md](ROADMAP.md).
 
 ## What is in the repository
@@ -67,7 +69,7 @@ Earlier networks — `viper-pq-1`, `viper-research-1`, an internal lab, `viper-t
 | `specs/` | the normative protocol contract | CC BY 4.0 |
 | `charts/viper-pq-chain`, `deploy/ansible`, `docker/` | Kubernetes chart (one StatefulSet per role), systemd path, images | BUSL-1.1 |
 | `configs/` | reference `node.json` per role and the local devnet set | BUSL-1.1 |
-| `sdk/typescript`, `sdk/python` | client SDKs (0.3.0 is published on npm / PyPI, 2026-04-25, and targets the retired `viper-pq-1` API; not yet re-tested against `viper-testnet-3`) | Apache-2.0 |
+| `sdk/typescript`, `sdk/python` | client SDKs (0.3.0 is published on npm / PyPI, 2026-04-25, and targets the retired `viper-pq-1` API; not yet re-tested against `viper-testnet-4`) | Apache-2.0 |
 | `tests/acvp`, `fuzz/` | ACVP conformance vectors; cargo-fuzz targets | Apache-2.0 / BUSL-1.1 |
 | `vendor/` | patched `libp2p-tls`, `libp2p-quic` (post-quantum handshake), `slh-dsa` | upstream |
 
